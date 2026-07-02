@@ -29,6 +29,9 @@ model Category {
   sortOrder   Int      @default(0)
   // Marks this category as auto-convertible (e.g. Lazer = 250 * rate)
   autoConvert Boolean  @default(false)
+  // When true, this category's values are NOT included in the monthly balance
+  // by default — the user toggles them via a UI switch (e.g. "valores a receber").
+  excludeFromTotal Boolean @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

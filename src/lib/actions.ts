@@ -41,6 +41,7 @@ export interface SaveCategoryArgs {
   type: 'EXPENSE' | 'INCOME' | 'RESERVE'
   currency: Currency
   note?: string
+  excludeFromTotal?: boolean
   user: string
 }
 

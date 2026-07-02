@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       currency: String(body.currency || 'BRL'),
       note: body.note ? String(body.note) : null,
       sortOrder,
+      excludeFromTotal: !!body.excludeFromTotal,
     },
   })
 
@@ -58,6 +59,7 @@ export async function PATCH(req: NextRequest) {
   if (body.name !== undefined) data.name = String(body.name)
   if (body.note !== undefined) data.note = body.note ? String(body.note) : null
   if (body.sortOrder !== undefined) data.sortOrder = Number(body.sortOrder)
+  if (body.excludeFromTotal !== undefined) data.excludeFromTotal = !!body.excludeFromTotal
 
   const cat = await db.category.update({ where: { id: String(body.id) }, data })
   await db.activityLog.create({

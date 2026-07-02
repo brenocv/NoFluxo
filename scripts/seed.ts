@@ -12,8 +12,7 @@ const db = new PrismaClient()
 
 const MONTHS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
 
-// Try to parse a numeric value from a cell. Returns null if it's a formula
-// (we'll compute manually for the few formula-driven categories we care about),
+// Try to parse a numeric value from a cell. Returns null if it's a formula,
 // a string like "x", or empty.
 function numOrNull(v: any): number | null {
   if (v === null || v === undefined) return null
@@ -41,12 +40,8 @@ async function main() {
   await db.category.deleteMany()
   await db.config.deleteMany()
 
-  // --- exchange rate from A4 ---
-  // The sheet stores "Euro" rate in column A, rows 4 (Despesas sheet uses 6.4)
-  // We'll fall back to 6.4 if not found.
-  let euroRate = 6.4
-  const a4 = ws['A4']
-  if (a4 && typeof a4.v === 'number') euroRate = a4.v
+  // --- exchange rate: 6 reais per euro (per user request, not 6.4 from sheet) ---
+  const euroRate = 6
   await db.config.create({
     data: { key: 'euroToBrl', value: String(euroRate) },
   })
@@ -55,11 +50,9 @@ async function main() {
   })
   console.log(`Euro rate set to ${euroRate}`)
 
-  // ---- Category definitions (matching the spreadsheet layout) ----
-  // Each entry maps to a row in the sheet. We'll read columns D..O (months 1..12)
-  // Note: spreadsheet columns are 1-indexed: A=1,B=2,C=3,D=4 (Jan) ... O=15 (Dec)
-  // So month m -> column index 3 + m (1-indexed), or letter from chr(68 + m - 1)
-  const cellLetter = (m: number) => String.fromCharCode(67 + m) // Jan=D(68), so m=1 -> 'D'
+  // ---- Category definitions ----
+  // Each entry maps to a row in the sheet (column C is the name, D..O are Jan..Dec).
+  const cellLetter = (m: number) => String.fromCharCode(67 + m) // Jan=D(68)
 
   interface CatDef {
     name: string
@@ -67,9 +60,10 @@ async function main() {
     type: 'EXPENSE' | 'INCOME' | 'RESERVE'
     currency: 'BRL' | 'EUR'
     note?: string
-    row: number // spreadsheet row
-    autoConvert?: boolean // Lazer: value = qty * euroRate
+    row: number
+    autoConvert?: boolean
     autoConvertQty?: number
+    excludeFromTotal?: boolean
   }
 
   const categories: CatDef[] = [
@@ -87,8 +81,19 @@ async function main() {
 
     // ---- Rendimentos BRL (group "rendimentos_brl") ----
     { name: 'Cheque especial Kiki', group: 'rendimentos_brl', type: 'INCOME', currency: 'BRL', row: 21 },
-    { name: 'Caixinha Breno', group: 'rendimentos_brl', type: 'INCOME', currency: 'BRL', row: 22 },
     { name: 'Salário Breno', group: 'rendimentos_brl', type: 'INCOME', currency: 'BRL', row: 24 },
+
+    // ---- Valores a receber (group "valores_a_receber") ----
+    // Caixinha Breno fica aqui: não é incorporada ao saldo por padrão,
+    // mas pode ser incluída via toggle na UI.
+    {
+      name: 'Caixinha Breno',
+      group: 'valores_a_receber',
+      type: 'INCOME',
+      currency: 'BRL',
+      row: 22,
+      excludeFromTotal: true,
+    },
 
     // ---- Rendimentos EUR (group "rendimentos_eur") ----
     { name: 'Rendimentos Porto', group: 'rendimentos_eur', type: 'INCOME', currency: 'EUR', note: 'Salário + extras', row: 31 },
@@ -98,13 +103,19 @@ async function main() {
     { name: 'Reserva viagem', group: 'reservas', type: 'RESERVE', currency: 'BRL', row: 16 },
     { name: 'Fundo desenvolvimento pessoal', group: 'reservas', type: 'RESERVE', currency: 'BRL', row: 17 },
 
-    // ---- Contas casa (group "contas_casa") ----
+    // ---- Contas casa (group "contas_casa") - todas em EUR ----
     { name: 'Aluguel', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 34 },
     { name: 'Luz Endesa', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 35 },
     { name: 'TV, Net, Celular', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', note: 'dia 5 - débito direto', row: 36 },
     { name: 'Supermercado', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 37 },
     { name: 'Transporte Andante', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 38 },
     { name: 'Água', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 40 },
+    // Categorias que estavam faltando (rows 42-46):
+    { name: 'Plano Tetê e Limão', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 42 },
+    { name: 'Turminha rações', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 43 },
+    { name: 'Mesada Kiki', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 44 },
+    { name: 'Mesada Breno', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', row: 45 },
+    { name: 'Wizink', group: 'contas_casa', type: 'EXPENSE', currency: 'EUR', note: 'dia 11', row: 46 },
   ]
 
   // ---- Create categories and read monthly values ----
@@ -119,6 +130,7 @@ async function main() {
         note: c.note ?? null,
         sortOrder: i,
         autoConvert: !!c.autoConvert,
+        excludeFromTotal: !!c.excludeFromTotal,
       },
     })
 
@@ -126,7 +138,7 @@ async function main() {
       let value: number | null = null
 
       if (c.autoConvert && c.autoConvertQty) {
-        // Lazer row uses different quantities per month in Despesas:
+        // Lazer row uses different quantities per month:
         // Jan-Jul: 250, Aug-Dec: 200 (per the formulas in the sheet)
         const qty = m <= 7 ? c.autoConvertQty : 200
         value = qty * euroRate
@@ -136,7 +148,6 @@ async function main() {
         const cell = ws[cellRef]
         if (cell) {
           value = numOrNull(cell.v)
-          // Skip formula-driven cells (we'll compute Saldo manually)
           if (cell.f) value = null
         }
       }
@@ -152,7 +163,7 @@ async function main() {
         })
       }
     }
-    console.log(`Imported category: ${c.name}`)
+    console.log(`Imported category: ${c.name} (group=${c.group}, excludeFromTotal=${!!c.excludeFromTotal})`)
   }
 
   // Initial activity log entry

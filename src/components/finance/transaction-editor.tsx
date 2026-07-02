@@ -122,12 +122,14 @@ export function TransactionEditor({
               }}
             />
             {valid && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground tabular-nums">
                 {isIncome ? '+' : isReserve ? '' : '−'}
                 {formatMoney(parsed, category.currency)}
-                {category.currency === 'EUR' && (
-                  <span className="ml-1">≈ {formatMoney(parsed * euroRate, 'BRL')}</span>
-                )}
+                <span className="ml-1.5">
+                  ≈ {category.currency === 'BRL'
+                    ? formatMoney(parsed / euroRate, 'EUR')
+                    : formatMoney(parsed * euroRate, 'BRL')}
+                </span>
               </p>
             )}
           </div>

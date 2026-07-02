@@ -2,14 +2,16 @@
 
 import { useState } from 'react'
 import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import {
   Category,
   formatMoney,
+  formatDualCompact,
   GROUP_LABELS,
   Transaction,
 } from '@/lib/finance'
-import { Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Plus, Trash2, ChevronDown, Clock } from 'lucide-react'
 
 interface Props {
   group: string
@@ -44,13 +46,11 @@ export function GroupCard({
 
   const isIncome = group.startsWith('rendimentos')
   const isReserve = group === 'reservas'
+  const isReceivable = group === 'valores_a_receber'
 
-  // Choose sign for the group total:
-  //   INCOME: + if total >= 0, − if total < 0
-  //   EXPENSE: − if total >= 0, + if total < 0
-  //   RESERVE: no sign prefix (the number's own sign is enough)
+  // Group total is always shown in BRL with EUR equivalent
   const totalSign =
-    isReserve
+    isReserve || isReceivable
       ? ''
       : isIncome
         ? (total >= 0 ? '+' : '−')
@@ -69,7 +69,15 @@ export function GroupCard({
               !open && '-rotate-90'
             )}
           />
-          <span className="font-semibold text-sm">{GROUP_LABELS[group as keyof typeof GROUP_LABELS] || group}</span>
+          <span className="font-semibold text-sm">
+            {GROUP_LABELS[group as keyof typeof GROUP_LABELS] || group}
+          </span>
+          {isReceivable && (
+            <Badge variant="outline" className="h-5 px-1 text-[10px] gap-0.5 border-amber-300 bg-amber-50 text-amber-700">
+              <Clock className="h-2.5 w-2.5" />
+              a receber
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground">({cats.length})</span>
         </div>
         <span
@@ -77,13 +85,13 @@ export function GroupCard({
             'text-sm font-semibold tabular-nums',
             isIncome
               ? 'text-emerald-600'
-              : isReserve
+              : isReserve || isReceivable
                 ? 'text-amber-600'
                 : 'text-rose-600'
           )}
         >
           {totalSign}
-          {formatMoney(Math.abs(total), 'BRL')}
+          {formatDualCompact(Math.abs(total), 'BRL', euroRate)}
         </span>
       </button>
 
@@ -92,13 +100,10 @@ export function GroupCard({
           {cats.map((cat) => {
             const tx = transactionsByCat[cat.id]
             const value = tx?.value ?? null
-            // Build the displayed sign based on type AND actual value (so a
-            // negative income like "Cheque especial −217" shows "−R$ 217"
-            // rather than "+−R$ 217").
             const sign =
               value === null
                 ? ''
-                : cat.type === 'RESERVE'
+                : cat.type === 'RESERVE' || cat.group === 'valores_a_receber'
                   ? (value < 0 ? '−' : '')
                   : cat.type === 'INCOME'
                     ? (value >= 0 ? '+' : '−')
@@ -120,24 +125,32 @@ export function GroupCard({
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => onEdit(cat, tx)}
-                    className="px-3 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation"
+                    className="px-3 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right"
                   >
-                    <span
-                      className={cn(
-                        'text-sm font-semibold tabular-nums',
-                        value === null
-                          ? 'text-muted-foreground italic font-normal'
-                          : cat.type === 'INCOME'
-                            ? 'text-emerald-600'
-                            : cat.type === 'RESERVE'
-                              ? 'text-amber-600'
-                              : 'text-rose-600'
-                      )}
-                    >
-                      {value === null
-                        ? '—'
-                        : sign + formatMoney(Math.abs(value), cat.currency)}
-                    </span>
+                    {value === null ? (
+                      <span className="text-sm font-normal text-muted-foreground italic">—</span>
+                    ) : (
+                      <div className="flex flex-col items-end leading-tight">
+                        <span
+                          className={cn(
+                            'text-sm font-semibold tabular-nums',
+                            cat.type === 'INCOME'
+                              ? 'text-emerald-600'
+                              : cat.type === 'RESERVE' || cat.group === 'valores_a_receber'
+                                ? 'text-amber-600'
+                                : 'text-rose-600'
+                          )}
+                        >
+                          {sign}
+                          {formatMoney(Math.abs(value), cat.currency)}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          {cat.currency === 'BRL'
+                            ? formatMoney(Math.abs(value) / euroRate, 'EUR')
+                            : formatMoney(Math.abs(value) * euroRate, 'BRL')}
+                        </span>
+                      </div>
+                    )}
                   </button>
                   <button
                     onClick={() => onDeleteCategory(cat)}

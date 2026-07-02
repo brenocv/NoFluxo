@@ -48,6 +48,8 @@ export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
       setType('INCOME'); setCurrency('BRL')
     } else if (group === 'rendimentos_eur') {
       setType('INCOME'); setCurrency('EUR')
+    } else if (group === 'valores_a_receber') {
+      setType('INCOME'); setCurrency('BRL')
     } else if (group === 'reservas') {
       setType('RESERVE'); setCurrency('BRL')
     } else if (group === 'contas_casa') {
@@ -77,6 +79,9 @@ export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
         type,
         currency,
         note: note.trim() || undefined,
+        // Categorias criadas no grupo "valores_a_receber" são automaticamente
+        // marcadas como excludeFromTotal para não inflar o saldo do mês.
+        excludeFromTotal: group === 'valores_a_receber',
       })
       onOpenChange(false)
     } finally {
