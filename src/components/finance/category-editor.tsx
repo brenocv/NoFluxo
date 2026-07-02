@@ -19,11 +19,19 @@ import {
   SelectContent,
   SelectItem,
 } from '@/components/ui/select'
-import { GROUP_LABELS, CategoryGroup, CategoryType, Currency } from '@/lib/finance'
+import {
+  GROUP_STRUCTURE,
+  getTopGroupLabel,
+  getGroupLabel,
+  CategoryGroup,
+  CategoryType,
+  Currency,
+} from '@/lib/finance'
 
 interface Props {
   open: boolean
   group: CategoryGroup | null
+  labels: Record<string, string>
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
@@ -31,41 +39,47 @@ interface Props {
     type: CategoryType
     currency: Currency
     note?: string
+    excludeFromTotal?: boolean
+    monthlyGoal?: number | null
   }) => Promise<void>
 }
 
-export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
+export function CategoryEditor({ open, group, labels, onOpenChange, onCreate }: Props) {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
+  const [groupVal, setGroupVal] = useState<string>('')
   const [type, setType] = useState<CategoryType>('EXPENSE')
   const [currency, setCurrency] = useState<Currency>('BRL')
+  const [goal, setGoal] = useState('')
   const [saving, setSaving] = useState(false)
 
-  // Sensible defaults based on the group
   useEffect(() => {
     if (!group) return
-    if (group === 'rendimentos_brl') {
-      setType('INCOME'); setCurrency('BRL')
-    } else if (group === 'rendimentos_eur') {
-      setType('INCOME'); setCurrency('EUR')
-    } else if (group === 'valores_a_receber') {
-      setType('INCOME'); setCurrency('BRL')
-    } else if (group === 'reservas') {
-      setType('RESERVE'); setCurrency('BRL')
-    } else if (group === 'contas_casa') {
-      setType('EXPENSE'); setCurrency('EUR')
-    } else {
-      setType('EXPENSE'); setCurrency('BRL')
-    }
+    setGroupVal(group)
+    if (group === 'rendimentos.brl') { setType('INCOME'); setCurrency('BRL') }
+    else if (group === 'rendimentos.eur') { setType('INCOME'); setCurrency('EUR') }
+    else if (group === 'rendimentos.valores_a_receber') { setType('INCOME'); setCurrency('BRL') }
+    else if (group === 'reservas') { setType('RESERVE'); setCurrency('BRL') }
+    else if (group === 'despesas.contas_casa') { setType('EXPENSE'); setCurrency('EUR') }
+    else { setType('EXPENSE'); setCurrency('BRL') }
   }, [group])
 
-  // Reset name/note when opening
   useEffect(() => {
     if (open) {
       setName('')
       setNote('')
+      setGoal('')
     }
   }, [open])
+
+  // When group changes via the select, update type/currency defaults
+  useEffect(() => {
+    if (groupVal === 'rendimentos.brl') { setType('INCOME'); setCurrency('BRL') }
+    else if (groupVal === 'rendimentos.eur') { setType('INCOME'); setCurrency('EUR') }
+    else if (groupVal === 'rendimentos.valores_a_receber') { setType('INCOME'); setCurrency('BRL') }
+    else if (groupVal === 'reservas') { setType('RESERVE'); setCurrency('BRL') }
+    else if (groupVal === 'despesas.contas_casa') { setType('EXPENSE'); setCurrency('EUR') }
+  }, [groupVal])
 
   if (!group) return null
 
@@ -73,15 +87,15 @@ export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
     if (!name.trim()) return
     setSaving(true)
     try {
+      const parsedGoal = goal.trim() === '' ? null : parseFloat(goal.replace(',', '.'))
       await onCreate({
         name: name.trim(),
-        group,
+        group: groupVal as CategoryGroup,
         type,
         currency,
         note: note.trim() || undefined,
-        // Categorias criadas no grupo "valores_a_receber" são automaticamente
-        // marcadas como excludeFromTotal para não inflar o saldo do mês.
-        excludeFromTotal: group === 'valores_a_receber',
+        excludeFromTotal: groupVal === 'rendimentos.valores_a_receber',
+        monthlyGoal: parsedGoal,
       })
       onOpenChange(false)
     } finally {
@@ -89,16 +103,29 @@ export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
     }
   }
 
+  // Build select options from GROUP_STRUCTURE
+  const groupOptions: { value: string; label: string }[] = []
+  for (const top of GROUP_STRUCTURE) {
+    const topLabel = getTopGroupLabel(top.key, labels)
+    if (top.subgroups.length === 0) {
+      groupOptions.push({ value: top.key, label: topLabel })
+    } else {
+      for (const sub of top.subgroups) {
+        groupOptions.push({ value: sub.key, label: `${topLabel} › ${getGroupLabel(sub.key, labels)}` })
+      }
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova categoria</DialogTitle>
           <p className="text-xs text-muted-foreground">
-            em {GROUP_LABELS[group]}
+            em {getGroupLabel(group, labels)}
           </p>
           <DialogDescription className="sr-only">
-            Crie uma nova categoria em {GROUP_LABELS[group]} com nome, nota, tipo e moeda.
+            Crie uma nova categoria com nome, nota, tipo, moeda e meta opcional.
           </DialogDescription>
         </DialogHeader>
 
@@ -125,13 +152,22 @@ export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
             />
           </div>
 
+          <div className="space-y-1.5">
+            <Label>Grupo</Label>
+            <Select value={groupVal} onValueChange={setGroupVal}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {groupOptions.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
               <Label>Tipo</Label>
-              <Select
-                value={type}
-                onValueChange={(v) => setType(v as CategoryType)}
-              >
+              <Select value={type} onValueChange={(v) => setType(v as CategoryType)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="EXPENSE">Despesa</SelectItem>
@@ -142,10 +178,7 @@ export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
             </div>
             <div className="space-y-1.5">
               <Label>Moeda</Label>
-              <Select
-                value={currency}
-                onValueChange={(v) => setCurrency(v as Currency)}
-              >
+              <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BRL">Real (R$)</SelectItem>
@@ -153,6 +186,23 @@ export function CategoryEditor({ open, group, onOpenChange, onCreate }: Props) {
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cat-goal">
+              Meta mensal ({currency})
+              <span className="ml-1 text-xs text-muted-foreground">
+                {type === 'EXPENSE' ? '(gasto máx.)' : type === 'INCOME' ? '(mín. desejado)' : '(opcional)'}
+              </span>
+            </Label>
+            <Input
+              id="cat-goal"
+              type="text"
+              inputMode="decimal"
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder="Ex.: 250"
+            />
           </div>
         </div>
 

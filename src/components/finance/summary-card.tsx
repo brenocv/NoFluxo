@@ -4,8 +4,8 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { TrendingUp, TrendingDown, Wallet, ArrowRightLeft, PiggyBank } from 'lucide-react'
-import { formatBRL, formatEUR, formatDualCompact } from '@/lib/finance'
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, Clock } from 'lucide-react'
+import { formatBRL, formatEUR } from '@/lib/finance'
 
 interface Props {
   entradasBRL: number
@@ -21,30 +21,19 @@ interface Props {
 }
 
 export function SummaryCard({
-  entradasBRL,
-  saidasBRL,
-  entradasEUR,
-  saidasEUR,
-  reservasBRL,
-  receivablesBRL,
-  receivablesEUR,
-  includeReceivables,
-  onToggleReceivables,
-  euroRate,
+  entradasBRL, saidasBRL, entradasEUR, saidasEUR,
+  reservasBRL, receivablesBRL, receivablesEUR,
+  includeReceivables, onToggleReceivables, euroRate,
 }: Props) {
-  const saldoBRL = entradasBRL - saidasBRL
-  const saldoEUR = entradasEUR - saidasEUR
-
-  // Combined total in BRL
+  // Consolidate everything in BRL (and show EUR equivalent of the total)
   const totalEntradasBRL = entradasBRL + entradasEUR * euroRate
   const totalSaidasBRL = saidasBRL + saidasEUR * euroRate
   let saldoTotalBRL = totalEntradasBRL - totalSaidasBRL
-  let saldoTotalEUR = saldoTotalBRL / euroRate
 
   if (includeReceivables) {
     saldoTotalBRL += receivablesBRL + receivablesEUR * euroRate
-    saldoTotalEUR = saldoTotalBRL / euroRate
   }
+  const saldoTotalEUR = saldoTotalBRL / euroRate
 
   return (
     <Card className="p-4 space-y-3 shadow-sm">
@@ -57,7 +46,7 @@ export function SummaryCard({
         </span>
       </div>
 
-      {/* Big balance — dual currency */}
+      {/* Single consolidated balance */}
       <div className="space-y-1">
         <div className="flex items-baseline gap-2">
           <span className="text-xs text-muted-foreground">Saldo total</span>
@@ -85,39 +74,21 @@ export function SummaryCard({
         </div>
       </div>
 
-      {/* Detailed flows — each shows dual currency */}
+      {/* Two flows: entradas and saidas (each in BRL with EUR equiv) */}
       <div className="grid grid-cols-2 gap-2 pt-1">
         <Flow
           icon={<TrendingUp className="h-3.5 w-3.5" />}
           label="Entradas"
-          brl={entradasBRL}
-          eur={entradasEUR}
+          valueBRL={totalEntradasBRL}
           euroRate={euroRate}
           tone="positive"
         />
         <Flow
           icon={<TrendingDown className="h-3.5 w-3.5" />}
           label="Saídas"
-          brl={saidasBRL}
-          eur={saidasEUR}
+          valueBRL={totalSaidasBRL}
           euroRate={euroRate}
           tone="negative"
-        />
-        <Flow
-          icon={<Wallet className="h-3.5 w-3.5" />}
-          label="Saldo BRL"
-          brl={saldoBRL}
-          eur={null}
-          euroRate={euroRate}
-          tone={saldoBRL >= 0 ? 'positive' : 'negative'}
-        />
-        <Flow
-          icon={<ArrowRightLeft className="h-3.5 w-3.5" />}
-          label="Saldo EUR"
-          brl={null}
-          eur={saldoEUR}
-          euroRate={euroRate}
-          tone={saldoEUR >= 0 ? 'positive' : 'negative'}
         />
       </div>
 
@@ -128,20 +99,23 @@ export function SummaryCard({
             Reservas (mês)
           </span>
           <span className="text-xs font-semibold text-foreground tabular-nums">
-            {formatDualCompact(reservasBRL, 'BRL', euroRate)}
+            {formatBRL(reservasBRL)}
+            <span className="text-[10px] text-muted-foreground ml-1 font-normal">
+              ({formatEUR(reservasBRL / euroRate)})
+            </span>
           </span>
         </div>
       )}
 
-      {/* Toggle for valores a receber */}
       {(receivablesBRL > 0 || receivablesEUR > 0) && (
         <div className="flex items-center justify-between pt-2 border-t border-border gap-3">
           <div className="flex-1 min-w-0">
-            <Label htmlFor="include-receivables" className="text-xs font-medium cursor-pointer">
+            <Label htmlFor="include-receivables" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+              <Clock className="h-3 w-3" />
               Incluir valores a receber
             </Label>
-            <p className="text-[10px] text-muted-foreground truncate">
-              {formatDualCompact(receivablesBRL + receivablesEUR * euroRate, 'BRL', euroRate)} pendente
+            <p className="text-[10px] text-muted-foreground truncate tabular-nums">
+              {formatBRL(receivablesBRL + receivablesEUR * euroRate)} pendente
             </p>
           </div>
           <Switch
@@ -156,17 +130,11 @@ export function SummaryCard({
 }
 
 function Flow({
-  icon,
-  label,
-  brl,
-  eur,
-  euroRate,
-  tone,
+  icon, label, valueBRL, euroRate, tone,
 }: {
   icon: React.ReactNode
   label: string
-  brl: number | null
-  eur: number | null
+  valueBRL: number
   euroRate: number
   tone: 'positive' | 'negative'
 }) {
@@ -177,32 +145,17 @@ function Flow({
         <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
       </div>
       <div className="mt-1 space-y-0.5">
-        {brl !== null && (
-          <div
-            className={cn(
-              'text-sm font-semibold tabular-nums',
-              tone === 'positive' ? 'text-emerald-600' : 'text-rose-600'
-            )}
-          >
-            {formatBRL(brl)}
-            <span className="text-[10px] text-muted-foreground ml-1 font-normal">
-              ({formatEUR(brl / euroRate)})
-            </span>
-          </div>
-        )}
-        {eur !== null && (
-          <div
-            className={cn(
-              'text-sm font-semibold tabular-nums',
-              tone === 'positive' ? 'text-emerald-600' : 'text-rose-600'
-            )}
-          >
-            {formatEUR(eur)}
-            <span className="text-[10px] text-muted-foreground ml-1 font-normal">
-              ({formatBRL(eur * euroRate)})
-            </span>
-          </div>
-        )}
+        <div
+          className={cn(
+            'text-sm font-semibold tabular-nums',
+            tone === 'positive' ? 'text-emerald-600' : 'text-rose-600'
+          )}
+        >
+          {formatBRL(valueBRL)}
+        </div>
+        <div className="text-[10px] text-muted-foreground tabular-nums">
+          ≈ {formatEUR(valueBRL / euroRate)}
+        </div>
       </div>
     </div>
   )

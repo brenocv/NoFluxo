@@ -12,26 +12,33 @@ datasource db {
 // A category groups transactions (e.g. "Aluguel", "Nubank Kiki", "Salario Breno")
 // type controls sign and UI grouping.
 //   EXPENSE  -> saída (negative contribution to balance)
-//   INCOME   -> entrada (positive contribution)
+//   INCOME   -> entrada (positive)
 //   RESERVE  -> reserva (savings, neutral on monthly P&L)
+//
+// group is hierarchical:
+//   "despesas"                    -> top-level "Despesas"
+//   "despesas.cartoes"            -> subgroup "Cartões BR" inside Despesas
+//   "despesas.contas_casa"        -> subgroup "Contas casa" inside Despesas
+//   "rendimentos"                 -> top-level "Rendimentos"
+//   "rendimentos.brl"             -> subgroup "Em Real (R$)" inside Rendimentos
+//   "rendimentos.eur"             -> subgroup "Em Euro (€)" inside Rendimentos
+//   "rendimentos.valores_a_receber" -> subgroup "Valores a receber" inside Rendimentos
+//   "reservas"                    -> top-level "Reservas" (no subgroups)
 model Category {
   id          String   @id @default(cuid())
   name        String
-  // Group for UI tabs: "despesas" | "contas_casa" | "rendimentos_brl" | "rendimentos_eur" | "reservas"
   group       String
-  // "EXPENSE" | "INCOME" | "RESERVE"
-  type        String
-  // Currency: "BRL" or "EUR"
+  type        String   // "EXPENSE" | "INCOME" | "RESERVE"
   currency    String   @default("BRL")
-  // Optional description (e.g. "vence dia 11")
   note        String?
-  // Display order inside its group
   sortOrder   Int      @default(0)
-  // Marks this category as auto-convertible (e.g. Lazer = 250 * rate)
   autoConvert Boolean  @default(false)
   // When true, this category's values are NOT included in the monthly balance
-  // by default — the user toggles them via a UI switch (e.g. "valores a receber").
+  // by default (e.g. "valores a receber").
   excludeFromTotal Boolean @default(false)
+  // Optional monthly goal. For EXPENSE categories, this is a maximum spend;
+  // for INCOME, a minimum target. UI shows a warning when exceeded.
+  monthlyGoal Float?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -39,35 +46,41 @@ model Category {
 }
 
 // A transaction is a value for a given (category, month).
-// month is 1-12. year defaults to current year but is stored for multi-year support.
+// month is 1-12. year defaults to 2026.
 model Transaction {
   id          String   @id @default(cuid())
   categoryId  String
   category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   year        Int      @default(2026)
   month       Int
-  // The monetary value. For expenses, store as positive number; the UI/compute layer treats it as outflow based on category.type.
   value       Float
   note        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+
+  // Recurrence fields
+  isRecurring       Boolean  @default(false)
+  seriesId          String?  // groups transactions in the same recurring series
+  installmentNumber Int?     // 1-indexed within series (null for non-recurring or infinite)
+  installmentsTotal Int?     // total installments in series (null = infinite)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([categoryId, year, month])
 }
 
-// Key/value config store (e.g. euroToBrl rate, lastUpdatedBy)
+// Key/value config store
 model Config {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
 }
 
-// Activity log for who changed what (displayed in real-time feed)
+// Activity log for who changed what
 model ActivityLog {
   id        String   @id @default(cuid())
   user      String
   action    String   // "create" | "update" | "delete"
-  entity    String   // "transaction" | "category" | "config"
+  entity    String   // "transaction" | "category" | "config" | "label"
   detail    String
   createdAt DateTime @default(now())
 }

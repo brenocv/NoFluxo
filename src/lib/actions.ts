@@ -1,9 +1,6 @@
 'use client'
 
-// Thin wrapper around the API calls. Each function:
-//   1. POSTs to the relevant /api route
-//   2. Returns the server result so the caller can both update local state
-//      and broadcast a change message via socket.io
+// Thin wrapper around the API calls.
 import { Category, Currency } from '@/lib/finance'
 
 export interface SaveTransactionArgs {
@@ -13,12 +10,15 @@ export interface SaveTransactionArgs {
   value: number | null
   note?: string | null
   user: string
+  isRecurring?: boolean
+  installmentsTotal?: number | null
 }
 
 export interface SaveTransactionResult {
   ok: boolean
   action: 'create' | 'update' | 'delete' | 'noop'
-  transaction: any
+  transactions: any[]  // for recurring, multiple; for single, [transaction]
+  transaction: any     // the primary transaction (first or only)
   category: Category
 }
 
@@ -32,6 +32,29 @@ export async function saveTransaction(args: SaveTransactionArgs): Promise<SaveTr
     const err = await r.json().catch(() => ({}))
     throw new Error(err.error || 'Falha ao salvar')
   }
+  const data = await r.json()
+  // Normalise: if transactions array exists, use first as primary
+  if (data.transactions && data.transactions.length > 0) {
+    return { ...data, transaction: data.transactions[0] }
+  }
+  return data
+}
+
+export async function stopRecurringSeries(
+  seriesId: string,
+  currentMonth: number,
+  currentYear: number,
+  user: string
+): Promise<{ ok: boolean; deletedCount: number; category: Category | null }> {
+  const r = await fetch('/api/transactions/series-stop', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ seriesId, currentMonth, currentYear, user }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || 'Falha ao parar recorrência')
+  }
   return r.json()
 }
 
@@ -42,6 +65,7 @@ export interface SaveCategoryArgs {
   currency: Currency
   note?: string
   excludeFromTotal?: boolean
+  monthlyGoal?: number | null
   user: string
 }
 
@@ -54,6 +78,28 @@ export async function createCategory(args: SaveCategoryArgs): Promise<{ ok: bool
   if (!r.ok) {
     const err = await r.json().catch(() => ({}))
     throw new Error(err.error || 'Falha ao criar categoria')
+  }
+  return r.json()
+}
+
+export async function updateCategory(
+  id: string,
+  fields: {
+    name?: string
+    note?: string | null
+    monthlyGoal?: number | null
+    excludeFromTotal?: boolean
+  },
+  user: string
+): Promise<{ ok: boolean; category: Category }> {
+  const r = await fetch('/api/categories', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, ...fields, user }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || 'Falha ao atualizar categoria')
   }
   return r.json()
 }
@@ -80,6 +126,19 @@ export async function updateConfig(key: string, value: string, user: string): Pr
   if (!r.ok) {
     const err = await r.json().catch(() => ({}))
     throw new Error(err.error || 'Falha ao atualizar config')
+  }
+  return r.json()
+}
+
+export async function updateLabel(key: string, value: string, user: string): Promise<{ ok: boolean; labels: Record<string, string> }> {
+  const r = await fetch('/api/labels', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, value, user }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || 'Falha ao atualizar rótulo')
   }
   return r.json()
 }

@@ -96,3 +96,64 @@ Stage Summary:
 - Busca funcional por nome/nota das categorias
 - Toggle "Mostrar só preenchidos" para focar no que tem valor
 - Validação Agent Browser: busca ✓, toggle ✓, gráfico ✓, sync em tempo real ✓
+
+---
+Task ID: v3
+Agent: super-z (main)
+Task: Adicionar metas mensais, export Excel, gráfico de pizza, simplificar saldo, transações recorrentes com parcelas, reestruturar grupos (subgrupos), renomeação de tudo.
+
+Work Log:
+- Schema: adicionado monthlyGoal em Category; adicionado isRecurring/seriesId/installmentNumber/installmentsTotal em Transaction
+- Grupos reestruturados para hierarquia com pontos:
+  - despesas.cartoes (Cartões BR), despesas.contas_casa (Contas casa)
+  - rendimentos.brl (Em Real), rendimentos.eur (Em Euro), rendimentos.valores_a_receber (Valores a receber)
+  - reservas (sem subgrupos)
+- Novos helpers: getTopGroup, getSubgroup, getTopGroupLabel, getGroupLabel, GROUP_STRUCTURE, TOP_GROUP_ORDER
+- Labels system: Config key='labels' armazena JSON com renomeações de grupos/subgrupos
+  - API /api/labels (GET/PATCH), key="group:despesas" ou "subgroup:despesas.contas_casa"
+  - Hook useFinanceData trata type='label' em ChangeMessage
+- APIs novas:
+  - POST /api/transactions com isRecurring + installmentsTotal: cria múltiplas transações
+  - POST /api/transactions/series-stop: para recorrência, remove parcelas futuras
+  - GET /api/export: gera .xlsx com XLSX, retorna download
+  - PATCH /api/categories: aceita monthlyGoal
+  - GET/PATCH /api/labels
+- SummaryCard simplificado: removidos "Saldo BRL" e "Saldo EUR" separados — apenas "Saldo total" consolidado em R$ com € equivalente
+- TopGroupCard (novo): renderiza grupo top-level com subgrupos aninhados
+  - Cada subgrupo tem header próprio com total e collapse independente
+  - RenameButton (Popover) em cada grupo e subgrupo
+  - CategoryRow mostra badge "recorrente 1/3" e "meta" quando aplicável
+  - Botão "Parar recorrência" visível em hover para transações recorrentes
+- TransactionEditor expandido:
+  - Toggle "Recorrente" + campo "Nº de parcelas" (vazio = até dezembro)
+  - Quando editando recorrente: toggle disabled, mostra botão "Parar recorrência"
+  - Seção expansível "Editar categoria e meta": renomeia categoria, nota, meta mensal
+  - Alerta visual quando valor ultrapassa meta
+- CategoryEditor: seletor de grupo hierárquico, campo de meta mensal
+- ExpensePieChart (novo): PieChart com distribuição de gastos por categoria, legend top-8
+- MonthlyChart: lado a lado com PieChart em desktop, empilhados em mobile
+- Botão de export Excel no header (ícone Download)
+- Validação Agent Browser:
+  - Estrutura de grupos: Despesas(21) > Cartões BR(10) + Contas casa(11) ✓
+  - Rendimentos(4) > Em Real(2) + Em Euro(1) + Valores a receber(1) ✓
+  - Recorrência Salário: 7000 criado em Julho, propagou para Ago-Dez ✓
+  - Recorrência Empréstimo 3x: 1/3 Jul, 2/3 Ago, 3/3 Set, vazio Out (auto-disable) ✓
+  - Parar recorrência: aceitar dialog → remove Setembro, mantém Agosto ✓
+  - Meta mensal: Supermercado meta=200, valor=240 → badge "meta" ✓
+  - Renomeação: grupo Despesas → "Despesas totais" via API ✓
+  - Export Excel: .xlsx gerado (33KB) ✓
+  - Sync em tempo real: Luz Endesa 55 editado em uma sessão, apareceu na outra ✓
+
+Stage Summary:
+- 3 grupos top-level (Despesas, Rendimentos, Reservas) com subgrupos aninhados
+- "Valores a receber" agora é subgrupo dentro de Rendimentos
+- "Contas casa" agora é subgrupo dentro de Despesas
+- SummaryCard mostra apenas "Saldo total" (R$ + € equivalente)
+- Transações recorrentes com ou sem parcelas, auto-desligam no fim
+- Botão "Parar recorrência" remove parcelas futuras
+- Metas mensais com badge de alerta quando excedidas
+- Gráfico de pizza de distribuição de gastos
+- Gráfico de barras mantido lado a lado
+- Export Excel funcional
+- Renomeação de grupos, subgrupos e categorias
+- Sync em tempo real mantido

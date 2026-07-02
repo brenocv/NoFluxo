@@ -1,8 +1,5 @@
 'use client'
 
-// React hook that loads the initial app state from /api/data, keeps it in
-// local React state, and applies live updates from the socket.io service
-// so two devices (e.g. Breno and Kiki) always see the same numbers.
 import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityEntry,
@@ -17,6 +14,7 @@ interface State {
   categories: Category[]
   transactions: Transaction[]
   config: Record<string, string>
+  labels: Record<string, string>
   activity: ActivityEntry[]
   loading: boolean
   error: string | null
@@ -33,6 +31,7 @@ export function useFinanceData(currentUser: string) {
     categories: [],
     transactions: [],
     config: {},
+    labels: {},
     activity: [],
     loading: true,
     error: null,
@@ -56,6 +55,7 @@ export function useFinanceData(currentUser: string) {
           categories: data.categories,
           transactions: data.transactions,
           config: data.config,
+          labels: data.labels ?? {},
           activity: data.activity,
           loading: false,
           error: null,
@@ -65,9 +65,7 @@ export function useFinanceData(currentUser: string) {
         setState((s) => ({ ...s, loading: false, error: e.message || 'Erro' }))
       }
     })()
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [])
 
   // Socket.io connection
@@ -94,24 +92,51 @@ export function useFinanceData(currentUser: string) {
     }
 
     const onChange = (msg: ChangeMessage) => {
-      // Apply the change to local state
       setState((s) => {
         switch (msg.type) {
           case 'transaction': {
             const t = msg.payload.transaction
-            const category = msg.payload.category
             if (msg.action === 'delete') {
+              // payload may be { id } or { ids: [...] } or { seriesId, afterMonth }
+              if (msg.payload.ids) {
+                const idSet = new Set(msg.payload.ids)
+                return { ...s, transactions: s.transactions.filter((x) => !idSet.has(x.id)) }
+              }
+              if (msg.payload.id) {
+                return { ...s, transactions: s.transactions.filter((x) => x.id !== msg.payload.id) }
+              }
+              // For series-stop: delete by seriesId + month > X
+              if (msg.payload.seriesId && msg.payload.afterMonth) {
+                return {
+                  ...s,
+                  transactions: s.transactions.filter((x) =>
+                    !(x.seriesId === msg.payload.seriesId && x.month > msg.payload.afterMonth)
+                  ),
+                }
+              }
+              return s
+            }
+            // create or update — payload.transactions is an array
+            if (msg.payload.transactions) {
+              const txs = msg.payload.transactions as Transaction[]
+              const ids = new Set(txs.map((t) => t.id))
               return {
                 ...s,
-                transactions: s.transactions.filter((x) => x.id !== msg.payload.id),
+                transactions: [
+                  ...s.transactions.filter((x) => !ids.has(x.id)),
+                  ...txs,
+                ],
               }
             }
-            // create or update
-            const exists = s.transactions.some((x) => x.id === t.id)
-            const txs = exists
-              ? s.transactions.map((x) => (x.id === t.id ? t : x))
-              : [...s.transactions, t]
-            return { ...s, transactions: txs }
+            // single transaction
+            if (t) {
+              const exists = s.transactions.some((x) => x.id === t.id)
+              const txs = exists
+                ? s.transactions.map((x) => (x.id === t.id ? t : x))
+                : [...s.transactions, t]
+              return { ...s, transactions: txs }
+            }
+            return s
           }
           case 'category': {
             if (msg.action === 'delete') {
@@ -130,10 +155,16 @@ export function useFinanceData(currentUser: string) {
             return { ...s, categories: cats }
           }
           case 'config': {
-            return {
-              ...s,
-              config: { ...s.config, [msg.payload.key]: msg.payload.value },
+            return { ...s, config: { ...s.config, [msg.payload.key]: msg.payload.value } }
+          }
+          case 'label': {
+            const labels = { ...s.labels }
+            if (msg.payload.value === '') {
+              delete labels[msg.payload.key]
+            } else {
+              labels[msg.payload.key] = msg.payload.value
             }
+            return { ...s, labels }
           }
           case 'activity': {
             return { ...s, activity: [msg.payload, ...s.activity].slice(0, 30) }
@@ -164,21 +195,15 @@ export function useFinanceData(currentUser: string) {
 
     if (socket.connected) onConnect()
 
-    // Local patch listener: when the local user performs a save, the page
-    // dispatches a 'finance:patch' CustomEvent with the same shape as a
-    // socket 'change' message, so we apply the update locally without waiting
-    // for a round-trip through the server.
     const onLocalPatch = (e: Event) => {
       const detail = (e as CustomEvent).detail as ChangeMessage
-      // Reuse the same handler as socket 'change' events
       onChange(detail)
-      // Also surface the detail in the "last change" banner
       if (detail.detail) {
         setLive((l) => ({
           ...l,
           lastChange: {
             by: detail.by?.name ?? 'Anônimo',
-            detail: detail.detail!,
+            detail: detail.detail,
             at: detail.at,
           },
         }))
@@ -197,8 +222,6 @@ export function useFinanceData(currentUser: string) {
     }
   }, [currentUser])
 
-  // Broadcast a change to other clients (called after we successfully persist
-  // to the server).
   const broadcast = useCallback((msg: Omit<ChangeMessage, 'by' | 'at'>) => {
     const socket = getSocket()
     if (socket.connected) socket.emit('change', msg)

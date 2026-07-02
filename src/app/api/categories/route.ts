@@ -2,14 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // POST /api/categories
-//   body: { name, group, type, currency, note?, sortOrder?, user }
-//   Creates a new category.
+//   body: { name, group, type, currency, note?, sortOrder?, excludeFromTotal?, monthlyGoal?, user }
 // PATCH /api/categories
-//   body: { id, name?, note?, sortOrder?, user }
-//   Updates fields on an existing category.
+//   body: { id, name?, note?, sortOrder?, excludeFromTotal?, monthlyGoal?, user }
 // DELETE /api/categories
 //   body: { id, user }
-//   Deletes the category and all its transactions (cascade).
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
@@ -33,15 +30,14 @@ export async function POST(req: NextRequest) {
       note: body.note ? String(body.note) : null,
       sortOrder,
       excludeFromTotal: !!body.excludeFromTotal,
+      monthlyGoal: body.monthlyGoal ? Number(body.monthlyGoal) : null,
     },
   })
 
   await db.activityLog.create({
     data: {
-      user,
-      action: 'create',
-      entity: 'category',
-      detail: `Criou categoria "${cat.name}" em ${labelForGroup(cat.group)}`,
+      user, action: 'create', entity: 'category',
+      detail: `Criou categoria "${cat.name}"`,
     },
   })
 
@@ -60,13 +56,16 @@ export async function PATCH(req: NextRequest) {
   if (body.note !== undefined) data.note = body.note ? String(body.note) : null
   if (body.sortOrder !== undefined) data.sortOrder = Number(body.sortOrder)
   if (body.excludeFromTotal !== undefined) data.excludeFromTotal = !!body.excludeFromTotal
+  if (body.monthlyGoal !== undefined) {
+    data.monthlyGoal = body.monthlyGoal === null || body.monthlyGoal === ''
+      ? null
+      : Number(body.monthlyGoal)
+  }
 
   const cat = await db.category.update({ where: { id: String(body.id) }, data })
   await db.activityLog.create({
     data: {
-      user,
-      action: 'update',
-      entity: 'category',
+      user, action: 'update', entity: 'category',
       detail: `Editou categoria "${cat.name}"`,
     },
   })
@@ -86,22 +85,9 @@ export async function DELETE(req: NextRequest) {
   await db.category.delete({ where: { id: cat.id } })
   await db.activityLog.create({
     data: {
-      user,
-      action: 'delete',
-      entity: 'category',
+      user, action: 'delete', entity: 'category',
       detail: `Removeu categoria "${cat.name}"`,
     },
   })
   return NextResponse.json({ ok: true })
-}
-
-function labelForGroup(g: string) {
-  switch (g) {
-    case 'despesas': return 'Despesas'
-    case 'contas_casa': return 'Contas casa'
-    case 'rendimentos_brl': return 'Rendimentos BRL'
-    case 'rendimentos_eur': return 'Rendimentos EUR'
-    case 'reservas': return 'Reservas'
-    default: return g
-  }
 }
