@@ -188,3 +188,30 @@ Stage Summary:
 - Botão de renomear (lápis) agora sempre visível em grupos e subgrupos
 - Click em Entradas/Saídas no resumo faz scroll suave para o grupo correspondente
 - Sync em tempo real mantido entre dispositivos
+
+---
+Task ID: v5
+Agent: super-z (main)
+Task: Recorrência deve atravessar anos — finita (ex: 48x) continua em anos seguintes; infinita (sem parcelas) também.
+
+Work Log:
+- /api/transactions: substituída lógica que limitava ao dezembro do ano corrente
+  - Finita (ex: 48x): cria exatamente N transações, calculando (year, month) com math cross-year
+    - absoluteMonth = (month - 1) + i; targetMonth = (absoluteMonth % 12) + 1; targetYear = year + floor(absoluteMonth / 12)
+  - Infinita (null): cria 120 meses (10 anos) como horizonte padrão
+  - Activity log mostra range real: "Jul/2026 a Jun/2030 (48x)" ou "Jul/2026 a Jun/2036 (infinito)"
+- /api/transactions/series-stop: deleta parcelas futuras considerando ano
+  - OR clause: year > currentYear OR (year == currentYear AND month > currentMonth)
+- TransactionEditor: 
+  - Texto do label: "Nº de parcelas (deixe vazio para recorrência infinita)"
+  - Placeholder: "Ex.: 48 (empréstimo 48x), 8, 12…"
+  - Preview dinâmico mostra data final real:
+    - Finita: "Criará 48 lançamentos de Julho/2026 até Junho/2030."
+    - Infinita: "Recorrência infinita • criará lançamentos de Julho/2026 até Junho/2036 (10 anos)."
+  - Badge de recorrência existente: "(infinito)" em vez de "(sem fim definido)"
+
+Stage Summary:
+- Recorrência finita 48x: testada de Jul/2026 (1/48) → Jan/2027 (7/48) → Dez/2027 (18/48) → Jun/2030 (48/48) → Jul/2030 (vazio, série terminou) ✓
+- Recorrência infinita: testada em Jul/2026, Jul/2030, Jul/2035 — todas mostram "recorrente" ✓
+- Parar recorrência cross-year: parada em 2030 removeu 71 parcelas futuras (2030-2036); 2026-2029 mantidos; 2031+ vazio ✓
+- Lint limpo

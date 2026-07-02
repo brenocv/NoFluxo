@@ -221,7 +221,7 @@ export function TransactionEditor({
               <>
                 <div className="space-y-1.5">
                   <Label htmlFor="tx-installments" className="text-xs text-muted-foreground">
-                    Nº de parcelas (deixe vazio para repetir até dezembro)
+                    Nº de parcelas (deixe vazio para recorrência infinita)
                   </Label>
                   <Input
                     id="tx-installments"
@@ -230,15 +230,26 @@ export function TransactionEditor({
                     inputMode="numeric"
                     value={installmentsTotal}
                     onChange={(e) => setInstallmentsTotal(e.target.value)}
-                    placeholder="Ex.: 8 (para empréstimo em 8x)"
+                    placeholder="Ex.: 48 (empréstimo 48x), 8, 12…"
                     disabled={editingRecurring}
                   />
                 </div>
                 {!editingRecurring && (
                   <p className="text-[10px] text-muted-foreground">
-                    {installmentsTotal
-                      ? `Criará ${installmentsTotal} lançamentos de ${monthLabel} até ${MONTHS_PT_LONG[Math.min(11, month - 1 + parseInt(installmentsTotal, 10) - 1)]}.`
-                      : `Criará lançamentos de ${monthLabel} até Dezembro.`}
+                    {(() => {
+                      const n = installmentsTotal ? parseInt(installmentsTotal, 10) : 0
+                      if (isNaN(n) || n <= 0) {
+                        // Infinite — 120 months = 10 years
+                        const endAbs = (month - 1) + 120 - 1
+                        const endMonthIdx = (endAbs % 12)
+                        const endYear = year + Math.floor(endAbs / 12)
+                        return `Recorrência infinita • criará lançamentos de ${monthLabel}/${year} até ${MONTHS_PT_LONG[endMonthIdx]}/${endYear} (10 anos). Continue criando nova série se precisar de mais.`
+                      }
+                      const endAbs = (month - 1) + n - 1
+                      const endMonthIdx = (endAbs % 12)
+                      const endYear = year + Math.floor(endAbs / 12)
+                      return `Criará ${n} lançamento${n > 1 ? 's' : ''} de ${monthLabel}/${year} até ${MONTHS_PT_LONG[endMonthIdx]}/${endYear}.`
+                    })()}
                   </p>
                 )}
                 {editingRecurring && (
@@ -247,7 +258,7 @@ export function TransactionEditor({
                     Este é um lançamento recorrente
                     {transaction?.installmentsTotal
                       ? ` (parcela ${transaction.installmentNumber}/${transaction.installmentsTotal})`
-                      : ' (sem fim definido)'}
+                      : ' (infinito)'}
                     . Edite o valor apenas desta parcela.
                   </p>
                 )}

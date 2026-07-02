@@ -60,24 +60,36 @@ export async function POST(req: NextRequest) {
     const seriesId = `series-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
     const created: any[] = []
 
-    // Determine the range of months
-    let endMonth: number
+    // Determine how many installments to create.
+    //   - Finite (e.g. 48x): create exactly N transactions, spanning across
+    //     years as needed. A 48-installment loan starting in Oct/2026 ends
+    //     in Sep/2030.
+    //   - Infinite (null): create a long horizon so the recurrence keeps
+    //     showing up in future years without the user having to re-trigger
+    //     anything. 120 months = 10 years is a reasonable default; if the
+    //     user needs more they can create a new series later.
+    let count: number
+    let actualTotal: number | null
     if (installmentsTotal !== null) {
-      endMonth = Math.min(12, month + installmentsTotal - 1)
+      count = installmentsTotal
+      actualTotal = installmentsTotal
     } else {
-      endMonth = 12
+      count = 120
+      actualTotal = null
     }
-    const totalToCreate = endMonth - month + 1
-    const actualTotal = installmentsTotal !== null ? Math.min(installmentsTotal, totalToCreate) : null
 
-    for (let m = month; m <= endMonth; m++) {
-      const installmentNumber = m - month + 1
-      // Check if a transaction already exists for this month
+    for (let i = 0; i < count; i++) {
+      // Compute target (year, month) from the 0-indexed offset.
+      // month is 1-indexed, so: offset 0 = (year, month), offset 1 = next month, etc.
+      const absoluteMonth = (month - 1) + i // 0-indexed absolute month from Jan of `year`
+      const targetMonth = (absoluteMonth % 12) + 1
+      const targetYear = year + Math.floor(absoluteMonth / 12)
+      const installmentNumber = i + 1
+
       const existing = await db.transaction.findUnique({
-        where: { categoryId_year_month: { categoryId, year, month: m } },
+        where: { categoryId_year_month: { categoryId, year: targetYear, month: targetMonth } },
       })
       if (existing) {
-        // Update the existing one to join the series
         const updated = await db.transaction.update({
           where: { id: existing.id },
           data: { value, note, isRecurring: true, seriesId, installmentNumber, installmentsTotal: actualTotal },
@@ -86,7 +98,7 @@ export async function POST(req: NextRequest) {
       } else {
         const tx = await db.transaction.create({
           data: {
-            categoryId, year, month: m, value, note,
+            categoryId, year: targetYear, month: targetMonth, value, note,
             isRecurring: true, seriesId, installmentNumber,
             installmentsTotal: actualTotal,
           },
@@ -95,10 +107,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Build the activity log detail with the real end date (may be in a future year)
+    const lastTx = created[created.length - 1]
+    const endMonthLabel = MONTHS_PT[lastTx.month - 1]
+    const endYearLabel = lastTx.year
+    const rangeStr = count > 1
+      ? `${monthName}/${year} a ${endMonthLabel}/${endYearLabel}`
+      : `${monthName}/${year}`
+
     await db.activityLog.create({
       data: {
         user, action: 'create', entity: 'transaction',
-        detail: `Criou lançamento recorrente "${category.name}" • ${monthName}-${MONTHS_PT[endMonth - 1]}/${year} • ${formatMoney(value, category.currency)}${actualTotal ? ` (${actualTotal}x)` : ''}`,
+        detail: `Criou lançamento recorrente "${category.name}" • ${rangeStr} • ${formatMoney(value, category.currency)}${actualTotal ? ` (${actualTotal}x)` : ' (infinito)'}`,
       },
     })
 

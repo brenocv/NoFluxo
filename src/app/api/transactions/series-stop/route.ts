@@ -4,9 +4,10 @@ import { db } from '@/lib/db'
 // POST /api/transactions/series-stop
 //   body: { seriesId, currentMonth, currentYear, user }
 //
-// Stops a recurring series: deletes all transactions in the series with
-// month > currentMonth (and same year). The current month's transaction
-// remains but is detached from the series (isRecurring=false).
+// Stops a recurring series: deletes all transactions in the series that come
+// AFTER (currentYear, currentMonth) — including those in future years.
+// The current month's transaction remains but is detached from the series
+// (isRecurring=false, seriesId=null).
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   if (!body || !body.seriesId || !body.currentMonth) {
@@ -18,12 +19,17 @@ export async function POST(req: NextRequest) {
   const currentYear = Number(body.currentYear ?? 2026)
   const user = String(body.user || 'Anônimo').slice(0, 30)
 
-  // Delete future installments
+  // Delete future installments — across years.
+  // A transaction is "future" if:
+  //   year > currentYear, OR
+  //   year == currentYear AND month > currentMonth
   const deleted = await db.transaction.deleteMany({
     where: {
       seriesId,
-      year: currentYear,
-      month: { gt: currentMonth },
+      OR: [
+        { year: { gt: currentYear } },
+        { year: currentYear, month: { gt: currentMonth } },
+      ],
     },
   })
 
