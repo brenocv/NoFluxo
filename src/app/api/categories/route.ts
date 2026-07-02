@@ -1,0 +1,105 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { db } from '@/lib/db'
+
+// POST /api/categories
+//   body: { name, group, type, currency, note?, sortOrder?, user }
+//   Creates a new category.
+// PATCH /api/categories
+//   body: { id, name?, note?, sortOrder?, user }
+//   Updates fields on an existing category.
+// DELETE /api/categories
+//   body: { id, user }
+//   Deletes the category and all its transactions (cascade).
+
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => null)
+  if (!body || !body.name || !body.group || !body.type) {
+    return NextResponse.json({ error: 'name, group, type are required' }, { status: 400 })
+  }
+  const user = String(body.user || 'Anônimo').slice(0, 30)
+
+  const maxOrder = await db.category.aggregate({
+    where: { group: body.group },
+    _max: { sortOrder: true },
+  })
+  const sortOrder = body.sortOrder ?? (maxOrder._max.sortOrder ?? -1) + 1
+
+  const cat = await db.category.create({
+    data: {
+      name: String(body.name),
+      group: String(body.group),
+      type: String(body.type),
+      currency: String(body.currency || 'BRL'),
+      note: body.note ? String(body.note) : null,
+      sortOrder,
+    },
+  })
+
+  await db.activityLog.create({
+    data: {
+      user,
+      action: 'create',
+      entity: 'category',
+      detail: `Criou categoria "${cat.name}" em ${labelForGroup(cat.group)}`,
+    },
+  })
+
+  return NextResponse.json({ ok: true, category: cat })
+}
+
+export async function PATCH(req: NextRequest) {
+  const body = await req.json().catch(() => null)
+  if (!body || !body.id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 })
+  }
+  const user = String(body.user || 'Anônimo').slice(0, 30)
+
+  const data: any = {}
+  if (body.name !== undefined) data.name = String(body.name)
+  if (body.note !== undefined) data.note = body.note ? String(body.note) : null
+  if (body.sortOrder !== undefined) data.sortOrder = Number(body.sortOrder)
+
+  const cat = await db.category.update({ where: { id: String(body.id) }, data })
+  await db.activityLog.create({
+    data: {
+      user,
+      action: 'update',
+      entity: 'category',
+      detail: `Editou categoria "${cat.name}"`,
+    },
+  })
+  return NextResponse.json({ ok: true, category: cat })
+}
+
+export async function DELETE(req: NextRequest) {
+  const body = await req.json().catch(() => null)
+  if (!body || !body.id) {
+    return NextResponse.json({ error: 'id is required' }, { status: 400 })
+  }
+  const user = String(body.user || 'Anônimo').slice(0, 30)
+
+  const cat = await db.category.findUnique({ where: { id: String(body.id) } })
+  if (!cat) return NextResponse.json({ error: 'not found' }, { status: 404 })
+
+  await db.category.delete({ where: { id: cat.id } })
+  await db.activityLog.create({
+    data: {
+      user,
+      action: 'delete',
+      entity: 'category',
+      detail: `Removeu categoria "${cat.name}"`,
+    },
+  })
+  return NextResponse.json({ ok: true })
+}
+
+function labelForGroup(g: string) {
+  switch (g) {
+    case 'despesas': return 'Despesas'
+    case 'contas_casa': return 'Contas casa'
+    case 'rendimentos_brl': return 'Rendimentos BRL'
+    case 'rendimentos_eur': return 'Rendimentos EUR'
+    case 'reservas': return 'Reservas'
+    default: return g
+  }
+}

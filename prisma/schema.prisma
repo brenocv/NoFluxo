@@ -1,0 +1,70 @@
+// Prisma schema for the Porto family finance app
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// A category groups transactions (e.g. "Aluguel", "Nubank Kiki", "Salario Breno")
+// type controls sign and UI grouping.
+//   EXPENSE  -> saída (negative contribution to balance)
+//   INCOME   -> entrada (positive contribution)
+//   RESERVE  -> reserva (savings, neutral on monthly P&L)
+model Category {
+  id          String   @id @default(cuid())
+  name        String
+  // Group for UI tabs: "despesas" | "contas_casa" | "rendimentos_brl" | "rendimentos_eur" | "reservas"
+  group       String
+  // "EXPENSE" | "INCOME" | "RESERVE"
+  type        String
+  // Currency: "BRL" or "EUR"
+  currency    String   @default("BRL")
+  // Optional description (e.g. "vence dia 11")
+  note        String?
+  // Display order inside its group
+  sortOrder   Int      @default(0)
+  // Marks this category as auto-convertible (e.g. Lazer = 250 * rate)
+  autoConvert Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  transactions Transaction[]
+}
+
+// A transaction is a value for a given (category, month).
+// month is 1-12. year defaults to current year but is stored for multi-year support.
+model Transaction {
+  id          String   @id @default(cuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  year        Int      @default(2026)
+  month       Int
+  // The monetary value. For expenses, store as positive number; the UI/compute layer treats it as outflow based on category.type.
+  value       Float
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([categoryId, year, month])
+}
+
+// Key/value config store (e.g. euroToBrl rate, lastUpdatedBy)
+model Config {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// Activity log for who changed what (displayed in real-time feed)
+model ActivityLog {
+  id        String   @id @default(cuid())
+  user      String
+  action    String   // "create" | "update" | "delete"
+  entity    String   // "transaction" | "category" | "config"
+  detail    String
+  createdAt DateTime @default(now())
+}
