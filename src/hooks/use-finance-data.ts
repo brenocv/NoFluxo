@@ -6,6 +6,7 @@ import {
   Category,
   ChangeMessage,
   PresenceUser,
+  Subgroup,
   Transaction,
 } from '@/lib/finance'
 import { getSocket } from '@/lib/socket'
@@ -15,6 +16,7 @@ interface State {
   transactions: Transaction[]
   config: Record<string, string>
   labels: Record<string, string>
+  subgroups: Subgroup[]
   activity: ActivityEntry[]
   loading: boolean
   error: string | null
@@ -32,6 +34,7 @@ export function useFinanceData(currentUser: string, year: number) {
     transactions: [],
     config: {},
     labels: {},
+    subgroups: [],
     activity: [],
     loading: true,
     error: null,
@@ -57,6 +60,7 @@ export function useFinanceData(currentUser: string, year: number) {
           transactions: data.transactions,
           config: data.config,
           labels: data.labels ?? {},
+          subgroups: data.subgroups ?? [],
           activity: data.activity,
           loading: false,
           error: null,
@@ -174,6 +178,27 @@ export function useFinanceData(currentUser: string, year: number) {
               labels[msg.payload.key] = msg.payload.value
             }
             return { ...s, labels }
+          }
+          case 'subgroup': {
+            if (msg.action === 'delete') {
+              // Move categories from deleted subgroup (and descendants) to parent
+              const deletedKeys = new Set(msg.payload.deletedKeys as string[] ?? [msg.payload.key])
+              const parentKey = msg.payload.parentKey as string
+              return {
+                ...s,
+                subgroups: s.subgroups.filter((sg) => !deletedKeys.has(sg.key)),
+                categories: s.categories.map((c) =>
+                  deletedKeys.has(c.group) ? { ...c, group: parentKey } : c
+                ),
+              }
+            }
+            // create
+            const sg = msg.payload.subgroup as Subgroup
+            const exists = s.subgroups.some((x) => x.key === sg.key)
+            const subgroups = exists
+              ? s.subgroups.map((x) => (x.key === sg.key ? sg : x))
+              : [...s.subgroups, sg]
+            return { ...s, subgroups }
           }
           case 'activity': {
             return { ...s, activity: [msg.payload, ...s.activity].slice(0, 30) }

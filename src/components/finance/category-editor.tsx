@@ -23,15 +23,18 @@ import {
   GROUP_STRUCTURE,
   getTopGroupLabel,
   getGroupLabel,
+  collectGroupPaths,
   CategoryGroup,
   CategoryType,
   Currency,
+  Subgroup,
 } from '@/lib/finance'
 
 interface Props {
   open: boolean
   group: CategoryGroup | null
   labels: Record<string, string>
+  subgroups: Subgroup[]
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
@@ -44,7 +47,7 @@ interface Props {
   }) => Promise<void>
 }
 
-export function CategoryEditor({ open, group, labels, onOpenChange, onCreate }: Props) {
+export function CategoryEditor({ open, group, labels, subgroups, onOpenChange, onCreate }: Props) {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [groupVal, setGroupVal] = useState<string>('')
@@ -56,12 +59,7 @@ export function CategoryEditor({ open, group, labels, onOpenChange, onCreate }: 
   useEffect(() => {
     if (!group) return
     setGroupVal(group)
-    if (group === 'rendimentos.brl') { setType('INCOME'); setCurrency('BRL') }
-    else if (group === 'rendimentos.eur') { setType('INCOME'); setCurrency('EUR') }
-    else if (group === 'rendimentos.valores_a_receber') { setType('INCOME'); setCurrency('BRL') }
-    else if (group === 'reservas') { setType('RESERVE'); setCurrency('BRL') }
-    else if (group === 'despesas.contas_casa') { setType('EXPENSE'); setCurrency('EUR') }
-    else { setType('EXPENSE'); setCurrency('BRL') }
+    applyDefaults(group)
   }, [group])
 
   useEffect(() => {
@@ -74,12 +72,20 @@ export function CategoryEditor({ open, group, labels, onOpenChange, onCreate }: 
 
   // When group changes via the select, update type/currency defaults
   useEffect(() => {
-    if (groupVal === 'rendimentos.brl') { setType('INCOME'); setCurrency('BRL') }
-    else if (groupVal === 'rendimentos.eur') { setType('INCOME'); setCurrency('EUR') }
-    else if (groupVal === 'rendimentos.valores_a_receber') { setType('INCOME'); setCurrency('BRL') }
-    else if (groupVal === 'reservas') { setType('RESERVE'); setCurrency('BRL') }
-    else if (groupVal === 'despesas.contas_casa') { setType('EXPENSE'); setCurrency('EUR') }
+    if (groupVal) applyDefaults(groupVal)
   }, [groupVal])
+
+  function applyDefaults(g: string) {
+    if (g === 'rendimentos.brl') { setType('INCOME'); setCurrency('BRL') }
+    else if (g === 'rendimentos.eur') { setType('INCOME'); setCurrency('EUR') }
+    else if (g === 'rendimentos.valores_a_receber') { setType('INCOME'); setCurrency('BRL') }
+    else if (g === 'reservas') { setType('RESERVE'); setCurrency('BRL') }
+    else if (g === 'despesas.contas_casa') { setType('EXPENSE'); setCurrency('EUR') }
+    // For user-created subgroups, inherit from parent top-level
+    else if (g.startsWith('despesas')) { setType('EXPENSE'); setCurrency('BRL') }
+    else if (g.startsWith('rendimentos')) { setType('INCOME'); setCurrency('BRL') }
+    else if (g.startsWith('reservas')) { setType('RESERVE'); setCurrency('BRL') }
+  }
 
   if (!group) return null
 
@@ -103,18 +109,8 @@ export function CategoryEditor({ open, group, labels, onOpenChange, onCreate }: 
     }
   }
 
-  // Build select options from GROUP_STRUCTURE
-  const groupOptions: { value: string; label: string }[] = []
-  for (const top of GROUP_STRUCTURE) {
-    const topLabel = getTopGroupLabel(top.key, labels)
-    if (top.subgroups.length === 0) {
-      groupOptions.push({ value: top.key, label: topLabel })
-    } else {
-      for (const sub of top.subgroups) {
-        groupOptions.push({ value: sub.key, label: `${topLabel} › ${getGroupLabel(sub.key, labels)}` })
-      }
-    }
-  }
+  // Build select options dynamically from the tree (including user-created subgroups at any depth)
+  const groupOptions = collectGroupPaths(subgroups, labels)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,7 +118,7 @@ export function CategoryEditor({ open, group, labels, onOpenChange, onCreate }: 
         <DialogHeader>
           <DialogTitle>Nova categoria</DialogTitle>
           <p className="text-xs text-muted-foreground">
-            em {getGroupLabel(group, labels)}
+            em {getGroupLabel(group, labels, subgroups)}
           </p>
           <DialogDescription className="sr-only">
             Crie uma nova categoria com nome, nota, tipo, moeda e meta opcional.
@@ -156,9 +152,15 @@ export function CategoryEditor({ open, group, labels, onOpenChange, onCreate }: 
             <Label>Grupo</Label>
             <Select value={groupVal} onValueChange={setGroupVal}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
+              <SelectContent className="max-h-60">
                 {groupOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  <SelectItem
+                    key={opt.value}
+                    value={opt.value}
+                    className={opt.depth > 0 ? 'text-xs' : 'font-medium'}
+                  >
+                    {opt.depth > 0 ? '  '.repeat(opt.depth) + '↳ ' : ''}{opt.label}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>

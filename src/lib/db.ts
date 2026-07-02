@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
   prismaVersion?: string
 }
 
-const CURRENT_VERSION = 'v4-year-copy-reset'
+const CURRENT_VERSION = 'v6-subgroups-n-depth'
 
 function createClient() {
   return new PrismaClient({

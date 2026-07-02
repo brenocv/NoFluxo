@@ -185,3 +185,36 @@ export async function updateLabel(key: string, value: string, user: string): Pro
   }
   return r.json()
 }
+
+export async function createSubgroup(
+  parentKey: string,
+  name: string,
+  user: string
+): Promise<{ ok: boolean; subgroup: any }> {
+  const r = await fetch('/api/subgroups', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ parentKey, name, user }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || 'Falha ao criar subgrupo')
+  }
+  return r.json()
+}
+
+export async function deleteSubgroup(
+  key: string,
+  user: string
+): Promise<{ ok: boolean; movedToParent: string }> {
+  const r = await fetch('/api/subgroups', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key, user }),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || 'Falha ao remover subgrupo')
+  }
+  return r.json()
+}

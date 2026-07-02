@@ -14,6 +14,8 @@ import {
   updateCategory,
   updateConfig,
   updateLabel,
+  createSubgroup,
+  deleteSubgroup,
 } from '@/lib/actions'
 import {
   ActivityEntry,
@@ -21,15 +23,18 @@ import {
   CategoryGroup,
   CategoryType,
   Currency,
-  TOP_GROUP_ORDER,
+  GroupTreeNode,
+  buildGroupTree,
+  getGroupLabel,
   MONTHS_PT,
   Transaction,
 } from '@/lib/finance'
 import { MonthSelector } from '@/components/finance/month-selector'
 import { SummaryCard } from '@/components/finance/summary-card'
-import { TopGroupCard } from '@/components/finance/top-group-card'
+import { GroupNode } from '@/components/finance/group-node'
 import { TransactionEditor } from '@/components/finance/transaction-editor'
 import { CategoryEditor } from '@/components/finance/category-editor'
+import { SubgroupEditor } from '@/components/finance/subgroup-editor'
 import { ActivityPanel } from '@/components/finance/activity-panel'
 import { SettingsDialog } from '@/components/finance/settings-dialog'
 import { SearchBar } from '@/components/finance/search-bar'
@@ -53,13 +58,14 @@ export default function Home() {
   const { user, setUser, hydrated } = useCurrentUser()
   const [year, setYear] = useState<number>(2026)
   const {
-    categories, transactions, config, labels, activity,
+    categories, transactions, config, labels, subgroups, activity,
     loading, error, live, broadcast,
   } = useFinanceData(user, year)
 
   const [month, setMonth] = useState<number>(() => new Date().getMonth() + 1)
   const [editTarget, setEditTarget] = useState<{ category: Category; tx: Transaction | null } | null>(null)
   const [newCatGroup, setNewCatGroup] = useState<CategoryGroup | null>(null)
+  const [newSubgroupParent, setNewSubgroupParent] = useState<{ key: string; label: string } | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [showOnlyFilled, setShowOnlyFilled] = useState(false)
@@ -78,7 +84,7 @@ export default function Home() {
   }, [])
 
   const dispatchChange = useCallback((
-    type: 'transaction' | 'category' | 'config' | 'label' | 'activity',
+    type: 'transaction' | 'category' | 'config' | 'label' | 'activity' | 'subgroup',
     action: 'create' | 'update' | 'delete',
     payload: any,
     detail: string,
@@ -101,21 +107,34 @@ export default function Home() {
     return m
   }, [transactions, month, year])
 
-  const filteredCategories = useMemo(() => {
+  // Filter category IDs based on search + showOnlyFilled
+  const filteredCategoryIds = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return categories.filter((c) => {
+    const ids = new Set<string>()
+    for (const c of categories) {
+      let pass = true
       if (q) {
         const nameMatch = c.name.toLowerCase().includes(q)
         const noteMatch = c.note?.toLowerCase().includes(q) ?? false
-        if (!nameMatch && !noteMatch) return false
+        if (!nameMatch && !noteMatch) pass = false
       }
-      if (showOnlyFilled) {
-        const tx = txByCat[c.id]
-        if (!tx) return false
+      if (pass) ids.add(c.id)
+    }
+    if (showOnlyFilled) {
+      const filled = new Set<string>()
+      for (const id of ids) {
+        if (txByCat[id]) filled.add(id)
       }
-      return true
-    })
+      return filled
+    }
+    return ids
   }, [categories, search, showOnlyFilled, txByCat])
+
+  // Build the recursive group tree (filtered by search)
+  const groupTree = useMemo(() => {
+    const filterSet = (search.trim() || showOnlyFilled) ? filteredCategoryIds : undefined
+    return buildGroupTree(categories, subgroups, labels, filterSet)
+  }, [categories, subgroups, labels, filteredCategoryIds, search, showOnlyFilled])
 
   const totals = useMemo(() => {
     let entradasBRL = 0, saidasBRL = 0, entradasEUR = 0, saidasEUR = 0
@@ -159,25 +178,13 @@ export default function Home() {
     return months
   }, [categories, transactions, euroRate, year])
 
-  const visibleTopGroups = useMemo(() => {
-    const s = new Set<string>()
-    for (const c of filteredCategories) {
-      const top = c.group.includes('.') ? c.group.split('.')[0] : c.group
-      s.add(top)
-    }
-    return TOP_GROUP_ORDER.filter((g) => s.has(g))
-  }, [filteredCategories])
-
   // ---- Scroll helpers ----
   const scrollToGroup = useCallback((topKey: string) => {
     const el = document.getElementById(`group-${topKey}`)
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      // Briefly highlight the card
       el.classList.add('ring-2', 'ring-primary', 'ring-offset-2')
-      setTimeout(() => {
-        el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2')
-      }, 1500)
+      setTimeout(() => { el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2') }, 1500)
     }
   }, [])
 
@@ -324,20 +331,59 @@ export default function Home() {
     }
   }
 
+  async function handleCreateSubgroup(name: string) {
+    if (!newSubgroupParent) return
+    try {
+      const r = await createSubgroup(newSubgroupParent.key, name, user)
+      const detail = `Criou subgrupo "${r.subgroup.name}" dentro de ${newSubgroupParent.label}`
+      dispatchChange('subgroup', 'create', { subgroup: r.subgroup }, detail, {
+        user, action: 'create', entity: 'subgroup', detail, createdAt: new Date().toISOString(),
+      })
+      toast.success(`Subgrupo "${r.subgroup.name}" criado`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao criar subgrupo')
+    }
+  }
+
+  async function handleDeleteSubgroup(node: GroupTreeNode) {
+    if (!confirm(`Remover o subgrupo "${node.label}"? As categorias dentro dele serão movidas para o grupo pai.`)) return
+    try {
+      const r = await deleteSubgroup(node.key, user)
+      // Collect all descendant keys for local state update
+      const deletedKeys = collectDescendantKeys(node)
+      const detail = `Removeu subgrupo "${node.label}"`
+      dispatchChange('subgroup', 'delete',
+        { key: node.key, deletedKeys, parentKey: r.movedToParent },
+        detail,
+        { user, action: 'delete', entity: 'subgroup', detail, createdAt: new Date().toISOString() }
+      )
+      toast.success(`Subgrupo "${node.label}" removido`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao remover subgrupo')
+    }
+  }
+
+  function collectDescendantKeys(node: GroupTreeNode): string[] {
+    const keys = [node.key]
+    for (const child of node.children) {
+      if (child.isUserCreated) {
+        keys.push(...collectDescendantKeys(child))
+      }
+    }
+    return keys
+  }
+
   async function handleCopyMonth(toYear: number, toMonth: number) {
     try {
       const r = await copyMonth({ fromYear: year, fromMonth: month, toYear, toMonth, user })
       const fromLabel = `${MONTHS_PT[month - 1]}/${year}`
       const toLabel = `${MONTHS_PT[toMonth - 1]}/${toYear}`
       const detail = `Copiou ${r.total} valor(es) de ${fromLabel} para ${toLabel}`
-
-      // If the target is in the currently-viewed year, apply the new transactions locally
       if (toYear === year) {
         dispatchChange('transaction', 'create', { transactions: r.transactions }, detail, {
           user, action: 'create', entity: 'transaction', detail, createdAt: new Date().toISOString(),
         })
       } else {
-        // Different year — just log activity, the user will see it when they switch years
         dispatchChange('activity', 'create', {
           id: `local-${Date.now()}`,
           user, action: 'create', entity: 'transaction',
@@ -359,8 +405,6 @@ export default function Home() {
       const detail = scope === 'month'
         ? `Zerou todos os valores de ${MONTHS_PT[month - 1]}/${year}`
         : `Zerou todos os valores de ${year}`
-
-      // Remove deleted transactions from local state
       dispatchChange('transaction', 'delete',
         scope === 'month' ? { deleteYear: year, deleteMonth: month } : { deleteYear: year },
         detail,
@@ -478,7 +522,7 @@ export default function Home() {
         </div>
 
         <div className="space-y-2">
-          <SearchBar value={search} onChange={setSearch} resultsCount={search.trim() ? filteredCategories.length : undefined} />
+          <SearchBar value={search} onChange={setSearch} resultsCount={search.trim() ? filteredCategoryIds.size : undefined} />
           <div className="flex items-center justify-between px-1">
             <Label htmlFor="only-filled" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
               {showOnlyFilled ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -488,24 +532,28 @@ export default function Home() {
           </div>
         </div>
 
-        {visibleTopGroups.length === 0 ? (
+        {groupTree.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
-            Nenhuma categoria encontrada para "{search}"
+            Nenhuma categoria encontrada{search.trim() ? ` para "${search}"` : ''}.
           </div>
         ) : (
-          visibleTopGroups.map((g) => (
-            <TopGroupCard
-              key={g}
-              topGroupKey={g}
+          groupTree.map((node) => (
+            <GroupNode
+              key={node.key}
+              node={node}
               labels={labels}
-              categories={filteredCategories}
               transactionsByCat={txByCat}
               euroRate={euroRate}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
-              onAddCategory={(grp) => setNewCatGroup(grp)}
+              onAddCategory={(grp) => setNewCatGroup(grp as CategoryGroup)}
               onDeleteCategory={handleDeleteCategory}
               onRename={handleRename}
               onStopRecurring={handleStopRecurringFromList}
+              onAddSubgroup={(parentKey) => setNewSubgroupParent({
+                key: parentKey,
+                label: getGroupLabel(parentKey, labels, subgroups),
+              })}
+              onDeleteSubgroup={handleDeleteSubgroup}
             />
           ))
         )}
@@ -555,8 +603,17 @@ export default function Home() {
         open={!!newCatGroup}
         group={newCatGroup}
         labels={labels}
+        subgroups={subgroups}
         onOpenChange={(o) => !o && setNewCatGroup(null)}
         onCreate={handleCreateCategory}
+      />
+
+      <SubgroupEditor
+        open={!!newSubgroupParent}
+        parentKey={newSubgroupParent?.key ?? null}
+        parentLabel={newSubgroupParent?.label ?? ''}
+        onOpenChange={(o) => !o && setNewSubgroupParent(null)}
+        onCreate={handleCreateSubgroup}
       />
 
       <SettingsDialog

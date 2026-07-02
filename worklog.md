@@ -215,3 +215,46 @@ Stage Summary:
 - Recorrência infinita: testada em Jul/2026, Jul/2030, Jul/2035 — todas mostram "recorrente" ✓
 - Parar recorrência cross-year: parada em 2030 removeu 71 parcelas futuras (2030-2036); 2026-2029 mantidos; 2031+ vazio ✓
 - Lint limpo
+
+---
+Task ID: v6
+Agent: super-z (main)
+Task: Subgrupos dinâmicos com profundidade ilimitada — criar novos subgrupos dentro de despesas, rendimentos, etc., e sub-subgrupos dentro de subgrupos.
+
+Work Log:
+- Schema: criado model Subgroup { id, key, parentKey, name, sortOrder }
+  - key é path completo: "despesas.contas_casa.mesada_breno.gastos_escolares"
+  - Top-level e subgrupos padrão vêm de GROUP_STRUCTURE (não do DB); apenas subgrupos user-created são persistidos
+- API /api/subgroups: POST (create com slugify do nome, valida parentKey), DELETE (remove subgrupo + descendentes, move categorias para parent)
+- API /api/data: retorna array de subgroups
+- finance.ts:
+  - Tipo Subgroup adicionado
+  - ChangeMessage: type 'subgroup' adicionado
+  - getGroupLabel/getSubgroupLabel: aceitam userSubgroups[] como 3º param
+  - Nova função buildGroupTree(): constrói árvore recursiva GroupTreeNode[] a partir de categories + subgroups + labels
+  - Nova função computeNodeTotal(): soma valores de um nó + descendentes
+  - Nova função collectGroupPaths(): coleta todos os paths para o seletor do CategoryEditor
+  - buildNode recursivo: mostra user-created subgroups mesmo quando vazios (para que o usuário possa adicionar categorias)
+- useFinanceData: subgroups no state, handler type 'subgroup' (create + delete com move-to-parent)
+- Componente GroupNode (NOVO, substitui TopGroupCard): recursivo, renderiza qualquer profundidade
+  - Cada nó tem: toggle collapse, label, rename (lápis), "novo subgrupo" (folder+), delete subgrupo (se user-created), total
+  - Indentação visual por profundidade (marginLeft + border-left)
+  - CategoryRow reutilizável em qualquer nível
+- SubgroupEditor (NOVO): dialog simples com nome + label do parent
+- CategoryEditor: seletor de grupo dinâmico via collectGroupPaths() — mostra "↳ Despesas › Mesada Breno › Gastos escolares" com indentação por depth
+- actions.ts: createSubgroup(), deleteSubgroup()
+- page.tsx: 
+  - Usa buildGroupTree() para construir árvore filtrada por busca
+  - Handlers handleCreateSubgroup, handleDeleteSubgroup (com collectDescendantKeys)
+  - SubgroupEditor integrado
+
+Stage Summary:
+- Testado: criado subgrupo "Mesada Breno" dentro de Contas casa (depth 2)
+- Testado: criado sub-subgrupo "Gastos escolares" dentro de Mesada Breno (depth 3)
+- Testado: criado categoria "Material escolar" dentro de Gastos escolares
+- Seletor de grupo no CategoryEditor mostra hierarquia completa: "↳ Despesas › Mesada Breno › Gastos escolares"
+- Sync em tempo real: segunda sessão viu todos os subgrupos e categorias criados
+- Botão "Novo subgrupo" (folder+) visível em todos os níveis
+- Botão "Remover subgrupo" (trash) só em subgrupos user-created
+- Renomeação via lápis funciona em qualquer nível
+- Lint limpo

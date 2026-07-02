@@ -75,12 +75,28 @@ model Config {
   updatedAt DateTime @updatedAt
 }
 
+// User-created subgroups. Allow N-level nesting inside top-level groups.
+// `key` is the full dot-separated path, e.g. "despesas.contas_casa.mesada_breno".
+// `parentKey` is the parent path (or the top-level key for first-level subgroups).
+// Top-level groups (despesas, rendimentos, reservas) and their default subgroups
+// (cartoes, contas_casa, etc.) are NOT stored here — they come from GROUP_STRUCTURE
+// in code. Only user-created subgroups are stored.
+model Subgroup {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  parentKey String
+  name      String
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // Activity log for who changed what
 model ActivityLog {
   id        String   @id @default(cuid())
   user      String
   action    String   // "create" | "update" | "delete"
-  entity    String   // "transaction" | "category" | "config" | "label"
+  entity    String   // "transaction" | "category" | "config" | "label" | "subgroup"
   detail    String
   createdAt DateTime @default(now())
 }
