@@ -294,3 +294,42 @@ Stage Summary:
 - Indicador "(com sub)" quando categoria tem valor próprio + filhos
 - Botão "+" em hover para adicionar sub-item em qualquer categoria
 - Lint limpo
+
+---
+Task ID: v8
+Agent: super-z (main)
+Task: Saldo do mês anterior carrega para o próximo mês como linha destacada no topo de Despesas (déficit) ou Rendimentos (sobra).
+
+Work Log:
+- API /api/previous-month-balance?year=YYYY&month=M: calcula saldo realizado do mês anterior
+  - balance = entradas - saídas (BRL, EUR convertido a euroRate)
+  - Exclui categorias excludeFromTotal (receivables)
+  - Trata跨-year: se month=1, busca dezembro do ano anterior
+  - Retorna { balance, currency, prevMonth, prevYear, prevMonthLabel }
+- page.tsx: 
+  - Estado prevMonthBalance + prevMonthLabel
+  - useEffect busca /api/previous-month-balance quando month ou year muda
+  - Passa previousMonthBalance + prevMonthLabel + onPrevMonthClick para GroupNode
+  - onPrevMonthClick: navega para mês anterior (tratando跨-year)
+- GroupNode:
+  - Novas props: previousMonthBalance, prevMonthLabel, onPrevMonthClick
+  - showPrevBalance: true se top-level Despesas E balance < 0, OU top-level Rendimentos E balance > 0
+  - displayTotal inclui |balance| quando showPrevBalance
+  - Renderiza PrevBalanceRow no topo do corpo, antes de categorias e subgrupos
+- PrevBalanceRow (novo componente):
+  - Fundo gradient amber (from-amber-50 to-amber-50/30)
+  - Borda lateral esquerda amber 4px (border-l-4 border-l-amber-400)
+  - Ícone circular amber com ArrowLeftRight
+  - "Saldo mês anterior" + badge com mês/ano (ex: "Jun/2026")
+  - Subtítulo "déficit do mês anterior" ou "sobra do mês anterior"
+  - Valor em vermelho (déficit) ou verde (sobra) com dupla moeda
+  - Click navega para o mês anterior
+
+Stage Summary:
+- Testado em Julho: mostra "Saldo mês anterior | Jun/2026 | déficit do mês anterior | −R$ 1.500,00 | ≈ € 250,00"
+- Testado em Agosto: mostra "Saldo mês anterior | Jul/2026 | déficit do mês anterior | −R$ 4.506,50"
+- Linha aparece no topo de Despesas, antes de Cartões BR
+- Total de Despesas inclui o saldo anterior (Julho: R$ 15.189,50 com déficit)
+- Saldo total do mês inclui o saldo anterior no cálculo
+- Click na linha navega para o mês anterior
+- Lint limpo

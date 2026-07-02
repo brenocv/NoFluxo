@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useFinanceData } from '@/hooks/use-finance-data'
 import { useCurrentUser } from '@/hooks/use-current-user'
@@ -76,8 +76,29 @@ export default function Home() {
     if (typeof window === 'undefined') return false
     try { return window.localStorage.getItem(RECEIVABLES_TOGGLE_KEY) === '1' } catch { return false }
   })
+  const [prevMonthBalance, setPrevMonthBalance] = useState<number | null>(null)
+  const [prevMonthLabel, setPrevMonthLabel] = useState<string>('')
 
   const euroRate = parseFloat(config.euroToBrl ?? '6') || 6
+
+  // Fetch previous month's closing balance whenever month or year changes
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch(`/api/previous-month-balance?year=${year}&month=${month}`)
+        if (!r.ok) throw new Error('Falha')
+        const data = await r.json()
+        if (cancelled) return
+        setPrevMonthBalance(data.balance)
+        setPrevMonthLabel(data.prevMonthLabel)
+      } catch {
+        if (cancelled) return
+        setPrevMonthBalance(null)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [year, month])
 
   const handleToggleReceivables = useCallback((v: boolean) => {
     setIncludeReceivables(v)
@@ -548,6 +569,12 @@ export default function Home() {
               transactionsByCat={txByCat}
               allCategories={categories}
               euroRate={euroRate}
+              previousMonthBalance={prevMonthBalance}
+              prevMonthLabel={prevMonthLabel}
+              onPrevMonthClick={() => {
+                if (month === 1) { setYear(year - 1); setMonth(12) }
+                else setMonth(month - 1)
+              }}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
               onAddCategory={(grp, parentCategoryId) => {
                 setNewCatGroup(grp as CategoryGroup)

@@ -22,7 +22,7 @@ import {
 } from '@/lib/finance'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock, AlertTriangle, RefreshCw, Check,
-  FolderPlus,
+  FolderPlus, ArrowLeftRight,
 } from 'lucide-react'
 
 interface Props {
@@ -31,6 +31,9 @@ interface Props {
   transactionsByCat: Record<string, Transaction | undefined>
   allCategories: Category[]
   euroRate: number
+  previousMonthBalance: number | null
+  prevMonthLabel: string
+  onPrevMonthClick: () => void
   onEdit: (category: Category, current: Transaction | undefined) => void
   onAddCategory: (group: string, parentCategoryId?: string | null) => void
   onDeleteCategory: (cat: Category) => void
@@ -50,6 +53,17 @@ export function GroupNode(props: Props) {
   const isReserve = node.key === 'reservas'
   const isReceivable = node.isReceivable
 
+  // Determine if this top-level group should show the "Saldo mês anterior" row.
+  //   - Despesas (isTopLevel && key === 'despesas'): show if previous month closed NEGATIVE
+  //   - Rendimentos (isTopLevel && key === 'rendimentos'): show if previous month closed POSITIVE
+  // The row appears at the very top, before any categories or subgroups.
+  const showPrevBalance =
+    isTopLevel &&
+    props.previousMonthBalance !== null &&
+    props.previousMonthBalance !== 0 &&
+    ((node.key === 'despesas' && props.previousMonthBalance < 0) ||
+     (node.key === 'rendimentos' && props.previousMonthBalance > 0))
+
   const totalSign =
     isReserve || isReceivable
       ? ''
@@ -66,6 +80,11 @@ export function GroupNode(props: Props) {
 
   // Build category tree for direct categories in this group node
   const categoryTree = buildCategoryTree(node.categories, null)
+
+  // If showing prev balance, add its value to the group total
+  const displayTotal = showPrevBalance
+    ? total + Math.abs(props.previousMonthBalance!)
+    : total
 
   return (
     <Card
@@ -127,9 +146,9 @@ export function GroupNode(props: Props) {
           )}
           <span className={cn('text-sm font-semibold tabular-nums', totalColor)}>
             {totalSign}
-            {formatMoney(Math.abs(total), 'BRL')}
+            {formatMoney(Math.abs(displayTotal), 'BRL')}
             <span className="text-[10px] text-muted-foreground ml-1 font-normal">
-              ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+              ({formatMoney(Math.abs(displayTotal) / euroRate, 'EUR')})
             </span>
           </span>
         </div>
@@ -138,6 +157,17 @@ export function GroupNode(props: Props) {
       {/* Body */}
       {open && (
         <div>
+          {/* Saldo mês anterior — highlighted row at the top */}
+          {showPrevBalance && (
+            <PrevBalanceRow
+              balance={props.previousMonthBalance!}
+              prevMonthLabel={props.prevMonthLabel}
+              isExpense={props.previousMonthBalance! < 0}
+              euroRate={euroRate}
+              onClick={props.onPrevMonthClick}
+            />
+          )}
+
           {/* Direct categories (recursive tree) */}
           {categoryTree.length > 0 && (
             <div className="divide-y divide-border border-t border-border">
@@ -367,6 +397,63 @@ function CategoryNodeRow({
         </div>
       )}
     </>
+  )
+}
+
+// ---- Saldo mês anterior — highlighted virtual row ----
+
+function PrevBalanceRow({
+  balance,
+  prevMonthLabel,
+  isExpense,
+  euroRate,
+  onClick,
+}: {
+  balance: number
+  prevMonthLabel: string
+  isExpense: boolean
+  euroRate: number
+  onClick: () => void
+}) {
+  const absValue = Math.abs(balance)
+  const sign = isExpense ? '−' : '+'
+  const color = isExpense ? 'text-rose-600' : 'text-emerald-600'
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'w-full flex items-center justify-between px-3 py-3 border-t border-border touch-manipulation transition-colors',
+        'bg-gradient-to-r from-amber-50 to-amber-50/30 hover:from-amber-100 hover:to-amber-50/50',
+        'border-l-4 border-l-amber-400'
+      )}
+      title={`Clique para ver ${prevMonthLabel}`}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <div className="h-7 w-7 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+          <ArrowLeftRight className="h-3.5 w-3.5 text-amber-600" />
+        </div>
+        <div className="flex flex-col items-start min-w-0">
+          <span className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+            Saldo mês anterior
+            <Badge variant="outline" className="h-4 px-1 text-[9px] gap-0.5 border-amber-300 bg-amber-100 text-amber-700">
+              {prevMonthLabel}
+            </Badge>
+          </span>
+          <span className="text-[10px] text-muted-foreground">
+            {isExpense ? 'déficit do mês anterior' : 'sobra do mês anterior'}
+          </span>
+        </div>
+      </div>
+      <div className="flex flex-col items-end leading-tight flex-shrink-0">
+        <span className={cn('text-sm font-bold tabular-nums', color)}>
+          {sign}{formatMoney(absValue, 'BRL')}
+        </span>
+        <span className="text-[10px] text-muted-foreground tabular-nums">
+          ≈ {formatMoney(absValue / euroRate, 'EUR')}
+        </span>
+      </div>
+    </button>
   )
 }
 
