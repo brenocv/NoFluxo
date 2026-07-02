@@ -8,10 +8,11 @@ import { getTopGroupLabel, getGroupLabel, GROUP_STRUCTURE, MONTHS_PT } from '@/l
 export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const euroRate = parseFloat(url.searchParams.get('euroRate') ?? '6') || 6
+  const year = parseInt(url.searchParams.get('year') ?? '2026', 10) || 2026
 
   const [categories, transactions, configRows] = await Promise.all([
     db.category.findMany({ orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }] }),
-    db.transaction.findMany(),
+    db.transaction.findMany({ where: { year } }),
     db.config.findMany(),
   ])
 
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
   const rows: any[][] = []
 
   // Header rows
-  rows.push(['Euro', '', 'Despesas', ...MONTHS_PT.map((_, i) => new Date(2026, i, 1)), 'Total'])
+  rows.push(['Euro', '', 'Despesas', ...MONTHS_PT.map((_, i) => new Date(year, i, 1)), 'Total'])
   rows.push([euroRate, '', 'Total geral', ...MONTHS_PT.map(() => ''), ''])
 
   // Group categories by top-level group, then subgroup
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
           const row: any[] = ['', '', cat.name]
           let total = 0
           for (let m = 1; m <= 12; m++) {
-            const tx = transactions.find((t) => t.categoryId === cat.id && t.month === m && t.year === 2026)
+            const tx = transactions.find((t) => t.categoryId === cat.id && t.month === m && true)
             if (tx) {
               row.push(tx.value)
               total += tx.value
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
         const row: any[] = ['', '', cat.name]
         let total = 0
         for (let m = 1; m <= 12; m++) {
-          const tx = transactions.find((t) => t.categoryId === cat.id && t.month === m && t.year === 2026)
+          const tx = transactions.find((t) => t.categoryId === cat.id && t.month === m && true)
           if (tx) {
             row.push(tx.value)
             total += tx.value
@@ -91,7 +92,7 @@ export async function GET(req: NextRequest) {
   ]
 
   const wb = XLSX.utils.book_new()
-  XLSX.utils.book_append_sheet(wb, ws, 'Porto 2026')
+  XLSX.utils.book_append_sheet(wb, ws, `Porto ${year}`)
 
   // Generate buffer
   const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
@@ -99,7 +100,7 @@ export async function GET(req: NextRequest) {
   return new Response(buf, {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'Content-Disposition': `attachment; filename="Porto-2026-${new Date().toISOString().slice(0, 10)}.xlsx"`,
+      'Content-Disposition': `attachment; filename="Porto-${year}-${new Date().toISOString().slice(0, 10)}.xlsx"`,
     },
   })
 }

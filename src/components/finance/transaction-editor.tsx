@@ -22,6 +22,7 @@ interface Props {
   category: Category | null
   transaction: Transaction | null
   month: number
+  year: number
   euroRate: number
   onOpenChange: (open: boolean) => void
   onSave: (args: {
@@ -40,7 +41,7 @@ interface Props {
 }
 
 export function TransactionEditor({
-  open, category, transaction, month, euroRate,
+  open, category, transaction, month, year, euroRate,
   onOpenChange, onSave, onClear, onStopRecurring, onUpdateCategory,
 }: Props) {
   const [raw, setRaw] = useState('')
@@ -141,12 +142,12 @@ export function TransactionEditor({
           <DialogTitle className="flex flex-col gap-1">
             <span className="text-base">{category.name}</span>
             <span className="text-xs font-normal text-muted-foreground">
-              {monthLabel} / 2026 • {category.currency}
+              {monthLabel} / {year} • {category.currency}
               {category.note ? ` • ${category.note}` : ''}
             </span>
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Edite o valor, nota, recorrência e meta desta categoria para {monthLabel} de 2026.
+            Edite o valor, nota, recorrência e meta desta categoria para {monthLabel} de {year}.
           </DialogDescription>
         </DialogHeader>
 

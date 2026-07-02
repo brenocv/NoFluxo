@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { TrendingUp, TrendingDown, Wallet, PiggyBank, Clock } from 'lucide-react'
+import { TrendingUp, TrendingDown, PiggyBank, Clock } from 'lucide-react'
 import { formatBRL, formatEUR } from '@/lib/finance'
 
 interface Props {
@@ -18,14 +18,16 @@ interface Props {
   includeReceivables: boolean
   onToggleReceivables: (v: boolean) => void
   euroRate: number
+  onEntradasClick: () => void
+  onSaidasClick: () => void
 }
 
 export function SummaryCard({
   entradasBRL, saidasBRL, entradasEUR, saidasEUR,
   reservasBRL, receivablesBRL, receivablesEUR,
   includeReceivables, onToggleReceivables, euroRate,
+  onEntradasClick, onSaidasClick,
 }: Props) {
-  // Consolidate everything in BRL (and show EUR equivalent of the total)
   const totalEntradasBRL = entradasBRL + entradasEUR * euroRate
   const totalSaidasBRL = saidasBRL + saidasEUR * euroRate
   let saldoTotalBRL = totalEntradasBRL - totalSaidasBRL
@@ -46,7 +48,6 @@ export function SummaryCard({
         </span>
       </div>
 
-      {/* Single consolidated balance */}
       <div className="space-y-1">
         <div className="flex items-baseline gap-2">
           <span className="text-xs text-muted-foreground">Saldo total</span>
@@ -56,40 +57,52 @@ export function SummaryCard({
             </span>
           )}
         </div>
-        <div
-          className={cn(
-            'text-3xl font-bold tabular-nums',
-            saldoTotalBRL >= 0 ? 'text-emerald-600' : 'text-rose-600'
-          )}
-        >
+        <div className={cn('text-3xl font-bold tabular-nums', saldoTotalBRL >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
           {formatBRL(saldoTotalBRL)}
         </div>
-        <div
-          className={cn(
-            'text-sm font-medium tabular-nums',
-            saldoTotalEUR >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80'
-          )}
-        >
+        <div className={cn('text-sm font-medium tabular-nums', saldoTotalEUR >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80')}>
           ≈ {formatEUR(saldoTotalEUR)}
         </div>
       </div>
 
-      {/* Two flows: entradas and saidas (each in BRL with EUR equiv) */}
+      {/* Entradas / Saídas — clickable to scroll to the corresponding group */}
       <div className="grid grid-cols-2 gap-2 pt-1">
-        <Flow
-          icon={<TrendingUp className="h-3.5 w-3.5" />}
-          label="Entradas"
-          valueBRL={totalEntradasBRL}
-          euroRate={euroRate}
-          tone="positive"
-        />
-        <Flow
-          icon={<TrendingDown className="h-3.5 w-3.5" />}
-          label="Saídas"
-          valueBRL={totalSaidasBRL}
-          euroRate={euroRate}
-          tone="negative"
-        />
+        <button
+          onClick={onEntradasClick}
+          className="text-left rounded-lg bg-muted/50 p-2.5 hover:bg-muted transition-colors touch-manipulation active:scale-[0.98]"
+          aria-label="Ver rendimentos"
+        >
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <TrendingUp className="h-3.5 w-3.5" />
+            <span className="text-[10px] uppercase tracking-wider font-medium">Entradas →</span>
+          </div>
+          <div className="mt-1 space-y-0.5">
+            <div className="text-sm font-semibold tabular-nums text-emerald-600">
+              {formatBRL(totalEntradasBRL)}
+            </div>
+            <div className="text-[10px] text-muted-foreground tabular-nums">
+              ≈ {formatEUR(totalEntradasBRL / euroRate)}
+            </div>
+          </div>
+        </button>
+        <button
+          onClick={onSaidasClick}
+          className="text-left rounded-lg bg-muted/50 p-2.5 hover:bg-muted transition-colors touch-manipulation active:scale-[0.98]"
+          aria-label="Ver despesas"
+        >
+          <div className="flex items-center gap-1.5 text-muted-foreground">
+            <TrendingDown className="h-3.5 w-3.5" />
+            <span className="text-[10px] uppercase tracking-wider font-medium">Saídas →</span>
+          </div>
+          <div className="mt-1 space-y-0.5">
+            <div className="text-sm font-semibold tabular-nums text-rose-600">
+              {formatBRL(totalSaidasBRL)}
+            </div>
+            <div className="text-[10px] text-muted-foreground tabular-nums">
+              ≈ {formatEUR(totalSaidasBRL / euroRate)}
+            </div>
+          </div>
+        </button>
       </div>
 
       {reservasBRL > 0 && (
@@ -126,37 +139,5 @@ export function SummaryCard({
         </div>
       )}
     </Card>
-  )
-}
-
-function Flow({
-  icon, label, valueBRL, euroRate, tone,
-}: {
-  icon: React.ReactNode
-  label: string
-  valueBRL: number
-  euroRate: number
-  tone: 'positive' | 'negative'
-}) {
-  return (
-    <div className="rounded-lg bg-muted/50 p-2.5">
-      <div className="flex items-center gap-1.5 text-muted-foreground">
-        {icon}
-        <span className="text-[10px] uppercase tracking-wider font-medium">{label}</span>
-      </div>
-      <div className="mt-1 space-y-0.5">
-        <div
-          className={cn(
-            'text-sm font-semibold tabular-nums',
-            tone === 'positive' ? 'text-emerald-600' : 'text-rose-600'
-          )}
-        >
-          {formatBRL(valueBRL)}
-        </div>
-        <div className="text-[10px] text-muted-foreground tabular-nums">
-          ≈ {formatEUR(valueBRL / euroRate)}
-        </div>
-      </div>
-    </div>
   )
 }

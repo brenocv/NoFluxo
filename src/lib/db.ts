@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
   prismaVersion?: string
 }
 
-const CURRENT_VERSION = 'v3-recurring-goals-labels'
+const CURRENT_VERSION = 'v4-year-copy-reset'
 
 function createClient() {
   return new PrismaClient({

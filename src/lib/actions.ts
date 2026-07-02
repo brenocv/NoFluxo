@@ -58,6 +58,49 @@ export async function stopRecurringSeries(
   return r.json()
 }
 
+export async function copyMonth(args: {
+  fromYear: number
+  fromMonth: number
+  toYear: number
+  toMonth: number
+  user: string
+}): Promise<{
+  ok: boolean
+  createdCount: number
+  updatedCount: number
+  total: number
+  transactions: any[]
+}> {
+  const r = await fetch('/api/transactions/copy-month', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || 'Falha ao copiar mês')
+  }
+  return r.json()
+}
+
+export async function resetValues(args: {
+  scope: 'month' | 'year'
+  year: number
+  month?: number
+  user: string
+}): Promise<{ ok: boolean; deletedCount: number }> {
+  const r = await fetch('/api/transactions/reset', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(args),
+  })
+  if (!r.ok) {
+    const err = await r.json().catch(() => ({}))
+    throw new Error(err.error || 'Falha ao zerar valores')
+  }
+  return r.json()
+}
+
 export interface SaveCategoryArgs {
   name: string
   group: string

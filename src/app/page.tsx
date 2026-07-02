@@ -7,6 +7,8 @@ import { useCurrentUser } from '@/hooks/use-current-user'
 import {
   saveTransaction,
   stopRecurringSeries,
+  copyMonth,
+  resetValues,
   createCategory,
   deleteCategory,
   updateCategory,
@@ -33,11 +35,15 @@ import { SettingsDialog } from '@/components/finance/settings-dialog'
 import { SearchBar } from '@/components/finance/search-bar'
 import { MonthlyChart } from '@/components/finance/monthly-chart'
 import { ExpensePieChart } from '@/components/finance/expense-pie-chart'
+import { CopyMonthDialog } from '@/components/finance/copy-month-dialog'
+import { ResetDialog } from '@/components/finance/reset-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Download } from 'lucide-react'
+import {
+  Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Download, Copy, Eraser,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const USER_COLOR = '#16a34a'
@@ -45,10 +51,11 @@ const RECEIVABLES_TOGGLE_KEY = 'porto_finance_include_receivables'
 
 export default function Home() {
   const { user, setUser, hydrated } = useCurrentUser()
+  const [year, setYear] = useState<number>(2026)
   const {
     categories, transactions, config, labels, activity,
     loading, error, live, broadcast,
-  } = useFinanceData(user)
+  } = useFinanceData(user, year)
 
   const [month, setMonth] = useState<number>(() => new Date().getMonth() + 1)
   const [editTarget, setEditTarget] = useState<{ category: Category; tx: Transaction | null } | null>(null)
@@ -56,6 +63,8 @@ export default function Home() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [showOnlyFilled, setShowOnlyFilled] = useState(false)
+  const [copyOpen, setCopyOpen] = useState(false)
+  const [resetOpen, setResetOpen] = useState(false)
   const [includeReceivables, setIncludeReceivables] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false
     try { return window.localStorage.getItem(RECEIVABLES_TOGGLE_KEY) === '1' } catch { return false }
@@ -87,10 +96,10 @@ export default function Home() {
   const txByCat = useMemo(() => {
     const m: Record<string, Transaction | undefined> = {}
     for (const t of transactions) {
-      if (t.month === month && t.year === 2026) m[t.categoryId] = t
+      if (t.month === month && t.year === year) m[t.categoryId] = t
     }
     return m
-  }, [transactions, month])
+  }, [transactions, month, year])
 
   const filteredCategories = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -139,7 +148,7 @@ export default function Home() {
       let entradas = 0, saidas = 0
       for (const c of categories) {
         if (c.excludeFromTotal) continue
-        const tx = transactions.find((t) => t.categoryId === c.id && t.month === m && t.year === 2026)
+        const tx = transactions.find((t) => t.categoryId === c.id && t.month === m && t.year === year)
         if (!tx) continue
         const vBRL = c.currency === 'BRL' ? tx.value : tx.value * euroRate
         if (c.type === 'INCOME') entradas += vBRL
@@ -148,7 +157,7 @@ export default function Home() {
       months.push({ month: MONTHS_PT[m - 1], monthIdx: m, entradas, saidas, saldo: entradas - saidas })
     }
     return months
-  }, [categories, transactions, euroRate])
+  }, [categories, transactions, euroRate, year])
 
   const visibleTopGroups = useMemo(() => {
     const s = new Set<string>()
@@ -158,6 +167,19 @@ export default function Home() {
     }
     return TOP_GROUP_ORDER.filter((g) => s.has(g))
   }, [filteredCategories])
+
+  // ---- Scroll helpers ----
+  const scrollToGroup = useCallback((topKey: string) => {
+    const el = document.getElementById(`group-${topKey}`)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      // Briefly highlight the card
+      el.classList.add('ring-2', 'ring-primary', 'ring-offset-2')
+      setTimeout(() => {
+        el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2')
+      }, 1500)
+    }
+  }, [])
 
   // ---- Handlers ----
 
@@ -169,7 +191,7 @@ export default function Home() {
     const cat = editTarget.category
     try {
       const result = await saveTransaction({
-        categoryId: cat.id, month, year: 2026,
+        categoryId: cat.id, month, year,
         value: args.value, note: args.note, user,
         isRecurring: args.isRecurring,
         installmentsTotal: args.installmentsTotal,
@@ -180,20 +202,13 @@ export default function Home() {
       const actionVerb = result.action === 'create' ? 'Adicionou' : result.action === 'update' ? 'Atualizou' : 'Removeu'
       const valueStr = args.value !== null ? ` • ${cat.currency === 'BRL' ? 'R$' : '€'} ${args.value.toFixed(2)}` : ''
       const recurringStr = args.isRecurring && args.value !== null
-        ? args.installmentsTotal
-          ? ` (${args.installmentsTotal}x)`
-          : ' (recorrente)'
+        ? args.installmentsTotal ? ` (${args.installmentsTotal}x)` : ' (recorrente)'
         : ''
-      const detail = `${actionVerb} ${cat.name} • ${monthLabel}/2026${valueStr}${recurringStr}`
+      const detail = `${actionVerb} ${cat.name} • ${monthLabel}/${year}${valueStr}${recurringStr}`
 
-      // For recurring, result.transactions is an array; for single, it's [transaction]
       const txs = result.transactions ?? (result.transaction ? [result.transaction] : [])
-      dispatchChange(
-        'transaction',
-        result.action as 'create' | 'update' | 'delete',
-        txs.length > 0
-          ? { transactions: txs }
-          : { id: editTarget.tx?.id },
+      dispatchChange('transaction', result.action as 'create' | 'update' | 'delete',
+        txs.length > 0 ? { transactions: txs } : { id: editTarget.tx?.id },
         detail,
         { user, action: result.action, entity: 'transaction', detail, createdAt: new Date().toISOString() }
       )
@@ -211,7 +226,7 @@ export default function Home() {
   async function handleStopRecurring() {
     if (!editTarget?.tx?.seriesId) return
     try {
-      const r = await stopRecurringSeries(editTarget.tx.seriesId, month, 2026, user)
+      const r = await stopRecurringSeries(editTarget.tx.seriesId, month, year, user)
       const detail = `Parou recorrência de ${editTarget.category.name} • ${r.deletedCount} parcela(s) futura(s) removida(s)`
       dispatchChange('transaction', 'delete',
         { seriesId: editTarget.tx.seriesId, afterMonth: month },
@@ -226,16 +241,12 @@ export default function Home() {
 
   async function handleStopRecurringFromList(seriesId: string, currentMonth: number) {
     try {
-      const r = await stopRecurringSeries(seriesId, currentMonth, 2026, user)
-      // Find category name
+      const r = await stopRecurringSeries(seriesId, currentMonth, year, user)
       const tx = transactions.find((t) => t.seriesId === seriesId)
       const cat = tx ? categories.find((c) => c.id === tx.categoryId) : null
       const detail = `Parou recorrência${cat ? ` de ${cat.name}` : ''} • ${r.deletedCount} parcela(s) futura(s) removida(s)`
-      dispatchChange('transaction', 'delete',
-        { seriesId, afterMonth: currentMonth },
-        detail,
-        { user, action: 'delete', entity: 'transaction', detail, createdAt: new Date().toISOString() }
-      )
+      dispatchChange('transaction', 'delete', { seriesId, afterMonth: currentMonth }, detail,
+        { user, action: 'delete', entity: 'transaction', detail, createdAt: new Date().toISOString() })
       toast.success(`Recorrência parada • ${r.deletedCount} parcela(s) removida(s)`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao parar recorrência')
@@ -302,35 +313,75 @@ export default function Home() {
 
   async function handleRename(key: string, value: string) {
     try {
-      const r = await updateLabel(key, value, user)
+      await updateLabel(key, value, user)
       const detail = value === '' ? `Resetou rótulo` : `Renomeou para "${value}"`
       dispatchChange('label', 'update', { key, value }, detail, {
         user, action: 'update', entity: 'label', detail, createdAt: new Date().toISOString(),
       })
-      // Also update the full labels map locally
-      window.dispatchEvent(new CustomEvent('finance:patch', {
-        detail: {
-          type: 'label', action: 'update',
-          payload: { key, value },
-          by: { name: user, color: USER_COLOR }, at: Date.now(),
-        },
-      }))
       toast.success(value === '' ? 'Rótulo resetado' : 'Renomeado')
     } catch (e: any) {
       toast.error(e.message || 'Erro ao renomear')
     }
   }
 
+  async function handleCopyMonth(toYear: number, toMonth: number) {
+    try {
+      const r = await copyMonth({ fromYear: year, fromMonth: month, toYear, toMonth, user })
+      const fromLabel = `${MONTHS_PT[month - 1]}/${year}`
+      const toLabel = `${MONTHS_PT[toMonth - 1]}/${toYear}`
+      const detail = `Copiou ${r.total} valor(es) de ${fromLabel} para ${toLabel}`
+
+      // If the target is in the currently-viewed year, apply the new transactions locally
+      if (toYear === year) {
+        dispatchChange('transaction', 'create', { transactions: r.transactions }, detail, {
+          user, action: 'create', entity: 'transaction', detail, createdAt: new Date().toISOString(),
+        })
+      } else {
+        // Different year — just log activity, the user will see it when they switch years
+        dispatchChange('activity', 'create', {
+          id: `local-${Date.now()}`,
+          user, action: 'create', entity: 'transaction',
+          detail, createdAt: new Date().toISOString(),
+        }, detail, {
+          user, action: 'create', entity: 'transaction',
+          detail, createdAt: new Date().toISOString(),
+        })
+      }
+      toast.success(`${r.total} valor(es) copiado(s) para ${toLabel}`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao copiar mês')
+    }
+  }
+
+  async function handleReset(scope: 'month' | 'year') {
+    try {
+      const r = await resetValues({ scope, year, month, user })
+      const detail = scope === 'month'
+        ? `Zerou todos os valores de ${MONTHS_PT[month - 1]}/${year}`
+        : `Zerou todos os valores de ${year}`
+
+      // Remove deleted transactions from local state
+      dispatchChange('transaction', 'delete',
+        scope === 'month' ? { deleteYear: year, deleteMonth: month } : { deleteYear: year },
+        detail,
+        { user, action: 'delete', entity: 'transaction', detail, createdAt: new Date().toISOString() }
+      )
+      toast.success(`${r.deletedCount} valor(es) removido(s)`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao zerar valores')
+    }
+  }
+
   async function handleExportExcel() {
     try {
       toast.info('Gerando Excel…')
-      const r = await fetch(`/api/export?euroRate=${euroRate}`)
+      const r = await fetch(`/api/export?euroRate=${euroRate}&year=${year}`)
       if (!r.ok) throw new Error('Falha ao exportar')
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `Porto-2026-${new Date().toISOString().slice(0, 10)}.xlsx`
+      a.download = `Porto-${year}-${new Date().toISOString().slice(0, 10)}.xlsx`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -375,18 +426,24 @@ export default function Home() {
               €
             </div>
             <div>
-              <h1 className="text-sm font-semibold leading-none">Porto 2026</h1>
+              <h1 className="text-sm font-semibold leading-none">Porto {year}</h1>
               <p className="text-[10px] text-muted-foreground">Controle financeiro</p>
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1">
             <Badge variant="outline" className={cn(
-              'gap-1 px-1.5 py-0 h-7 text-[10px]',
+              'gap-1 px-1.5 py-0 h-7 text-[10px] hidden sm:flex',
               live.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
             )}>
-              {live.connected ? <><Wifi className="h-3 w-3" /><span className="hidden sm:inline">Sincronizando</span></>
-                : <><WifiOff className="h-3 w-3" /><span className="hidden sm:inline">Offline</span></>}
+              {live.connected ? <><Wifi className="h-3 w-3" /><span>Sincronizando</span></>
+                : <><WifiOff className="h-3 w-3" /><span>Offline</span></>}
             </Badge>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCopyOpen(true)} aria-label="Copiar mês" title="Copiar valores para outro mês">
+              <Copy className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setResetOpen(true)} aria-label="Zerar valores" title="Zerar valores do mês ou ano">
+              <Eraser className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleExportExcel} aria-label="Exportar Excel">
               <Download className="h-4 w-4" />
             </Button>
@@ -398,7 +455,7 @@ export default function Home() {
       </header>
 
       <main className="flex-1 max-w-3xl w-full mx-auto px-3 py-3 space-y-3 pb-24">
-        <MonthSelector selected={month} onSelect={setMonth} />
+        <MonthSelector selected={month} year={year} onSelect={setMonth} onYearChange={setYear} />
 
         <SummaryCard
           entradasBRL={totals.entradasBRL}
@@ -411,15 +468,15 @@ export default function Home() {
           includeReceivables={includeReceivables}
           onToggleReceivables={handleToggleReceivables}
           euroRate={euroRate}
+          onEntradasClick={() => scrollToGroup('rendimentos')}
+          onSaidasClick={() => scrollToGroup('despesas')}
         />
 
-        {/* Charts side by side on desktop, stacked on mobile */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           <MonthlyChart data={chartData} selectedMonth={month} onSelectMonth={setMonth} euroRate={euroRate} />
           <ExpensePieChart categories={categories} transactionsByCat={txByCat} euroRate={euroRate} />
         </div>
 
-        {/* Search + filter */}
         <div className="space-y-2">
           <SearchBar value={search} onChange={setSearch} resultsCount={search.trim() ? filteredCategories.length : undefined} />
           <div className="flex items-center justify-between px-1">
@@ -431,7 +488,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Top-level group cards */}
         {visibleTopGroups.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             Nenhuma categoria encontrada para "{search}"
@@ -486,6 +542,7 @@ export default function Home() {
         category={editTarget?.category ?? null}
         transaction={editTarget?.tx ?? null}
         month={month}
+        year={year}
         euroRate={euroRate}
         onOpenChange={(o) => !o && setEditTarget(null)}
         onSave={handleSaveTransaction}
@@ -509,6 +566,22 @@ export default function Home() {
         onSetUser={setUser}
         euroRate={euroRate}
         onSaveEuroRate={handleSaveEuroRate}
+      />
+
+      <CopyMonthDialog
+        open={copyOpen}
+        onOpenChange={setCopyOpen}
+        fromYear={year}
+        fromMonth={month}
+        onCopy={handleCopyMonth}
+      />
+
+      <ResetDialog
+        open={resetOpen}
+        onOpenChange={setResetOpen}
+        year={year}
+        month={month}
+        onReset={handleReset}
       />
     </div>
   )

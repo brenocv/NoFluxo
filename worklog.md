@@ -157,3 +157,34 @@ Stage Summary:
 - Export Excel funcional
 - Renomeação de grupos, subgrupos e categorias
 - Sync em tempo real mantido
+
+---
+Task ID: v4
+Agent: super-z (main)
+Task: Adicionar botão de copiar mês, botão de zerar valores, renomeação sempre visível, click em Entradas/Saídas para scroll, seletor de ano para visualização infinita.
+
+Work Log:
+- API /api/data atualizada para aceitar ?year=YYYY (filtra transações por ano)
+- API /api/transactions/copy-month: copia todas as transações de (fromYear, fromMonth) para (toYear, toMonth), sobrescrevendo existentes
+- API /api/transactions/reset: deleta transações por escopo ('month' ou 'year')
+- API /api/export atualizada para aceitar ?year=YYYY
+- Hook useFinanceData atualizado para aceitar year como segundo parâmetro; re-fetch quando year muda
+- Hook trata bulk delete (deleteYear/deleteMonth) em ChangeMessage
+- MonthSelector redesenhado: navegação de ano (← 2026 →) acima da faixa de meses
+- CopyMonthDialog: escolher ano+mes destino, grid de 4x3 meses, mostra "origem" no mês atual, warning se igual
+- ResetDialog: escopo mês/ano, warning, confirmação digitando "ZERAR"
+- TopGroupCard: id={`group-${topGroupKey}`} para scroll; RenameButton sempre visível (removido opacity-0 group-hover:opacity-100)
+- SummaryCard: Entradas e Saídas agora são botões clicáveis com onEntradasClick/onSaidasClick
+  - Click Entradas → scroll suave para grupo 'rendimentos' + highlight ring
+  - Click Saídas → scroll suave para grupo 'despesas' + highlight ring
+- TransactionEditor: aceita prop `year`, usa em vez de hardcoded 2026
+- page.tsx: year state, handlers handleCopyMonth/handleReset, scrollToGroup, botões Copy/Eraser no header
+- Categorias e configurações são globais (não por ano); apenas transações são filtradas por ano
+
+Stage Summary:
+- Botão Copy (ícone) no header → dialog para copiar mês atual para qualquer outro mês/ano
+- Botão Eraser (ícone) no header → dialog para zerar valores do mês ou ano inteiro (com confirmação ZERAR)
+- Seletor de ano: setas ← → mudam o ano; dados persistem infinitamente, visualização é ano a ano
+- Botão de renomear (lápis) agora sempre visível em grupos e subgrupos
+- Click em Entradas/Saídas no resumo faz scroll suave para o grupo correspondente
+- Sync em tempo real mantido entre dispositivos

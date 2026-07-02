@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
     await db.activityLog.create({
       data: {
         user, action: 'create', entity: 'transaction',
-        detail: `Criou lançamento recorrente "${category.name}" • ${monthName}-${MONTHS_PT[endMonth - 1]}/2026 • ${formatMoney(value, category.currency)}${actualTotal ? ` (${actualTotal}x)` : ''}`,
+        detail: `Criou lançamento recorrente "${category.name}" • ${monthName}-${MONTHS_PT[endMonth - 1]}/${year} • ${formatMoney(value, category.currency)}${actualTotal ? ` (${actualTotal}x)` : ''}`,
       },
     })
 

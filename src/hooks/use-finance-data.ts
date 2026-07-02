@@ -26,7 +26,7 @@ interface LiveMeta {
   lastChange: { by: string; detail: string; at: number } | null
 }
 
-export function useFinanceData(currentUser: string) {
+export function useFinanceData(currentUser: string, year: number) {
   const [state, setState] = useState<State>({
     categories: [],
     transactions: [],
@@ -42,12 +42,13 @@ export function useFinanceData(currentUser: string) {
     lastChange: null,
   })
 
-  // Initial load
+  // Initial load — re-fetches whenever the year changes
   useEffect(() => {
     let cancelled = false
+    setState((s) => ({ ...s, loading: true, error: null }))
     ;(async () => {
       try {
-        const r = await fetch('/api/data')
+        const r = await fetch(`/api/data?year=${year}`)
         if (!r.ok) throw new Error('Falha ao carregar dados')
         const data = await r.json()
         if (cancelled) return
@@ -66,9 +67,9 @@ export function useFinanceData(currentUser: string) {
       }
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [year])
 
-  // Socket.io connection
+  // Socket.io connection (does not depend on year)
   useEffect(() => {
     const socket = getSocket()
 
@@ -97,7 +98,6 @@ export function useFinanceData(currentUser: string) {
           case 'transaction': {
             const t = msg.payload.transaction
             if (msg.action === 'delete') {
-              // payload may be { id } or { ids: [...] } or { seriesId, afterMonth }
               if (msg.payload.ids) {
                 const idSet = new Set(msg.payload.ids)
                 return { ...s, transactions: s.transactions.filter((x) => !idSet.has(x.id)) }
@@ -105,7 +105,6 @@ export function useFinanceData(currentUser: string) {
               if (msg.payload.id) {
                 return { ...s, transactions: s.transactions.filter((x) => x.id !== msg.payload.id) }
               }
-              // For series-stop: delete by seriesId + month > X
               if (msg.payload.seriesId && msg.payload.afterMonth) {
                 return {
                   ...s,
@@ -114,9 +113,20 @@ export function useFinanceData(currentUser: string) {
                   ),
                 }
               }
+              // Bulk delete (e.g. reset month/year): delete by year [+month]
+              if (msg.payload.deleteYear) {
+                return {
+                  ...s,
+                  transactions: s.transactions.filter((x) => {
+                    if (x.year !== msg.payload.deleteYear) return true
+                    if (msg.payload.deleteMonth && x.month !== msg.payload.deleteMonth) return true
+                    return false
+                  }),
+                }
+              }
               return s
             }
-            // create or update — payload.transactions is an array
+            // create or update
             if (msg.payload.transactions) {
               const txs = msg.payload.transactions as Transaction[]
               const ids = new Set(txs.map((t) => t.id))
@@ -128,7 +138,6 @@ export function useFinanceData(currentUser: string) {
                 ],
               }
             }
-            // single transaction
             if (t) {
               const exists = s.transactions.some((x) => x.id === t.id)
               const txs = exists
@@ -159,7 +168,7 @@ export function useFinanceData(currentUser: string) {
           }
           case 'label': {
             const labels = { ...s.labels }
-            if (msg.payload.value === '') {
+            if (msg.payload.value === '' || msg.payload.value === undefined) {
               delete labels[msg.payload.key]
             } else {
               labels[msg.payload.key] = msg.payload.value
