@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       sortOrder,
       excludeFromTotal: !!body.excludeFromTotal,
       monthlyGoal: body.monthlyGoal ? Number(body.monthlyGoal) : null,
+      parentCategoryId: body.parentCategoryId ? String(body.parentCategoryId) : null,
     },
   })
 

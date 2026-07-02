@@ -258,3 +258,39 @@ Stage Summary:
 - Botão "Remover subgrupo" (trash) só em subgrupos user-created
 - Renomeação via lápis funciona em qualquer nível
 - Lint limpo
+
+---
+Task ID: v7
+Agent: super-z (main)
+Task: Categorias podem ter sub-categorias (árvore) com chevron e indentação travessão.
+
+Work Log:
+- Schema: adicionado parentCategoryId String? + relação CategoryTree (parent/children) em Category
+- API /api/categories: POST aceita parentCategoryId
+- finance.ts: 
+  - Tipo Category atualizado com parentCategoryId
+  - Nova função buildCategoryTree(categories, parentId): constrói árvore recursiva
+  - Nova função computeCategoryNodeTotal(): soma valor próprio + descendentes
+- GroupNode reescrito:
+  - CategoryRow → CategoryNodeRow (recursivo)
+  - Cada categoria com filhos mostra chevron (ChevronRight/ChevronDown)
+  - Clique no chevron expande/recolhe os filhos
+  - Filhos aparecem com indentação + border-left (travessão visual): ml-4 + border-l-2 + bg-muted/10
+  - Cada categoria tem botão "+" (add sub-item) visível em hover
+  - Total da categoria pai inclui filhos, com indicador "(com sub)" quando tem valor próprio + filhos
+  - Badge (N) mostrando número de filhos diretos
+- actions.ts: SaveCategoryArgs inclui parentCategoryId
+- page.tsx: 
+  - Estado newCatParent (parentCategoryId)
+  - onAddCategory agora recebe (group, parentCategoryId)
+  - handleCreateCategory passa parentCategoryId para a API
+  - Botão "Nova categoria" do footer reset newCatParent para null
+
+Stage Summary:
+- Testado: Lazer › Comercio do Farazi › Coca Cola lata (3 níveis de categorias)
+- Chevron aparece em categorias que têm filhos
+- Indentação travessão: filhos aparecem com border-left + bg-muted/10 + margem
+- Totais acumulam: Coca Cola R$5,50 → Comercio do Farazi R$5,50 → Lazer R$1.505,50 (com sub)
+- Indicador "(com sub)" quando categoria tem valor próprio + filhos
+- Botão "+" em hover para adicionar sub-item em qualquer categoria
+- Lint limpo

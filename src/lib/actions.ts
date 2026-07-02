@@ -109,6 +109,7 @@ export interface SaveCategoryArgs {
   note?: string
   excludeFromTotal?: boolean
   monthlyGoal?: number | null
+  parentCategoryId?: string | null
   user: string
 }
 

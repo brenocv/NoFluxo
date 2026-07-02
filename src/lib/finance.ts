@@ -25,6 +25,7 @@ export interface Category {
   autoConvert: boolean
   excludeFromTotal: boolean
   monthlyGoal: number | null
+  parentCategoryId: string | null
   createdAt: string
   updatedAt: string
 }
@@ -365,6 +366,48 @@ function collectUserSubgroups(
     result.push({ value: child.key, label: pathLabel, depth: depth + 1 })
     collectUserSubgroups(child.key, parentPathLabel + ' › ' + childLabel, childLabel, userSubgroups, labels, depth + 1, result)
   }
+}
+
+// ---- Category tree (nested categories) ----
+
+export interface CategoryNode {
+  category: Category
+  children: CategoryNode[]
+  depth: number
+}
+
+// Build a tree of categories from a flat list. Only categories whose
+// parentCategoryId is null (or whose parent is not in the list) are roots.
+// `parentId` filters to only children of the given parent (null = roots).
+export function buildCategoryTree(
+  categories: Category[],
+  parentId: string | null = null
+): CategoryNode[] {
+  const children = categories
+    .filter((c) => (c.parentCategoryId ?? null) === parentId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  return children.map((c) => ({
+    category: c,
+    children: buildCategoryTree(categories, c.id),
+    depth: 0, // depth is set by the renderer
+  }))
+}
+
+// Compute the total value of a category node (own value + all descendants).
+export function computeCategoryNodeTotal(
+  node: CategoryNode,
+  transactionsByCat: Record<string, Transaction | undefined>,
+  euroRate: number
+): number {
+  let total = 0
+  const tx = transactionsByCat[node.category.id]
+  if (tx) {
+    total += node.category.currency === 'EUR' ? tx.value * euroRate : tx.value
+  }
+  for (const child of node.children) {
+    total += computeCategoryNodeTotal(child, transactionsByCat, euroRate)
+  }
+  return total
 }
 
 // ---- Months ----

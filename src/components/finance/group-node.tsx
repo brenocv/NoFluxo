@@ -16,10 +16,12 @@ import {
   formatMoney,
   GroupTreeNode,
   computeNodeTotal,
+  buildCategoryTree,
+  computeCategoryNodeTotal,
   Transaction,
 } from '@/lib/finance'
 import {
-  Plus, Trash2, ChevronDown, Pencil, Clock, AlertTriangle, RefreshCw, Check,
+  Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock, AlertTriangle, RefreshCw, Check,
   FolderPlus,
 } from 'lucide-react'
 
@@ -27,9 +29,10 @@ interface Props {
   node: GroupTreeNode
   labels: Record<string, string>
   transactionsByCat: Record<string, Transaction | undefined>
+  allCategories: Category[]
   euroRate: number
   onEdit: (category: Category, current: Transaction | undefined) => void
-  onAddCategory: (group: string) => void
+  onAddCategory: (group: string, parentCategoryId?: string | null) => void
   onDeleteCategory: (cat: Category) => void
   onRename: (key: string, value: string) => void
   onStopRecurring: (seriesId: string, currentMonth: number) => void
@@ -38,7 +41,7 @@ interface Props {
 }
 
 export function GroupNode(props: Props) {
-  const { node, labels, transactionsByCat, euroRate } = props
+  const { node, labels, transactionsByCat, euroRate, allCategories } = props
   const [open, setOpen] = useState(true)
 
   const total = computeNodeTotal(node, transactionsByCat, euroRate)
@@ -47,7 +50,6 @@ export function GroupNode(props: Props) {
   const isReserve = node.key === 'reservas'
   const isReceivable = node.isReceivable
 
-  // Sign for the total
   const totalSign =
     isReserve || isReceivable
       ? ''
@@ -55,13 +57,15 @@ export function GroupNode(props: Props) {
         ? (total >= 0 ? '+' : '−')
         : (total >= 0 ? '−' : '+')
 
-  // Color
   const totalColor =
     isIncome
       ? 'text-emerald-600'
       : (isReserve || isReceivable)
         ? 'text-amber-600'
         : 'text-rose-600'
+
+  // Build category tree for direct categories in this group node
+  const categoryTree = buildCategoryTree(node.categories, null)
 
   return (
     <Card
@@ -91,7 +95,7 @@ export function GroupNode(props: Props) {
             </Badge>
           )}
           <span className="text-xs text-muted-foreground flex-shrink-0">
-            ({countAll(node)})
+            ({countAll(node, allCategories)})
           </span>
         </button>
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -103,7 +107,6 @@ export function GroupNode(props: Props) {
             )}
             small={!isTopLevel}
           />
-          {/* Add subgroup button */}
           <button
             onClick={(e) => { e.stopPropagation(); props.onAddSubgroup(node.key) }}
             className="p-1 rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation"
@@ -112,7 +115,6 @@ export function GroupNode(props: Props) {
           >
             <FolderPlus className="h-3.5 w-3.5" />
           </button>
-          {/* Delete user-created subgroup */}
           {!isTopLevel && (
             <button
               onClick={(e) => { e.stopPropagation(); props.onDeleteSubgroup(node) }}
@@ -136,18 +138,15 @@ export function GroupNode(props: Props) {
       {/* Body */}
       {open && (
         <div>
-          {/* Direct categories */}
-          {node.categories.length > 0 && (
+          {/* Direct categories (recursive tree) */}
+          {categoryTree.length > 0 && (
             <div className="divide-y divide-border border-t border-border">
-              {node.categories.map((cat) => (
-                <CategoryRow
-                  key={cat.id}
-                  cat={cat}
-                  tx={transactionsByCat[cat.id]}
-                  euroRate={euroRate}
-                  onEdit={props.onEdit}
-                  onDelete={props.onDeleteCategory}
-                  onStopRecurring={props.onStopRecurring}
+              {categoryTree.map((catNode) => (
+                <CategoryNodeRow
+                  key={catNode.category.id}
+                  catNode={catNode}
+                  depth={0}
+                  allProps={props}
                 />
               ))}
             </div>
@@ -165,7 +164,7 @@ export function GroupNode(props: Props) {
 
           {/* Add category button */}
           <button
-            onClick={() => props.onAddCategory(node.key)}
+            onClick={() => props.onAddCategory(node.key, null)}
             className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors touch-manipulation border-t border-border"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -177,109 +176,197 @@ export function GroupNode(props: Props) {
   )
 }
 
-function countAll(node: GroupTreeNode): number {
-  return node.categories.length + node.children.reduce((acc, c) => acc + countAll(c), 0)
+function countAll(node: GroupTreeNode, allCategories: Category[]): number {
+  // Count direct categories (including nested children) in this group
+  const directCount = node.categories.length
+  const childCount = node.children.reduce((acc, c) => acc + countAll(c, allCategories), 0)
+  return directCount + childCount
 }
 
-function CategoryRow({
-  cat, tx, euroRate, onEdit, onDelete, onStopRecurring,
+// ---- Recursive category node ----
+
+function CategoryNodeRow({
+  catNode,
+  depth,
+  allProps,
 }: {
-  cat: Category
-  tx: Transaction | undefined
-  euroRate: number
-  onEdit: (c: Category, t: Transaction | undefined) => void
-  onDelete: (c: Category) => void
-  onStopRecurring: (s: string, m: number) => void
+  catNode: import('@/lib/finance').CategoryNode
+  depth: number
+  allProps: Props
 }) {
+  const { category, children } = catNode
+  const [open, setOpen] = useState(false) // collapsed by default
+  const { transactionsByCat, euroRate } = allProps
+
+  const tx = transactionsByCat[category.id]
   const value = tx?.value ?? null
   const isRecurring = tx?.isRecurring ?? false
   const installmentNumber = tx?.installmentNumber ?? null
   const installmentsTotal = tx?.installmentsTotal ?? null
+  const hasChildren = children.length > 0
 
-  const goalExceeded = cat.monthlyGoal !== null && value !== null && cat.type === 'EXPENSE' && value > cat.monthlyGoal
+  const goalExceeded = category.monthlyGoal !== null && value !== null && category.type === 'EXPENSE' && value > category.monthlyGoal
+
+  // Total including children
+  const totalWithChildren = hasChildren
+    ? computeCategoryNodeTotal(catNode, transactionsByCat, euroRate)
+    : null
 
   const sign =
-    value === null
+    value === null && totalWithChildren === null
       ? ''
-      : cat.type === 'RESERVE' || cat.group === 'rendimentos.valores_a_receber'
-        ? (value < 0 ? '−' : '')
-        : cat.type === 'INCOME'
-          ? (value >= 0 ? '+' : '−')
-          : (value >= 0 ? '−' : '+')
+      : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber'
+        ? ((value ?? totalWithChildren ?? 0) < 0 ? '−' : '')
+        : category.type === 'INCOME'
+          ? ((value ?? totalWithChildren ?? 0) >= 0 ? '+' : '−')
+          : ((value ?? totalWithChildren ?? 0) >= 0 ? '−' : '+')
+
+  const displayValue = totalWithChildren !== null ? totalWithChildren : value
+  const displayCurrency = category.currency
 
   return (
-    <div className="flex items-center justify-between px-3 py-2.5 group">
-      <button
-        onClick={() => onEdit(cat, tx)}
-        className="flex-1 flex flex-col items-start text-left touch-manipulation min-w-0"
+    <>
+      <div
+        className="flex items-center justify-between px-3 py-2.5 group hover:bg-muted/30 transition-colors"
+        style={depth > 0 ? { paddingLeft: `${12 + depth * 20}px` } : undefined}
       >
-        <span className="text-sm font-medium text-foreground flex items-center gap-1">
-          {cat.name}
-          {isRecurring && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded">
-              <RefreshCw className="h-2 w-2" />
-              {installmentsTotal ? `${installmentNumber}/${installmentsTotal}` : 'recorrente'}
-            </span>
-          )}
-          {goalExceeded && (
-            <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded">
-              <AlertTriangle className="h-2 w-2" />
-              meta
-            </span>
-          )}
-        </span>
-        {cat.note && (
-          <span className="text-xs text-muted-foreground truncate">{cat.note}</span>
-        )}
-      </button>
-      <div className="flex items-center gap-1">
-        {isRecurring && (
-          <button
-            onClick={() => tx?.seriesId && onStopRecurring(tx.seriesId, tx.month)}
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-cyan-50 hover:text-cyan-600 transition-all touch-manipulation"
-            aria-label="Parar recorrência"
-            title="Parar recorrência (remove parcelas futuras)"
-          >
-            <RefreshCw className="h-3 w-3" />
-          </button>
-        )}
-        <button
-          onClick={() => onEdit(cat, tx)}
-          className="px-3 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right"
-        >
-          {value === null ? (
-            <span className="text-sm font-normal text-muted-foreground italic">—</span>
+        {/* Left: chevron (if has children) + name */}
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          {hasChildren ? (
+            <button
+              onClick={() => setOpen((o) => !o)}
+              className="p-0.5 rounded hover:bg-muted text-muted-foreground touch-manipulation flex-shrink-0"
+              aria-label={open ? 'Recolher' : 'Expandir'}
+            >
+              {open
+                ? <ChevronDown className="h-3.5 w-3.5" />
+                : <ChevronRight className="h-3.5 w-3.5" />}
+            </button>
           ) : (
-            <div className="flex flex-col items-end leading-tight">
-              <span
-                className={cn(
-                  'text-sm font-semibold tabular-nums',
-                  cat.type === 'INCOME'
-                    ? 'text-emerald-600'
-                    : cat.type === 'RESERVE' || cat.group === 'rendimentos.valores_a_receber'
-                      ? 'text-amber-600'
-                      : 'text-rose-600'
-                )}
-              >
-                {sign}{formatMoney(Math.abs(value), cat.currency)}
-              </span>
-              <span className="text-[10px] text-muted-foreground tabular-nums">
-                {cat.currency === 'BRL'
-                  ? formatMoney(Math.abs(value) / euroRate, 'EUR')
-                  : formatMoney(Math.abs(value) * euroRate, 'BRL')}
-              </span>
-            </div>
+            <span className="w-5 flex-shrink-0" />
           )}
-        </button>
-        <button
-          onClick={() => onDelete(cat)}
-          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation"
-          aria-label="Remover categoria"
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+          <button
+            onClick={() => allProps.onEdit(category, tx)}
+            className="flex flex-col items-start text-left touch-manipulation min-w-0"
+          >
+            <span className="text-sm font-medium text-foreground flex items-center gap-1 truncate">
+              {category.name}
+              {isRecurring && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded">
+                  <RefreshCw className="h-2 w-2" />
+                  {installmentsTotal ? `${installmentNumber}/${installmentsTotal}` : 'recorrente'}
+                </span>
+              )}
+              {goalExceeded && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded">
+                  <AlertTriangle className="h-2 w-2" />
+                  meta
+                </span>
+              )}
+              {hasChildren && (
+                <span className="text-[9px] text-muted-foreground">
+                  ({children.length})
+                </span>
+              )}
+            </span>
+            {category.note && (
+              <span className="text-xs text-muted-foreground truncate">{category.note}</span>
+            )}
+          </button>
+        </div>
+
+        {/* Right: value + actions */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* Add sub-item button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              allProps.onAddCategory(category.group, category.id)
+            }}
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation"
+            aria-label="Adicionar sub-item"
+            title="Adicionar sub-item dentro desta categoria"
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+          {isRecurring && (
+            <button
+              onClick={() => tx?.seriesId && allProps.onStopRecurring(tx.seriesId, tx.month)}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-cyan-50 hover:text-cyan-600 transition-all touch-manipulation"
+              aria-label="Parar recorrência"
+              title="Parar recorrência (remove parcelas futuras)"
+            >
+              <RefreshCw className="h-3 w-3" />
+            </button>
+          )}
+          <button
+            onClick={() => allProps.onEdit(category, tx)}
+            className="px-3 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right"
+          >
+            {displayValue === null ? (
+              <span className="text-sm font-normal text-muted-foreground italic">—</span>
+            ) : (
+              <div className="flex flex-col items-end leading-tight">
+                <span
+                  className={cn(
+                    'text-sm font-semibold tabular-nums',
+                    category.type === 'INCOME'
+                      ? 'text-emerald-600'
+                      : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber'
+                        ? 'text-amber-600'
+                        : 'text-rose-600'
+                  )}
+                >
+                  {sign}{formatMoney(Math.abs(displayValue), displayCurrency)}
+                  {hasChildren && totalWithChildren !== null && value !== null && (
+                    <span className="text-[9px] text-muted-foreground ml-1 font-normal">
+                      (com sub)
+                    </span>
+                  )}
+                </span>
+                <span className="text-[10px] text-muted-foreground tabular-nums">
+                  {displayCurrency === 'BRL'
+                    ? formatMoney(Math.abs(displayValue) / euroRate, 'EUR')
+                    : formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
+                </span>
+              </div>
+            )}
+          </button>
+          <button
+            onClick={() => allProps.onDeleteCategory(category)}
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation"
+            aria-label="Remover categoria"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
-    </div>
+
+      {/* Children — indented with left border (travessão visual) */}
+      {hasChildren && open && (
+        <div
+          className="border-l-2 border-l-muted-foreground/15 ml-4 bg-muted/10"
+        >
+          {children.map((child) => (
+            <CategoryNodeRow
+              key={child.category.id}
+              catNode={child}
+              depth={depth + 1}
+              allProps={allProps}
+            />
+          ))}
+          {/* Add sub-item at the bottom of expanded children */}
+          <button
+            onClick={() => allProps.onAddCategory(category.group, category.id)}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors touch-manipulation"
+            style={{ paddingLeft: `${12 + (depth + 1) * 20}px` }}
+          >
+            <Plus className="h-3 w-3" />
+            Adicionar sub-item em {category.name}
+          </button>
+        </div>
+      )}
+    </>
   )
 }
 

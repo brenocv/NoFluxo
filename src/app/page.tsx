@@ -65,6 +65,7 @@ export default function Home() {
   const [month, setMonth] = useState<number>(() => new Date().getMonth() + 1)
   const [editTarget, setEditTarget] = useState<{ category: Category; tx: Transaction | null } | null>(null)
   const [newCatGroup, setNewCatGroup] = useState<CategoryGroup | null>(null)
+  const [newCatParent, setNewCatParent] = useState<string | null>(null)
   const [newSubgroupParent, setNewSubgroupParent] = useState<{ key: string; label: string } | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -280,12 +281,14 @@ export default function Home() {
     note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null
   }) {
     try {
-      const r = await createCategory({ ...args, user })
-      const detail = `Criou categoria "${r.category.name}"`
+      const r = await createCategory({ ...args, parentCategoryId: newCatParent, user })
+      const detail = newCatParent
+        ? `Criou sub-item "${r.category.name}"`
+        : `Criou categoria "${r.category.name}"`
       dispatchChange('category', 'create', { category: r.category }, detail, {
         user, action: 'create', entity: 'category', detail, createdAt: new Date().toISOString(),
       })
-      toast.success(`Categoria "${r.category.name}" criada`)
+      toast.success(newCatParent ? `Sub-item "${r.category.name}" criado` : `Categoria "${r.category.name}" criada`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao criar categoria')
     }
@@ -543,9 +546,13 @@ export default function Home() {
               node={node}
               labels={labels}
               transactionsByCat={txByCat}
+              allCategories={categories}
               euroRate={euroRate}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
-              onAddCategory={(grp) => setNewCatGroup(grp as CategoryGroup)}
+              onAddCategory={(grp, parentCategoryId) => {
+                setNewCatGroup(grp as CategoryGroup)
+                setNewCatParent(parentCategoryId ?? null)
+              }}
               onDeleteCategory={handleDeleteCategory}
               onRename={handleRename}
               onStopRecurring={handleStopRecurringFromList}
@@ -578,7 +585,7 @@ export default function Home() {
               {user}
             </button>
           </div>
-          <Button size="sm" onClick={() => setNewCatGroup('despesas.cartoes')} className="h-8">
+          <Button size="sm" onClick={() => { setNewCatGroup('despesas.cartoes'); setNewCatParent(null) }} className="h-8">
             <Plus className="h-4 w-4 mr-1" />
             Nova categoria
           </Button>

@@ -8,7 +8,7 @@ const globalForPrisma = globalThis as unknown as {
   prismaVersion?: string
 }
 
-const CURRENT_VERSION = 'v6-subgroups-n-depth'
+const CURRENT_VERSION = 'v7-category-tree'
 
 function createClient() {
   return new PrismaClient({

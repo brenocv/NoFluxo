@@ -39,6 +39,12 @@ model Category {
   // Optional monthly goal. For EXPENSE categories, this is a maximum spend;
   // for INCOME, a minimum target. UI shows a warning when exceeded.
   monthlyGoal Float?
+  // Parent category for tree nesting. null = direct child of the group.
+  // When a category has children, it shows a chevron and its total includes
+  // the sum of all descendants.
+  parentCategoryId String?
+  parent          Category?  @relation("CategoryTree", fields: [parentCategoryId], references: [id], onDelete: Cascade)
+  children        Category[] @relation("CategoryTree")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
