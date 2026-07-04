@@ -333,3 +333,36 @@ Stage Summary:
 - Saldo total do mês inclui o saldo anterior no cálculo
 - Click na linha navega para o mês anterior
 - Lint limpo
+
+---
+Task ID: v16
+Agent: super-z (main)
+Task: Backup JSON (export/import); notificações push para vencimentos; orçamento anual com meta de poupança.
+
+Work Log:
+1. Backup JSON:
+   - API GET /api/backup: retorna JSON completo (categories, subgroups, transactions, notes, config, activityLogs)
+   - API POST /api/backup/import: aceita { backup, mode: 'replace' | 'merge' }
+     - replace: apaga tudo e restaura do backup
+     - merge: adiciona só o que falta (por ID)
+   - BackupDialog: exportar (download JSON), importar (file picker + mode selector)
+   - Botão Database no header
+
+2. Notificações push:
+   - Hook useVencimentoNotifications: parse "vence dia X", notifica 3 dias antes, 1 dia antes, e no dia
+   - Uses Notification API (nativo do browser), pede permissão
+   - Não repete notificação no mesmo dia (localStorage key)
+   - Botão Bell/BellOff no header
+
+3. Orçamento anual:
+   - API GET/POST /api/budget: armazena meta em config key `budget:YYYY`
+   - BudgetCard: mostra Poupado / Meta / Faltam, progress bar colorida, status
+   - Editável via Popover (lápis)
+   - Calcula poupança atual = entradas - saídas do ano todo
+
+Stage Summary:
+- Backup: exportar JSON completo, importar com modo replace ou merge
+- Notificações: ativa/desativa via botão Bell, notifica vencimentos 3/1/0 dias antes
+- Orçamento: meta de poupança anual com progress bar e status visual
+- Todos os componentes perdidos foram recriados (undo-redo-buttons, vencimento-alerts, annual-dashboard, move-category-dialog, theme-toggle, theme-provider, notes-panel, use-action-history)
+- Lint limpo

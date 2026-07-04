@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useFinanceData } from '@/hooks/use-finance-data'
 import { useCurrentUser } from '@/hooks/use-current-user'
+import { useActionHistory } from '@/hooks/use-action-history'
 import {
   saveTransaction,
   stopRecurringSeries,
@@ -42,12 +43,22 @@ import { MonthlyChart } from '@/components/finance/monthly-chart'
 import { ExpensePieChart } from '@/components/finance/expense-pie-chart'
 import { CopyMonthDialog } from '@/components/finance/copy-month-dialog'
 import { ResetDialog } from '@/components/finance/reset-dialog'
+import { NotesPanel } from '@/components/finance/notes-panel'
+import { ThemeToggle } from '@/components/theme-toggle'
+import { UndoRedoButtons } from '@/components/finance/undo-redo-buttons'
+import { VencimentoAlerts } from '@/components/finance/vencimento-alerts'
+import { AnnualDashboard } from '@/components/finance/annual-dashboard'
+import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
+import { BackupDialog } from '@/components/finance/backup-dialog'
+import { BudgetCard } from '@/components/finance/budget-card'
+import { useVencimentoNotifications } from '@/hooks/use-vencimento-notifications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Download, Copy, Eraser,
+  Database, Bell, BellOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -72,6 +83,10 @@ export default function Home() {
   const [showOnlyFilled, setShowOnlyFilled] = useState(false)
   const [copyOpen, setCopyOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
+  const [moveTarget, setMoveTarget] = useState<Category | null>(null)
+  const [backupOpen, setBackupOpen] = useState(false)
+  const history = useActionHistory()
+  const notifications = useVencimentoNotifications(categories)
   const [includeReceivables, setIncludeReceivables] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false
     try { return window.localStorage.getItem(RECEIVABLES_TOGGLE_KEY) === '1' } catch { return false }
@@ -218,6 +233,7 @@ export default function Home() {
   }) {
     if (!editTarget) return
     const cat = editTarget.category
+    const prevTx = editTarget.tx ? { ...editTarget.tx } : null
     try {
       const result = await saveTransaction({
         categoryId: cat.id, month, year,
@@ -241,6 +257,33 @@ export default function Home() {
         detail,
         { user, action: result.action, entity: 'transaction', detail, createdAt: new Date().toISOString() }
       )
+
+      // Record undo/redo
+      const newTxs = txs
+      history.push({
+        description: detail,
+        undo: async () => {
+          if (prevTx) {
+            await saveTransaction({ categoryId: cat.id, month: prevTx.month, year: prevTx.year, value: prevTx.value, note: prevTx.note, user })
+            dispatchChange('transaction', 'update', { transactions: [prevTx] }, `Desfez: ${detail}`,
+              { user, action: 'update', entity: 'transaction', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString() })
+          } else {
+            for (const t of newTxs) {
+              await saveTransaction({ categoryId: cat.id, month: t.month, year: t.year, value: null, note: null, user })
+            }
+            dispatchChange('transaction', 'delete', { ids: newTxs.map((t: any) => t.id) }, `Desfez: ${detail}`,
+              { user, action: 'delete', entity: 'transaction', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString() })
+          }
+        },
+        redo: async () => {
+          const r = await saveTransaction({ categoryId: cat.id, month, year, value: args.value, note: args.note, user, isRecurring: args.isRecurring, installmentsTotal: args.installmentsTotal })
+          const rTxs = r.transactions ?? (r.transaction ? [r.transaction] : [])
+          dispatchChange('transaction', r.action as 'create' | 'update' | 'delete',
+            rTxs.length > 0 ? { transactions: rTxs } : { id: prevTx?.id },
+            `Refazendo: ${detail}`,
+            { user, action: r.action, entity: 'transaction', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString() })
+        },
+      })
 
       toast.success(args.value === null ? `${cat.name} removido` : args.isRecurring ? `${cat.name} recorrente criado` : `${cat.name} atualizado`)
     } catch (e: any) {
@@ -424,6 +467,11 @@ export default function Home() {
   }
 
   async function handleReset(scope: 'month' | 'year') {
+    const txsToDelete = transactions.filter((t) => {
+      if (t.year !== year) return false
+      if (scope === 'month' && t.month !== month) return false
+      return true
+    })
     try {
       const r = await resetValues({ scope, year, month, user })
       const detail = scope === 'month'
@@ -434,9 +482,123 @@ export default function Home() {
         detail,
         { user, action: 'delete', entity: 'transaction', detail, createdAt: new Date().toISOString() }
       )
+      const snapshot = txsToDelete.map((t) => ({
+        categoryId: t.categoryId, year: t.year, month: t.month,
+        value: t.value, note: t.note,
+      }))
+      history.push({
+        description: detail,
+        undo: async () => {
+          for (const t of snapshot) {
+            await saveTransaction({ categoryId: t.categoryId, month: t.month, year: t.year, value: t.value, note: t.note, user })
+          }
+          const refreshed = await fetch(`/api/data?year=${year}`).then((r) => r.json())
+          if (refreshed.transactions) {
+            dispatchChange('transaction', 'create', { transactions: refreshed.transactions }, `Desfez: ${detail}`,
+              { user, action: 'create', entity: 'transaction', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString() })
+          }
+        },
+        redo: async () => {
+          await resetValues({ scope, year, month, user })
+          dispatchChange('transaction', 'delete',
+            scope === 'month' ? { deleteYear: year, deleteMonth: month } : { deleteYear: year },
+            `Refazendo: ${detail}`,
+            { user, action: 'delete', entity: 'transaction', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString() })
+        },
+      })
       toast.success(`${r.deletedCount} valor(es) removido(s)`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao zerar valores')
+    }
+  }
+
+  async function handleUndo() {
+    try { await history.undo(); toast.success('Ação desfeita') }
+    catch (e: any) { toast.error(e.message || 'Erro ao desfazer') }
+  }
+
+  async function handleRedo() {
+    try { await history.redo(); toast.success('Ação refeita') }
+    catch (e: any) { toast.error(e.message || 'Erro ao refazer') }
+  }
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) { e.preventDefault(); handleUndo() }
+      else if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) { e.preventDefault(); handleRedo() }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [history])
+
+  async function handleMoveCategory(newGroup: string, newParentCategoryId: string | null) {
+    if (!moveTarget) return
+    const prevGroup = moveTarget.group
+    const prevParent = moveTarget.parentCategoryId
+    try {
+      const r = await updateCategory(moveTarget.id, { group: newGroup, parentCategoryId: newParentCategoryId }, user)
+      const detail = `Moveu categoria "${r.category.name}"`
+      dispatchChange('category', 'update', { category: r.category }, detail, {
+        user, action: 'update', entity: 'category', detail, createdAt: new Date().toISOString(),
+      })
+      history.push({
+        description: detail,
+        undo: async () => {
+          const rr = await updateCategory(moveTarget.id, { group: prevGroup, parentCategoryId: prevParent }, user)
+          dispatchChange('category', 'update', { category: rr.category }, `Desfez: ${detail}`, {
+            user, action: 'update', entity: 'category', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+        redo: async () => {
+          const rr = await updateCategory(moveTarget.id, { group: newGroup, parentCategoryId: newParentCategoryId }, user)
+          dispatchChange('category', 'update', { category: rr.category }, `Refazendo: ${detail}`, {
+            user, action: 'update', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+      })
+      toast.success('Categoria movida')
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao mover categoria')
+    }
+  }
+
+  async function handleExportBackup() {
+    try {
+      toast.info('Gerando backup…')
+      const r = await fetch('/api/backup')
+      if (!r.ok) throw new Error('Falha')
+      const blob = await r.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `porto-backup-${new Date().toISOString().slice(0, 10)}.json`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+      toast.success('Backup exportado')
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao exportar backup')
+    }
+  }
+
+  async function handleImportBackup(file: File, mode: 'replace' | 'merge') {
+    try {
+      toast.info('Importando backup…')
+      const text = await file.text()
+      const backup = JSON.parse(text)
+      const r = await fetch('/api/backup/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ backup, mode, user }),
+      })
+      if (!r.ok) throw new Error('Falha')
+      const data = await r.json()
+      toast.success(`Backup importado: ${data.imported.transactions} transações`)
+      // Reload to refresh all data
+      setTimeout(() => location.reload(), 1000)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao importar backup')
     }
   }
 
@@ -506,18 +668,42 @@ export default function Home() {
               {live.connected ? <><Wifi className="h-3 w-3" /><span>Sincronizando</span></>
                 : <><WifiOff className="h-3 w-3" /><span>Offline</span></>}
             </Badge>
+            <UndoRedoButtons
+              canUndo={history.canUndo}
+              canRedo={history.canRedo}
+              nextUndo={history.nextUndo}
+              nextRedo={history.nextRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+            />
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCopyOpen(true)} aria-label="Copiar mês" title="Copiar valores para outro mês">
               <Copy className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setResetOpen(true)} aria-label="Zerar valores" title="Zerar valores do mês ou ano">
               <Eraser className="h-4 w-4" />
             </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setBackupOpen(true)} aria-label="Backup" title="Backup e restauração">
+              <Database className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleExportExcel} aria-label="Exportar Excel">
               <Download className="h-4 w-4" />
             </Button>
+            {notifications.supported && (
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => notifications.enabled ? notifications.disable() : notifications.requestPermission()}
+                aria-label="Notificações"
+                title={notifications.enabled ? 'Desativar notificações' : 'Ativar notificações de vencimento'}
+              >
+                {notifications.enabled ? <Bell className="h-4 w-4 text-emerald-600" /> : <BellOff className="h-4 w-4" />}
+              </Button>
+            )}
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSettingsOpen(true)} aria-label="Configurações">
               <Settings className="h-4 w-4" />
             </Button>
+            <ThemeToggle />
           </div>
         </div>
       </header>
@@ -544,6 +730,24 @@ export default function Home() {
           <MonthlyChart data={chartData} selectedMonth={month} onSelectMonth={setMonth} euroRate={euroRate} />
           <ExpensePieChart categories={categories} transactionsByCat={txByCat} euroRate={euroRate} />
         </div>
+
+        {/* Annual dashboard */}
+        <AnnualDashboard
+          data={chartData}
+          selectedMonth={month}
+          onSelectMonth={setMonth}
+          euroRate={euroRate}
+        />
+
+        {/* Budget card — meta de poupança */}
+        <BudgetCard year={year} user={user} />
+
+        {/* Vencimento alerts */}
+        <VencimentoAlerts
+          categories={categories}
+          currentDay={new Date().getDate()}
+          daysInMonth={new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate()}
+        />
 
         <div className="space-y-2">
           <SearchBar value={search} onChange={setSearch} resultsCount={search.trim() ? filteredCategoryIds.size : undefined} />
@@ -588,9 +792,13 @@ export default function Home() {
                 label: getGroupLabel(parentKey, labels, subgroups),
               })}
               onDeleteSubgroup={handleDeleteSubgroup}
+              onMoveCategory={(cat) => setMoveTarget(cat)}
             />
           ))
         )}
+
+        {/* Caderninho — lined-paper notes for the current month (above activity) */}
+        <NotesPanel year={year} month={month} user={user} />
 
         <ActivityPanel activity={activity} presences={live.presences} currentUser={user} />
 
@@ -673,6 +881,22 @@ export default function Home() {
         year={year}
         month={month}
         onReset={handleReset}
+      />
+
+      <MoveCategoryDialog
+        open={!!moveTarget}
+        category={moveTarget}
+        labels={labels}
+        subgroups={subgroups}
+        onOpenChange={(o) => !o && setMoveTarget(null)}
+        onMove={handleMoveCategory}
+      />
+
+      <BackupDialog
+        open={backupOpen}
+        onOpenChange={setBackupOpen}
+        onExport={handleExportBackup}
+        onImport={handleImportBackup}
       />
     </div>
   )
