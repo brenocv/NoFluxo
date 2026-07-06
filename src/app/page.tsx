@@ -51,6 +51,7 @@ import { AnnualDashboard } from '@/components/finance/annual-dashboard'
 import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
 import { BackupDialog } from '@/components/finance/backup-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
+import { PrevBalanceCard } from '@/components/finance/prev-balance-card'
 import { useVencimentoNotifications } from '@/hooks/use-vencimento-notifications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -760,6 +761,17 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Saldo do mês anterior — card separado, acima dos grupos */}
+        <PrevBalanceCard
+          balance={prevMonthBalance}
+          prevMonthLabel={prevMonthLabel}
+          euroRate={euroRate}
+          onClick={() => {
+            if (month === 1) { setYear(year - 1); setMonth(12) }
+            else setMonth(month - 1)
+          }}
+        />
+
         {groupTree.length === 0 ? (
           <div className="text-center py-12 text-sm text-muted-foreground">
             Nenhuma categoria encontrada{search.trim() ? ` para "${search}"` : ''}.
@@ -773,12 +785,6 @@ export default function Home() {
               transactionsByCat={txByCat}
               allCategories={categories}
               euroRate={euroRate}
-              previousMonthBalance={prevMonthBalance}
-              prevMonthLabel={prevMonthLabel}
-              onPrevMonthClick={() => {
-                if (month === 1) { setYear(year - 1); setMonth(12) }
-                else setMonth(month - 1)
-              }}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
               onAddCategory={(grp, parentCategoryId) => {
                 setNewCatGroup(grp as CategoryGroup)
