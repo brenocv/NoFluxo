@@ -29,6 +29,13 @@ import {
   Currency,
   Subgroup,
 } from '@/lib/finance'
+import { cn } from '@/lib/utils'
+
+const PRESET_COLORS = [
+  '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
+  '#16a34a', '#0891b2', '#0284c7', '#4f46e5', '#7c3aed',
+  '#c026d3', '#db2777', '#e11d48', '#f97316', '#facc15',
+]
 
 interface Props {
   open: boolean
@@ -54,6 +61,7 @@ export function CategoryEditor({ open, group, labels, subgroups, onOpenChange, o
   const [type, setType] = useState<CategoryType>('EXPENSE')
   const [currency, setCurrency] = useState<Currency>('BRL')
   const [goal, setGoal] = useState('')
+  const [color, setColor] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -67,6 +75,7 @@ export function CategoryEditor({ open, group, labels, subgroups, onOpenChange, o
       setName('')
       setNote('')
       setGoal('')
+      setColor('')
     }
   }, [open])
 
@@ -102,6 +111,7 @@ export function CategoryEditor({ open, group, labels, subgroups, onOpenChange, o
         note: note.trim() || undefined,
         excludeFromTotal: groupVal === 'rendimentos.valores_a_receber',
         monthlyGoal: parsedGoal,
+        color: color || null,
       })
       onOpenChange(false)
     } finally {
@@ -205,6 +215,36 @@ export function CategoryEditor({ open, group, labels, subgroups, onOpenChange, o
               onChange={(e) => setGoal(e.target.value)}
               placeholder="Ex.: 250"
             />
+          </div>
+
+          {/* Color picker */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Cor (opcional)</Label>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setColor('')}
+                className={cn(
+                  'h-7 w-7 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all',
+                  !color ? 'border-primary ring-2 ring-primary/20' : 'border-border'
+                )}
+                title="Cor padrão do grupo"
+              >
+                A
+              </button>
+              {PRESET_COLORS.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => setColor(c)}
+                  className={cn(
+                    'h-7 w-7 rounded-full border-2 transition-all',
+                    color === c ? 'border-primary ring-2 ring-primary/20 scale-110' : 'border-transparent'
+                  )}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
           </div>
         </div>
 

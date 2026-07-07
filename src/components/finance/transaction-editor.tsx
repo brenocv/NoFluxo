@@ -17,6 +17,12 @@ import { Category, formatMoney, MONTHS_PT_LONG, Transaction } from '@/lib/financ
 import { cn } from '@/lib/utils'
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react'
 
+const PRESET_COLORS = [
+  '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
+  '#16a34a', '#0891b2', '#0284c7', '#4f46e5', '#7c3aed',
+  '#c026d3', '#db2777', '#e11d48', '#f97316', '#facc15',
+]
+
 interface Props {
   open: boolean
   category: Category | null
@@ -37,6 +43,8 @@ interface Props {
     name?: string
     note?: string | null
     monthlyGoal?: number | null
+    currency?: 'BRL' | 'EUR'
+    color?: string | null
   }) => Promise<void>
 }
 
@@ -54,6 +62,8 @@ export function TransactionEditor({
   const [catName, setCatName] = useState('')
   const [catNote, setCatNote] = useState('')
   const [goalValue, setGoalValue] = useState('')
+  const [catCurrency, setCatCurrency] = useState<'BRL' | 'EUR'>('BRL')
+  const [catColor, setCatColor] = useState<string>('')
 
   useEffect(() => {
     if (open && category) {
@@ -66,6 +76,8 @@ export function TransactionEditor({
       setCatName(category.name)
       setCatNote(category.note ?? '')
       setGoalValue(category.monthlyGoal != null ? String(category.monthlyGoal) : '')
+      setCatCurrency(category.currency)
+      setCatColor(category.color ?? '')
     }
   }, [open, transaction, category])
 
@@ -96,6 +108,8 @@ export function TransactionEditor({
       if (catNote !== (category!.note ?? '')) catFields.note = catNote.trim() || null
       const newGoal = goalValue === '' ? null : parsedGoal
       if (newGoal !== category!.monthlyGoal) catFields.monthlyGoal = newGoal
+      if (catCurrency !== category!.currency) catFields.currency = catCurrency
+      if (catColor !== (category!.color ?? '')) catFields.color = catColor || null
       if (Object.keys(catFields).length > 0) {
         await onUpdateCategory(catFields)
       }
@@ -306,7 +320,7 @@ export function TransactionEditor({
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="cat-goal" className="text-xs">
-                  Meta mensal ({category.currency === 'BRL' ? 'R$' : '€'})
+                  Meta mensal ({catCurrency === 'BRL' ? 'R$' : '€'})
                   <span className="ml-1 text-muted-foreground">
                     {category.type === 'EXPENSE' ? '(gasto máx.)' : '(mín. desejado)'}
                   </span>
@@ -326,6 +340,45 @@ export function TransactionEditor({
                     Valor ultrapassa a meta definida
                   </p>
                 )}
+              </div>
+
+              {/* Currency selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Moeda da categoria</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCatCurrency('BRL')}
+                    className={cn('h-9 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'BRL' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300' : 'border-border bg-muted/50 text-muted-foreground')}
+                  >R$ Real</button>
+                  <button
+                    type="button"
+                    onClick={() => setCatCurrency('EUR')}
+                    className={cn('h-9 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'EUR' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'border-border bg-muted/50 text-muted-foreground')}
+                  >€ Euro</button>
+                </div>
+              </div>
+
+              {/* Color picker */}
+              <div className="space-y-1.5">
+                <Label className="text-xs">Cor da categoria</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setCatColor('')}
+                    className={cn('h-7 w-7 rounded-full border-2 flex items-center justify-center text-[10px] font-bold transition-all', !catColor ? 'border-primary ring-2 ring-primary/20' : 'border-border')}
+                    title="Cor padrão"
+                  >A</button>
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCatColor(c)}
+                      className={cn('h-7 w-7 rounded-full border-2 transition-all', catColor === c ? 'border-primary ring-2 ring-primary/20 scale-110' : 'border-transparent')}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </details>

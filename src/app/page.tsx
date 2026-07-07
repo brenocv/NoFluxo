@@ -362,13 +362,33 @@ export default function Home() {
 
   async function handleUpdateCategory(fields: {
     name?: string; note?: string | null; monthlyGoal?: number | null
+    currency?: 'BRL' | 'EUR'; color?: string | null
   }) {
     if (!editTarget) return
+    const prevCat = { ...editTarget.category }
     try {
       const r = await updateCategory(editTarget.category.id, fields, user)
       const detail = `Editou categoria "${r.category.name}"`
       dispatchChange('category', 'update', { category: r.category }, detail, {
         user, action: 'update', entity: 'category', detail, createdAt: new Date().toISOString(),
+      })
+      history.push({
+        description: detail,
+        undo: async () => {
+          const rr = await updateCategory(prevCat.id, {
+            name: prevCat.name, note: prevCat.note, monthlyGoal: prevCat.monthlyGoal,
+            currency: prevCat.currency, color: prevCat.color,
+          }, user)
+          dispatchChange('category', 'update', { category: rr.category }, `Desfez: ${detail}`, {
+            user, action: 'update', entity: 'category', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+        redo: async () => {
+          const rr = await updateCategory(prevCat.id, fields, user)
+          dispatchChange('category', 'update', { category: rr.category }, `Refazendo: ${detail}`, {
+            user, action: 'update', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
       })
     } catch (e: any) {
       toast.error(e.message || 'Erro ao atualizar categoria')
@@ -377,7 +397,7 @@ export default function Home() {
 
   async function handleCreateCategory(args: {
     name: string; group: CategoryGroup; type: CategoryType; currency: Currency
-    note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null
+    note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null; color?: string | null
   }) {
     try {
       const r = await createCategory({ ...args, parentCategoryId: newCatParent, workbookId, user })

@@ -38,6 +38,8 @@ model Category {
   autoConvert Boolean  @default(false)
   excludeFromTotal Boolean @default(false)
   monthlyGoal Float?
+  // Optional custom color (hex like "#dc2626"). When null, uses the group color.
+  color String?
   parentCategoryId String?
   parent          Category?  @relation("CategoryTree", fields: [parentCategoryId], references: [id], onDelete: Cascade)
   children        Category[] @relation("CategoryTree")

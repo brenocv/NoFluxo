@@ -25,6 +25,7 @@ export interface Category {
   autoConvert: boolean
   excludeFromTotal: boolean
   monthlyGoal: number | null
+  color: string | null
   parentCategoryId: string | null
   createdAt: string
   updatedAt: string
@@ -203,11 +204,9 @@ export function buildGroupTree(
       labels,
       filterCategoryIds
     )
-    // Only include top-level nodes that have at least one category OR one
-    // visible child (user-created subgroup, etc.)
-    if (countCategoriesRecursive(node) > 0 || node.children.length > 0) {
-      nodes.push(node)
-    }
+    // Always include top-level groups, even if empty — so the user can add
+    // categories to a new workbook.
+    nodes.push(node)
   }
 
   return nodes

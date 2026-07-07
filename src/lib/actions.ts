@@ -109,6 +109,7 @@ export interface SaveCategoryArgs {
   note?: string
   excludeFromTotal?: boolean
   monthlyGoal?: number | null
+  color?: string | null
   parentCategoryId?: string | null
   workbookId?: string
   user: string
@@ -134,6 +135,10 @@ export async function updateCategory(
     note?: string | null
     monthlyGoal?: number | null
     excludeFromTotal?: boolean
+    currency?: 'BRL' | 'EUR'
+    color?: string | null
+    group?: string
+    parentCategoryId?: string | null
   },
   user: string
 ): Promise<{ ok: boolean; category: Category }> {

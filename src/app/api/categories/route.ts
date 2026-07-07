@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       sortOrder,
       excludeFromTotal: !!body.excludeFromTotal,
       monthlyGoal: body.monthlyGoal ? Number(body.monthlyGoal) : null,
+      color: body.color ? String(body.color) : null,
       parentCategoryId: body.parentCategoryId ? String(body.parentCategoryId) : null,
     },
   })
@@ -62,6 +63,15 @@ export async function PATCH(req: NextRequest) {
     data.monthlyGoal = body.monthlyGoal === null || body.monthlyGoal === ''
       ? null
       : Number(body.monthlyGoal)
+  }
+  if (body.color !== undefined) data.color = body.color ? String(body.color) : null
+  if (body.currency !== undefined) {
+    const cur = String(body.currency)
+    if (cur === 'BRL' || cur === 'EUR') data.currency = cur
+  }
+  if (body.group !== undefined) data.group = String(body.group)
+  if (body.parentCategoryId !== undefined) {
+    data.parentCategoryId = body.parentCategoryId ? String(body.parentCategoryId) : null
   }
 
   const cat = await db.category.update({ where: { id: String(body.id) }, data })

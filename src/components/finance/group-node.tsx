@@ -31,6 +31,11 @@ interface Props {
   transactionsByCat: Record<string, Transaction | undefined>
   allCategories: Category[]
   euroRate: number
+  highlightedCategoryIds: Set<string>
+  onClearSearch: () => void
+  previousMonthBalance: number | null
+  prevMonthLabel: string
+  onPrevMonthClick: () => void
   onEdit: (category: Category, current: Transaction | undefined) => void
   onAddCategory: (group: string, parentCategoryId?: string | null) => void
   onDeleteCategory: (cat: Category) => void
@@ -38,6 +43,7 @@ interface Props {
   onStopRecurring: (seriesId: string, currentMonth: number) => void
   onAddSubgroup: (parentKey: string) => void
   onDeleteSubgroup: (node: GroupTreeNode) => void
+  onMoveCategory: (cat: Category) => void
 }
 
 export function GroupNode(props: Props) {
@@ -54,8 +60,8 @@ export function GroupNode(props: Props) {
     isReserve || isReceivable
       ? ''
       : isIncome
-        ? (total >= 0 ? '+' : '−')
-        : (total >= 0 ? '−' : '+')
+        ? (total >= 0 ? '+' : '-')
+        : (total >= 0 ? '-' : '+')
 
   const totalColor =
     isIncome
@@ -216,10 +222,10 @@ function CategoryNodeRow({
     value === null && totalWithChildren === null
       ? ''
       : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber'
-        ? ((value ?? totalWithChildren ?? 0) < 0 ? '−' : '')
+        ? ((value ?? totalWithChildren ?? 0) < 0 ? '-' : '')
         : category.type === 'INCOME'
-          ? ((value ?? totalWithChildren ?? 0) >= 0 ? '+' : '−')
-          : ((value ?? totalWithChildren ?? 0) >= 0 ? '−' : '+')
+          ? ((value ?? totalWithChildren ?? 0) >= 0 ? '+' : '-')
+          : ((value ?? totalWithChildren ?? 0) >= 0 ? '-' : '+')
 
   const displayValue = totalWithChildren !== null ? totalWithChildren : value
   const displayCurrency = category.currency
@@ -249,7 +255,13 @@ function CategoryNodeRow({
             onClick={() => allProps.onEdit(category, tx)}
             className="flex flex-col items-start text-left touch-manipulation min-w-0"
           >
-            <span className="text-sm font-medium text-foreground flex items-center gap-1 truncate">
+            <span className="text-sm font-medium text-foreground flex items-center gap-1.5 truncate">
+              {category.color && (
+                <span
+                  className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: category.color }}
+                />
+              )}
               {category.name}
               {isRecurring && (
                 <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded">
