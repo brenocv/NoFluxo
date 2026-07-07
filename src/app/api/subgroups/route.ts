@@ -1,23 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { GROUP_STRUCTURE, TOP_GROUP_ORDER } from '@/lib/finance'
 
 // POST /api/subgroups
-//   body: { parentKey, name, user }
-//   Creates a new subgroup inside `parentKey`. The parentKey can be a top-level
-//   key (e.g. "despesas") or any existing subgroup key (e.g. "despesas.contas_casa").
-//   Returns the created subgroup.
-//
+//   body: { parentKey, name, workbookId, user }
 // DELETE /api/subgroups
-//   body: { key, user }
-//   Deletes the subgroup. All categories inside it (and its sub-subgroups) are
-//   moved up to the parent group. Sub-subgroups are also moved to the parent.
+//   body: { key, workbookId, user }
 
 function slugify(name: string): string {
   return name
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '') // remove accents
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '')
     .slice(0, 40) || 'subgrupo'
@@ -25,32 +18,28 @@ function slugify(name: string): string {
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
-  if (!body || !body.parentKey || !body.name) {
-    return NextResponse.json({ error: 'parentKey and name are required' }, { status: 400 })
+  if (!body || !body.parentKey || !body.name || !body.workbookId) {
+    return NextResponse.json({ error: 'parentKey, name and workbookId are required' }, { status: 400 })
   }
   const user = String(body.user || 'Anônimo').slice(0, 30)
   const parentKey = String(body.parentKey)
   const name = String(body.name).trim().slice(0, 60)
+  const wbid = String(body.workbookId)
   if (!name) return NextResponse.json({ error: 'name cannot be empty' }, { status: 400 })
 
-  // Validate parentKey: must be a top-level key OR an existing subgroup
-  const isTopLevel = TOP_GROUP_ORDER.includes(parentKey as any)
-  const isDefaultSubgroup = GROUP_STRUCTURE.some((g) =>
-    g.subgroups.some((s) => s.key === parentKey)
-  )
-  const isUserSubgroup = await db.subgroup.findUnique({ where: { key: parentKey } })
-
-  if (!isTopLevel && !isDefaultSubgroup && !isUserSubgroup) {
+  // Validate parentKey: must be a TopGroup OR an existing Subgroup in this workbook
+  const isTopGroup = await db.topGroup.findFirst({ where: { key: parentKey, workbookId: wbid } })
+  const isSubgroup = await db.subgroup.findFirst({ where: { key: parentKey, workbookId: wbid } })
+  if (!isTopGroup && !isSubgroup) {
     return NextResponse.json({ error: 'parentKey inválido' }, { status: 400 })
   }
 
   // Generate a unique key within this workbook
   const baseSlug = slugify(name)
-  let key = `${parentKey}.${baseSlug}`
+  let key = parentKey + '.' + baseSlug
   let suffix = 2
-  const wbid = String(body.workbookId)
   while (await db.subgroup.findFirst({ where: { key, workbookId: wbid } })) {
-    key = `${parentKey}.${baseSlug}_${suffix++}`
+    key = parentKey + '.' + baseSlug + '_' + suffix++
   }
 
   // Compute sortOrder
@@ -65,10 +54,7 @@ export async function POST(req: NextRequest) {
   })
 
   await db.activityLog.create({
-    data: {
-      user, action: 'create', entity: 'subgroup',
-      detail: `Criou subgrupo "${name}"`,
-    },
+    data: { user, action: 'create', entity: 'subgroup', detail: 'Criou subgrupo "' + name + '"' },
   })
 
   return NextResponse.json({ ok: true, subgroup: sg })
@@ -76,13 +62,13 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   const body = await req.json().catch(() => null)
-  if (!body || !body.key) {
-    return NextResponse.json({ error: 'key is required' }, { status: 400 })
+  if (!body || !body.key || !body.workbookId) {
+    return NextResponse.json({ error: 'key and workbookId are required' }, { status: 400 })
   }
   const user = String(body.user || 'Anônimo').slice(0, 30)
   const key = String(body.key)
-
   const wbid = String(body.workbookId)
+
   const sg = await db.subgroup.findFirst({ where: { key, workbookId: wbid } })
   if (!sg) return NextResponse.json({ error: 'subgroup not found' }, { status: 404 })
 
@@ -107,10 +93,7 @@ export async function DELETE(req: NextRequest) {
   await db.subgroup.delete({ where: { id: sg.id } })
 
   await db.activityLog.create({
-    data: {
-      user, action: 'delete', entity: 'subgroup',
-      detail: `Removeu subgrupo "${sg.name}" (categorias movidas para o grupo pai)`,
-    },
+    data: { user, action: 'delete', entity: 'subgroup', detail: 'Removeu subgrupo "' + sg.name + '"' },
   })
 
   return NextResponse.json({ ok: true, movedToParent: parentKey })

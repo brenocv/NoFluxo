@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useSyncExternalStore } from 'react'
 
 export interface HistoryAction {
   description: string
@@ -10,65 +10,64 @@ export interface HistoryAction {
 
 const MAX_HISTORY = 25
 
+// We use a simple external store pattern so we can read the current stacks
+// synchronously without triggering the "refs during render" lint error.
+let undoStack: HistoryAction[] = []
+let redoStack: HistoryAction[] = []
+const listeners = new Set<() => void>()
+
+function emit() { listeners.forEach((l) => l()) }
+function subscribe(cb: () => void) {
+  listeners.add(cb)
+  return () => { listeners.delete(cb) }
+}
+function getSnapshot() { return undoStack.length + ':' + redoStack.length }
+
 export function useActionHistory() {
-  const [undoStack, setUndoStack] = useState<HistoryAction[]>([])
-  const [redoStack, setRedoStack] = useState<HistoryAction[]>([])
+  // This hook subscribes to the external store so it re-renders when stacks change
+  useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
 
   const push = useCallback((action: HistoryAction) => {
-    setUndoStack((prev) => {
-      const next = [...prev, action]
-      if (next.length > MAX_HISTORY) next.shift()
-      return next
-    })
-    setRedoStack([])
+    undoStack = [...undoStack, action]
+    if (undoStack.length > MAX_HISTORY) undoStack.shift()
+    redoStack = []
+    emit()
   }, [])
 
   const undo = useCallback(async () => {
-    let undoneAction: HistoryAction | null = null
-    setUndoStack((prev) => {
-      if (prev.length === 0) return prev
-      undoneAction = prev[prev.length - 1]
-      return prev.slice(0, -1)
-    })
-    await new Promise((r) => setTimeout(r, 0))
-    if (!undoneAction) return
+    if (undoStack.length === 0) return
+    const action = undoStack[undoStack.length - 1]
+    undoStack = undoStack.slice(0, -1)
     try {
-      await undoneAction.undo()
-      setRedoStack((prev) => {
-        const next = [...prev, undoneAction!]
-        if (next.length > MAX_HISTORY) next.shift()
-        return next
-      })
+      await action.undo()
+      redoStack = [...redoStack, action]
+      if (redoStack.length > MAX_HISTORY) redoStack.shift()
     } catch (e) {
-      setUndoStack((prev) => [...prev, undoneAction!])
+      undoStack = [...undoStack, action]
       throw e
     }
+    emit()
   }, [])
 
   const redo = useCallback(async () => {
-    let redoneAction: HistoryAction | null = null
-    setRedoStack((prev) => {
-      if (prev.length === 0) return prev
-      redoneAction = prev[prev.length - 1]
-      return prev.slice(0, -1)
-    })
-    await new Promise((r) => setTimeout(r, 0))
-    if (!redoneAction) return
+    if (redoStack.length === 0) return
+    const action = redoStack[redoStack.length - 1]
+    redoStack = redoStack.slice(0, -1)
     try {
-      await redoneAction.redo()
-      setUndoStack((prev) => {
-        const next = [...prev, redoneAction!]
-        if (next.length > MAX_HISTORY) next.shift()
-        return next
-      })
+      await action.redo()
+      undoStack = [...undoStack, action]
+      if (undoStack.length > MAX_HISTORY) undoStack.shift()
     } catch (e) {
-      setRedoStack((prev) => [...prev, redoneAction!])
+      redoStack = [...redoStack, action]
       throw e
     }
+    emit()
   }, [])
 
   return {
-    push, undo, redo,
+    push,
+    undo,
+    redo,
     canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
     undoCount: undoStack.length,
