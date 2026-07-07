@@ -7,6 +7,7 @@ import {
   ChangeMessage,
   PresenceUser,
   Subgroup,
+  TopGroup,
   Transaction,
 } from '@/lib/finance'
 import { getSocket } from '@/lib/socket'
@@ -17,6 +18,7 @@ interface State {
   config: Record<string, string>
   labels: Record<string, string>
   subgroups: Subgroup[]
+  topGroups: TopGroup[]
   activity: ActivityEntry[]
   loading: boolean
   error: string | null
@@ -35,6 +37,7 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
     config: {},
     labels: {},
     subgroups: [],
+    topGroups: [],
     activity: [],
     loading: true,
     error: null,
@@ -61,6 +64,7 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
           config: data.config,
           labels: data.labels ?? {},
           subgroups: data.subgroups ?? [],
+          topGroups: data.topGroups ?? [],
           activity: data.activity,
           loading: false,
           error: null,

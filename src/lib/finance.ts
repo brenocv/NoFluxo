@@ -65,6 +65,19 @@ export interface Subgroup {
   updatedAt: string
 }
 
+export interface TopGroup {
+  id: string
+  workbookId: string
+  key: string
+  name: string
+  color: string
+  sortOrder: number
+  type: string
+  isDefault: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export interface PresenceUser {
   id: string
   name: string
@@ -169,43 +182,36 @@ export function getTopGroupLabel(
 // ---- Recursive group tree ----
 
 export interface GroupTreeNode {
-  key: string           // full path: "despesas.contas_casa.mesada_breno"
-  label: string         // display label (from labels or default)
-  depth: number         // 0 = top-level, 1 = subgroup, 2+ = nested
+  key: string
+  label: string
+  depth: number
   isTopLevel: boolean
   isUserCreated: boolean
-  isReceivable: boolean // true for "rendimentos.valores_a_receber"
+  isReceivable: boolean
+  color: string | null  // hex color from TopGroup, or null to use defaults
+  isDefaultTop: boolean // true for default top-level groups (can't delete)
+  groupType: string     // "EXPENSE" | "INCOME" | "RESERVE" (from TopGroup)
   children: GroupTreeNode[]
   categories: Category[]
 }
 
-// Build a recursive group tree from categories + user-created subgroups.
-// `filterCategoryIds` — if provided, only include categories whose id is in the set
-// (used for search filtering). If omitted, include all categories.
+// Build a recursive group tree from categories + subgroups + topGroups.
 export function buildGroupTree(
   categories: Category[],
   userSubgroups: Subgroup[],
   labels: Record<string, string>,
+  topGroups: TopGroup[],
   filterCategoryIds?: Set<string>
 ): GroupTreeNode[] {
   const nodes: GroupTreeNode[] = []
 
-  for (const topKey of TOP_GROUP_ORDER) {
-    const topDef = GROUP_STRUCTURE.find((g) => g.key === topKey)!
-    const topLabel = getTopGroupLabel(topKey, labels)
+  for (const tg of topGroups) {
+    const topLabel = labels[`group:${tg.key}`] ?? tg.name
     const node = buildNode(
-      topKey,
-      topLabel,
-      0,
-      true,
-      false,
-      categories,
-      userSubgroups,
-      labels,
-      filterCategoryIds
+      tg.key, topLabel, 0, true, false,
+      categories, userSubgroups, labels, filterCategoryIds,
+      tg.color, tg.isDefault, tg.type
     )
-    // Always include top-level groups, even if empty — so the user can add
-    // categories to a new workbook.
     nodes.push(node)
   }
 
@@ -221,54 +227,31 @@ function buildNode(
   categories: Category[],
   userSubgroups: Subgroup[],
   labels: Record<string, string>,
-  filterCategoryIds?: Set<string>
+  filterCategoryIds?: Set<string>,
+  color?: string | null,
+  isDefaultTop?: boolean,
+  groupType?: string
 ): GroupTreeNode {
-  // Direct categories in this node (group === key exactly)
   const directCategories = categories.filter((c) => {
     if (c.group !== key) return false
     if (filterCategoryIds && !filterCategoryIds.has(c.id)) return false
     return true
   })
 
-  // Find children: default subgroups (from GROUP_STRUCTURE) + user-created subgroups
-  const childKeys: { key: string; label: string; isUserCreated: boolean }[] = []
-
-  if (isTopLevel) {
-    const topDef = GROUP_STRUCTURE.find((g) => g.key === key)
-    if (topDef) {
-      for (const sg of topDef.subgroups) {
-        childKeys.push({ key: sg.key, label: sg.label, isUserCreated: false })
-      }
-    }
-  }
-
-  // User-created subgroups with parentKey === key
-  const userChildren = userSubgroups
+  // All subgroups come from the DB now (default + user-created)
+  const childKeys = userSubgroups
     .filter((s) => s.parentKey === key)
     .sort((a, b) => a.sortOrder - b.sortOrder)
-  for (const uc of userChildren) {
-    childKeys.push({ key: uc.key, label: uc.name, isUserCreated: true })
-  }
+    .map((s) => ({ key: s.key, label: s.name, isUserCreated: true }))
 
-  // Build child nodes recursively
   const children = childKeys.map((ck) => {
     const childLabel = getGroupLabel(ck.key, labels, userSubgroups)
     return buildNode(
-      ck.key,
-      childLabel,
-      depth + 1,
-      false,
-      ck.isUserCreated,
-      categories,
-      userSubgroups,
-      labels,
-      filterCategoryIds
+      ck.key, childLabel, depth + 1, false, ck.isUserCreated,
+      categories, userSubgroups, labels, filterCategoryIds,
+      null, false, 'EXPENSE'
     )
   }).filter((n) => {
-    // Show the node if it has categories, OR if it has children,
-    // OR if it's a user-created subgroup (even when empty, so the user can
-    // add categories to it). Hide empty default subgroups only when there's
-    // no search filter active.
     if (countCategoriesRecursive(n) > 0) return true
     if (n.children.length > 0) return true
     if (n.isUserCreated) return true
@@ -278,14 +261,11 @@ function buildNode(
   const isReceivable = key === 'rendimentos.valores_a_receber'
 
   return {
-    key,
-    label,
-    depth,
-    isTopLevel,
-    isUserCreated,
-    isReceivable,
-    children,
-    categories: directCategories,
+    key, label, depth, isTopLevel, isUserCreated, isReceivable,
+    color: color ?? null,
+    isDefaultTop: isDefaultTop ?? false,
+    groupType: groupType ?? 'EXPENSE',
+    children, categories: directCategories,
   }
 }
 
@@ -319,26 +299,17 @@ export function computeNodeTotal(
 // Collect all group keys in the tree (for the category editor's group selector).
 export function collectGroupPaths(
   userSubgroups: Subgroup[],
-  labels: Record<string, string>
+  labels: Record<string, string>,
+  topGroups?: TopGroup[]
 ): { value: string; label: string; depth: number }[] {
   const result: { value: string; label: string; depth: number }[] = []
-  for (const topKey of TOP_GROUP_ORDER) {
-    const topLabel = getTopGroupLabel(topKey, labels)
-    result.push({ value: topKey, label: topLabel, depth: 0 })
-
-    // Default subgroups
-    const topDef = GROUP_STRUCTURE.find((g) => g.key === topKey)
-    if (topDef) {
-      for (const sg of topDef.subgroups) {
-        const sgLabel = getGroupLabel(sg.key, labels, userSubgroups)
-        result.push({ value: sg.key, label: `${topLabel} › ${sgLabel}`, depth: 1 })
-        // Recursively add user-created sub-subgroups
-        collectUserSubgroups(sg.key, topLabel, sgLabel, userSubgroups, labels, 1, result)
-      }
-    }
-    // User-created subgroups directly under top-level (if no default subgroups)
-    const userChildren = userSubgroups.filter((s) => s.parentKey === topKey)
-    for (const uc of userChildren) {
+  const groups = topGroups ?? []
+  for (const tg of groups) {
+    const topLabel = labels[`group:${tg.key}`] ?? tg.name
+    result.push({ value: tg.key, label: topLabel, depth: 0 })
+    // All subgroups (default + user-created) come from DB
+    const children = userSubgroups.filter((s) => s.parentKey === tg.key).sort((a, b) => a.sortOrder - b.sortOrder)
+    for (const uc of children) {
       const ucLabel = getGroupLabel(uc.key, labels, userSubgroups)
       result.push({ value: uc.key, label: `${topLabel} › ${ucLabel}`, depth: 1 })
       collectUserSubgroups(uc.key, topLabel, ucLabel, userSubgroups, labels, 1, result)

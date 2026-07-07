@@ -4,25 +4,16 @@ import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
-  Category,
-  formatMoney,
-  GroupTreeNode,
-  computeNodeTotal,
-  buildCategoryTree,
-  computeCategoryNodeTotal,
-  Transaction,
+  Category, formatMoney, GroupTreeNode, computeNodeTotal,
+  buildCategoryTree, computeCategoryNodeTotal, Transaction,
 } from '@/lib/finance'
 import {
-  Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock, AlertTriangle, RefreshCw, Check,
-  FolderPlus, Move,
+  Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
+  AlertTriangle, RefreshCw, Check, FolderPlus, Move,
 } from 'lucide-react'
 
 interface Props {
@@ -33,9 +24,6 @@ interface Props {
   euroRate: number
   highlightedCategoryIds: Set<string>
   onClearSearch: () => void
-  previousMonthBalance: number | null
-  prevMonthLabel: string
-  onPrevMonthClick: () => void
   onEdit: (category: Category, current: Transaction | undefined) => void
   onAddCategory: (group: string, parentCategoryId?: string | null) => void
   onDeleteCategory: (cat: Category) => void
@@ -44,99 +32,101 @@ interface Props {
   onAddSubgroup: (parentKey: string) => void
   onDeleteSubgroup: (node: GroupTreeNode) => void
   onMoveCategory: (cat: Category) => void
+  onColorChange?: (node: GroupTreeNode, color: string) => void
+  onDeleteTopGroup?: (node: GroupTreeNode) => void
 }
 
+const CARD_COLORS = [
+  '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
+  '#16a34a', '#0891b2', '#0284c7', '#4f46e5', '#7c3aed',
+  '#c026d3', '#db2777', '#64748b', '#0f172a',
+]
+
 export function GroupNode(props: Props) {
-  const { node, labels, transactionsByCat, euroRate, allCategories } = props
+  const { node, transactionsByCat, euroRate, allCategories } = props
   const [open, setOpen] = useState(true)
 
   const total = computeNodeTotal(node, transactionsByCat, euroRate)
   const isTopLevel = node.isTopLevel
-  const isIncome = node.key.startsWith('rendimentos')
-  const isReserve = node.key === 'reservas'
+  const isIncome = node.groupType === 'INCOME'
+  const isReserve = node.groupType === 'RESERVE'
   const isReceivable = node.isReceivable
+  const cardColor = isTopLevel && node.color ? node.color : null
 
-  const totalSign =
-    isReserve || isReceivable
-      ? ''
-      : isIncome
-        ? (total >= 0 ? '+' : '-')
-        : (total >= 0 ? '-' : '+')
+  const totalSign = isReserve || isReceivable
+    ? ''
+    : isIncome
+      ? (total >= 0 ? '+' : '-')
+      : (total >= 0 ? '-' : '+')
 
-  const totalColor =
-    isIncome
-      ? 'text-emerald-600'
-      : (isReserve || isReceivable)
-        ? 'text-amber-600'
-        : 'text-rose-600'
-
-  // Build category tree for direct categories in this group node
   const categoryTree = buildCategoryTree(node.categories, null)
+  const childCount = countAll(node, allCategories)
+
+  // Card styles based on color
+  const cardStyle: React.CSSProperties = {}
+  if (!isTopLevel) {
+    cardStyle.marginLeft = `${(node.depth - 1) * 20}px`
+    cardStyle.borderLeft = '2px solid oklch(0.85 0 0)'
+  }
+  if (isTopLevel && cardColor) {
+    cardStyle.borderLeft = `6px solid ${cardColor}`
+    cardStyle.background = `${cardColor}08`
+  }
+
+  const headerStyle: React.CSSProperties = {}
+  if (isTopLevel && cardColor) {
+    headerStyle.background = `${cardColor}25`
+  }
+
+  const totalStyle: React.CSSProperties = {}
+  if (cardColor) {
+    totalStyle.color = cardColor
+  }
 
   return (
-    <Card
-      className={cn('overflow-hidden shadow-sm', !isTopLevel && 'border-l-2 border-l-muted-foreground/20')}
-      id={isTopLevel ? `group-${node.key}` : undefined}
-      style={!isTopLevel ? { marginLeft: `${(node.depth - 1) * 8}px` } : undefined}
-    >
+    <Card className="overflow-hidden shadow-sm" id={isTopLevel ? `group-${node.key}` : undefined} style={cardStyle}>
       {/* Header */}
-      <div className="w-full flex items-center justify-between p-3 hover:bg-muted/50 transition-colors">
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-2 flex-1 touch-manipulation min-w-0"
-        >
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 text-muted-foreground transition-transform flex-shrink-0',
-              !open && '-rotate-90'
-            )}
-          />
-          <span className={cn('truncate', isTopLevel ? 'font-semibold text-sm' : 'font-medium text-sm')}>
+      <div className="w-full flex items-center justify-between p-3 transition-colors" style={headerStyle}>
+        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 touch-manipulation min-w-0">
+          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform flex-shrink-0', !open && '-rotate-90')} />
+          <span className={cn('truncate', isTopLevel ? 'font-bold text-sm' : 'font-medium text-sm')} style={cardColor && isTopLevel ? { color: cardColor } : undefined}>
             {node.label}
           </span>
           {isReceivable && (
             <Badge variant="outline" className="h-5 px-1 text-[10px] gap-0.5 border-amber-300 bg-amber-50 text-amber-700 flex-shrink-0">
-              <Clock className="h-2.5 w-2.5" />
-              a receber
+              <Clock className="h-2.5 w-2.5" /> a receber
             </Badge>
           )}
-          <span className="text-xs text-muted-foreground flex-shrink-0">
-            ({countAll(node, allCategories)})
+          <span className={cn('text-xs flex-shrink-0', isTopLevel && cardColor ? '' : 'text-muted-foreground')} style={isTopLevel && cardColor ? { color: cardColor, opacity: 0.7 } : undefined}>
+            ({childCount})
           </span>
         </button>
         <div className="flex items-center gap-1 flex-shrink-0">
-          <RenameButton
-            currentLabel={node.label}
-            onRename={(v) => props.onRename(
-              isTopLevel ? `group:${node.key}` : `subgroup:${node.key}`,
-              v
-            )}
-            small={!isTopLevel}
-          />
-          <button
-            onClick={(e) => { e.stopPropagation(); props.onAddSubgroup(node.key) }}
-            className="p-1 rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation"
-            aria-label="Novo subgrupo"
-            title="Criar subgrupo aqui"
-          >
+          {/* Color button for top-level */}
+          {isTopLevel && props.onColorChange && (
+            <ColorButton currentColor={cardColor} onColorChange={c => props.onColorChange!(node, c)} />
+          )}
+          {/* Rename */}
+          <RenameButton currentLabel={node.label} onRename={v => props.onRename(isTopLevel ? `group:${node.key}` : `subgroup:${node.key}`, v)} small={!isTopLevel} />
+          {/* New subgroup */}
+          <button onClick={e => { e.stopPropagation(); props.onAddSubgroup(node.key) }} className="p-1 rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation" aria-label="Novo subgrupo" title="Criar subgrupo aqui">
             <FolderPlus className="h-3.5 w-3.5" />
           </button>
+          {/* Delete subgroup or custom top group */}
           {!isTopLevel && (
-            <button
-              onClick={(e) => { e.stopPropagation(); props.onDeleteSubgroup(node) }}
-              className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
-              aria-label="Remover subgrupo"
-              title="Remover subgrupo (categorias movidas para o grupo pai)"
-            >
+            <button onClick={e => { e.stopPropagation(); props.onDeleteSubgroup(node) }} className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation" aria-label="Remover subgrupo" title="Remover subgrupo">
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
-          <span className={cn('text-sm font-semibold tabular-nums', totalColor)}>
-            {totalSign}
-            {formatMoney(Math.abs(total), 'BRL')}
-            <span className="text-[10px] text-muted-foreground ml-1 font-normal">
-              ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
-            </span>
+          {isTopLevel && !node.isDefaultTop && props.onDeleteTopGroup && (
+            <button onClick={e => { e.stopPropagation(); props.onDeleteTopGroup!(node) }} className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation" aria-label="Remover card" title="Remover card">
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          {/* Total */}
+          <span className={cn('text-sm font-semibold tabular-nums ml-1', !cardColor && (isIncome ? 'text-emerald-600' : (isReserve || isReceivable) ? 'text-amber-600' : 'text-rose-600'))} style={cardColor ? totalStyle : undefined}>
+            {totalSign}{formatMoney(Math.abs(total), 'BRL')}
+            <span className="text-[10px] text-muted-foreground ml-1 font-normal">({formatMoney(Math.abs(total) / euroRate, 'EUR')})</span>
           </span>
         </div>
       </div>
@@ -144,37 +134,25 @@ export function GroupNode(props: Props) {
       {/* Body */}
       {open && (
         <div>
-          {/* Direct categories (recursive tree) */}
+          {/* Direct categories */}
           {categoryTree.length > 0 && (
-            <div className="divide-y divide-border border-t border-border">
-              {categoryTree.map((catNode) => (
-                <CategoryNodeRow
-                  key={catNode.category.id}
-                  catNode={catNode}
-                  depth={0}
-                  allProps={props}
-                />
+            <div className="divide-y divide-border/50 border-t border-border/50">
+              {categoryTree.map(catNode => (
+                <CategoryNodeRow key={catNode.category.id} catNode={catNode} depth={0} allProps={props} />
               ))}
             </div>
           )}
 
-          {/* Child subgroups (recursive) */}
-          {node.children.map((child) => (
+          {/* Child subgroups */}
+          {node.children.map(child => (
             <div key={child.key} className="border-t border-border">
-              <GroupNode
-                {...props}
-                node={child}
-              />
+              <GroupNode {...props} node={child} />
             </div>
           ))}
 
-          {/* Add category button */}
-          <button
-            onClick={() => props.onAddCategory(node.key, null)}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors touch-manipulation border-t border-border"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Adicionar categoria
+          {/* Add category */}
+          <button onClick={() => props.onAddCategory(node.key, null)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors touch-manipulation border-t border-border">
+            <Plus className="h-3.5 w-3.5" /> Adicionar categoria
           </button>
         </div>
       )}
@@ -183,198 +161,128 @@ export function GroupNode(props: Props) {
 }
 
 function countAll(node: GroupTreeNode, allCategories: Category[]): number {
-  // Count direct categories (including nested children) in this group
-  const directCount = node.categories.length
-  const childCount = node.children.reduce((acc, c) => acc + countAll(c, allCategories), 0)
-  return directCount + childCount
+  return node.categories.length + node.children.reduce((acc, c) => acc + countAll(c, allCategories), 0)
 }
 
-// ---- Recursive category node ----
+// ---- Recursive category row ----
 
-function CategoryNodeRow({
-  catNode,
-  depth,
-  allProps,
-}: {
-  catNode: import('@/lib/finance').CategoryNode
+function CategoryNodeRow({ catNode, depth, allProps }: {
+  catNode: ReturnType<typeof buildCategoryTree>[0]
   depth: number
   allProps: Props
 }) {
   const { category, children } = catNode
-  const [open, setOpen] = useState(false) // collapsed by default
   const { transactionsByCat, euroRate } = allProps
+  const [userOpen, setUserOpen] = useState(false)
+
+  const hasSearch = allProps.highlightedCategoryIds.size > 0
+  const hasHighlightedDescendant = (n: typeof catNode): boolean => {
+    if (allProps.highlightedCategoryIds.has(n.category.id)) return true
+    return n.children.some(hasHighlightedDescendant)
+  }
+  const shouldAutoExpand = hasSearch && hasHighlightedDescendant(catNode)
+  const open = shouldAutoExpand ? true : userOpen
 
   const tx = transactionsByCat[category.id]
-  const value = tx?.value ?? null
-  const isRecurring = tx?.isRecurring ?? false
-  const installmentNumber = tx?.installmentNumber ?? null
-  const installmentsTotal = tx?.installmentsTotal ?? null
+  const value = tx ? tx.value : null
+  const isRecurring = tx ? tx.isRecurring : false
+  const installmentNumber = tx ? tx.installmentNumber : null
+  const installmentsTotal = tx ? tx.installmentsTotal : null
   const hasChildren = children.length > 0
-
+  const isHighlighted = allProps.highlightedCategoryIds.has(category.id)
   const goalExceeded = category.monthlyGoal !== null && value !== null && category.type === 'EXPENSE' && value > category.monthlyGoal
 
-  // Total including children
-  const totalWithChildren = hasChildren
-    ? computeCategoryNodeTotal(catNode, transactionsByCat, euroRate)
-    : null
-
-  const sign =
-    value === null && totalWithChildren === null
-      ? ''
-      : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber'
-        ? ((value ?? totalWithChildren ?? 0) < 0 ? '-' : '')
-        : category.type === 'INCOME'
-          ? ((value ?? totalWithChildren ?? 0) >= 0 ? '+' : '-')
-          : ((value ?? totalWithChildren ?? 0) >= 0 ? '-' : '+')
-
+  const totalWithChildren = hasChildren ? computeCategoryNodeTotal(catNode, transactionsByCat, euroRate) : null
   const displayValue = totalWithChildren !== null ? totalWithChildren : value
-  const displayCurrency = category.currency
+
+  const sign = displayValue === null
+    ? ''
+    : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber'
+      ? (displayValue < 0 ? '-' : '')
+      : category.type === 'INCOME'
+        ? (displayValue >= 0 ? '+' : '-')
+        : (displayValue >= 0 ? '-' : '+')
+
+  const rowStyle: React.CSSProperties = { paddingLeft: depth > 0 ? `${12 + depth * 20}px` : undefined }
+  if (!isHighlighted || !hasSearch) rowStyle.background = undefined
+  if (hasSearch && !isHighlighted) rowStyle.opacity = 0.25
 
   return (
     <>
-      <div
-        className="flex items-center justify-between px-3 py-2.5 group hover:bg-muted/30 transition-colors"
-        style={depth > 0 ? { paddingLeft: `${12 + depth * 20}px` } : undefined}
-      >
-        {/* Left: chevron (if has children) + name */}
+      <div className={cn('flex items-center justify-between px-3 py-2.5 group transition-colors', !hasSearch && 'hover:bg-black/5')} style={rowStyle}>
+        {/* Left */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           {hasChildren ? (
-            <button
-              onClick={() => setOpen((o) => !o)}
-              className="p-0.5 rounded hover:bg-muted text-muted-foreground touch-manipulation flex-shrink-0"
-              aria-label={open ? 'Recolher' : 'Expandir'}
-            >
-              {open
-                ? <ChevronDown className="h-3.5 w-3.5" />
-                : <ChevronRight className="h-3.5 w-3.5" />}
+            <button onClick={() => setUserOpen(o => !o)} className="p-0.5 rounded hover:bg-muted text-muted-foreground touch-manipulation flex-shrink-0" aria-label={open ? 'Recolher' : 'Expandir'}>
+              {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
           ) : (
             <span className="w-5 flex-shrink-0" />
           )}
           <button
-            onClick={() => allProps.onEdit(category, tx)}
+            onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }}
             className="flex flex-col items-start text-left touch-manipulation min-w-0"
           >
             <span className="text-sm font-medium text-foreground flex items-center gap-1.5 truncate">
-              {category.color && (
-                <span
-                  className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: category.color }}
-                />
-              )}
+              {category.color && <span className="h-2.5 w-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: category.color }} />}
               {category.name}
               {isRecurring && (
                 <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded">
-                  <RefreshCw className="h-2 w-2" />
-                  {installmentsTotal ? `${installmentNumber}/${installmentsTotal}` : 'recorrente'}
+                  <RefreshCw className="h-2 w-2" />{installmentsTotal ? `${installmentNumber}/${installmentsTotal}` : 'recorrente'}
                 </span>
               )}
               {goalExceeded && (
                 <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded">
-                  <AlertTriangle className="h-2 w-2" />
-                  meta
+                  <AlertTriangle className="h-2 w-2" /> meta
                 </span>
               )}
-              {hasChildren && (
-                <span className="text-[9px] text-muted-foreground">
-                  ({children.length})
-                </span>
-              )}
+              {hasChildren && <span className="text-[9px] text-muted-foreground">({children.length})</span>}
             </span>
-            {category.note && (
-              <span className="text-xs text-muted-foreground truncate">{category.note}</span>
-            )}
+            {category.note && <span className="text-xs text-muted-foreground truncate">{category.note}</span>}
           </button>
         </div>
 
-        {/* Right: value + actions */}
+        {/* Right */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Add sub-item button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation()
-              allProps.onAddCategory(category.group, category.id)
-            }}
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation"
-            aria-label="Adicionar sub-item"
-            title="Adicionar sub-item dentro desta categoria"
-          >
+          <button onClick={e => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
             <Plus className="h-3 w-3" />
           </button>
+          <button onClick={e => { e.stopPropagation(); allProps.onMoveCategory(category) }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation" aria-label="Mover categoria" title="Mover para outro grupo">
+            <Move className="h-3 w-3" />
+          </button>
           {isRecurring && (
-            <button
-              onClick={() => tx?.seriesId && allProps.onStopRecurring(tx.seriesId, tx.month)}
-              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-cyan-50 hover:text-cyan-600 transition-all touch-manipulation"
-              aria-label="Parar recorrência"
-              title="Parar recorrência (remove parcelas futuras)"
-            >
+            <button onClick={() => tx && tx.seriesId && allProps.onStopRecurring(tx.seriesId, tx.month)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-cyan-50 hover:text-cyan-600 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
               <RefreshCw className="h-3 w-3" />
             </button>
           )}
-          <button
-            onClick={() => allProps.onEdit(category, tx)}
-            className="px-3 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right"
-          >
+          <button onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }} className="px-3 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right">
             {displayValue === null ? (
-              <span className="text-sm font-normal text-muted-foreground italic">—</span>
+              <span className="text-sm font-normal text-muted-foreground italic">--</span>
             ) : (
               <div className="flex flex-col items-end leading-tight">
-                <span
-                  className={cn(
-                    'text-sm font-semibold tabular-nums',
-                    category.type === 'INCOME'
-                      ? 'text-emerald-600'
-                      : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber'
-                        ? 'text-amber-600'
-                        : 'text-rose-600'
-                  )}
-                >
-                  {sign}{formatMoney(Math.abs(displayValue), displayCurrency)}
-                  {hasChildren && totalWithChildren !== null && value !== null && (
-                    <span className="text-[9px] text-muted-foreground ml-1 font-normal">
-                      (com sub)
-                    </span>
-                  )}
+                <span className={cn('text-sm font-semibold tabular-nums', category.type === 'INCOME' ? 'text-emerald-600' : (category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber') ? 'text-amber-600' : 'text-rose-600')}>
+                  {sign}{formatMoney(Math.abs(displayValue), category.currency)}
                 </span>
                 <span className="text-[10px] text-muted-foreground tabular-nums">
-                  {displayCurrency === 'BRL'
-                    ? formatMoney(Math.abs(displayValue) / euroRate, 'EUR')
-                    : formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
+                  {category.currency === 'BRL' ? formatMoney(Math.abs(displayValue) / euroRate, 'EUR') : formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
                 </span>
               </div>
             )}
           </button>
-          <button
-            onClick={() => allProps.onDeleteCategory(category)}
-            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation"
-            aria-label="Remover categoria"
-          >
+          <button onClick={() => allProps.onDeleteCategory(category)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation" aria-label="Remover categoria">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Children — indented with left border (travessão visual) */}
+      {/* Children */}
       {hasChildren && open && (
-        <div
-          className="border-l-2 border-l-muted-foreground/15 ml-4 bg-muted/10"
-        >
-          {children.map((child) => (
-            <CategoryNodeRow
-              key={child.category.id}
-              catNode={child}
-              depth={depth + 1}
-              allProps={allProps}
-            />
+        <div className="border-l-2 border-l-muted-foreground/15 ml-4">
+          {children.map(child => (
+            <CategoryNodeRow key={child.category.id} catNode={child} depth={depth + 1} allProps={allProps} />
           ))}
-          {/* Add sub-item at the bottom of expanded children */}
-          <button
-            onClick={() => allProps.onAddCategory(category.group, category.id)}
-            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors touch-manipulation"
-            style={{ paddingLeft: `${12 + (depth + 1) * 20}px` }}
-          >
-            <Plus className="h-3 w-3" />
-            Adicionar sub-item em {category.name}
+          <button onClick={() => allProps.onAddCategory(category.group, category.id)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors touch-manipulation" style={{ paddingLeft: `${12 + (depth + 1) * 20}px` }}>
+            <Plus className="h-3 w-3" /> Adicionar sub-item em {category.name}
           </button>
         </div>
       )}
@@ -382,59 +290,45 @@ function CategoryNodeRow({
   )
 }
 
-function RenameButton({
-  currentLabel, onRename, small,
-}: {
-  currentLabel: string
-  onRename: (v: string) => void
-  small?: boolean
-}) {
+// ---- Color button ----
+function ColorButton({ currentColor, onColorChange }: { currentColor: string | null; onColorChange: (c: string) => void }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button onClick={e => e.stopPropagation()} className="p-1 rounded-md hover:bg-muted transition-colors touch-manipulation" aria-label="Mudar cor" title="Mudar cor do card">
+          <span className="block h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: currentColor || '#64748b' }} />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent className="w-48" onClick={e => e.stopPropagation()}>
+        <div className="grid grid-cols-7 gap-1.5">
+          {CARD_COLORS.map(c => (
+            <button key={c} onClick={() => { onColorChange(c); setOpen(false) }} className={cn('h-6 w-6 rounded-full border-2 transition-all touch-manipulation', currentColor === c ? 'border-primary ring-2 ring-primary/20 scale-110' : 'border-transparent')} style={{ backgroundColor: c }} />
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+// ---- Rename button ----
+function RenameButton({ currentLabel, onRename, small }: { currentLabel: string; onRename: (v: string) => void; small?: boolean }) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(currentLabel)
-
   return (
-    <Popover open={open} onOpenChange={(o) => {
-      setOpen(o)
-      if (o) setValue(currentLabel)
-    }}>
+    <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setValue(currentLabel) }}>
       <PopoverTrigger asChild>
-        <button
-          onClick={(e) => e.stopPropagation()}
-          className="p-1 rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation"
-          aria-label="Renomear"
-        >
+        <button onClick={e => e.stopPropagation()} className="p-1 rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation" aria-label="Renomear">
           <Pencil className={small ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64" onClick={(e) => e.stopPropagation()}>
+      <PopoverContent className="w-64" onClick={e => e.stopPropagation()}>
         <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground">Renomear</label>
-          <Input
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            placeholder={currentLabel}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                onRename(value.trim())
-                setOpen(false)
-              }
-            }}
-          />
+          <Input value={value} onChange={e => setValue(e.target.value)} placeholder={currentLabel} autoFocus onKeyDown={e => { if (e.key === 'Enter') { onRename(value.trim()); setOpen(false) } }} />
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => {
-                onRename(value.trim())
-                setOpen(false)
-              }}
-            >
-              <Check className="h-3 w-3 mr-1" />
-              Salvar
-            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button size="sm" onClick={() => { onRename(value.trim()); setOpen(false) }}><Check className="h-3 w-3 mr-1" /> Salvar</Button>
           </div>
         </div>
       </PopoverContent>

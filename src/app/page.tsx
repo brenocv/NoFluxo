@@ -53,6 +53,7 @@ import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
 import { BackupDialog } from '@/components/finance/backup-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
 import { WorkbookSwitcher } from '@/components/finance/workbook-switcher'
+import { NewCardDialog } from '@/components/finance/new-card-dialog'
 import { PrevBalanceCard } from '@/components/finance/prev-balance-card'
 import { useVencimentoNotifications } from '@/hooks/use-vencimento-notifications'
 import { Button } from '@/components/ui/button'
@@ -75,7 +76,7 @@ export default function Home() {
   const [workbookOpen, setWorkbookOpen] = useState(false)
   const [workbookName, setWorkbookName] = useState<string>('')
   const {
-    categories, transactions, config, labels, subgroups, activity,
+    categories, transactions, config, labels, subgroups, topGroups, activity,
     loading, error, live, broadcast,
   } = useFinanceData(user, year, workbookId)
 
@@ -91,6 +92,7 @@ export default function Home() {
   const [resetOpen, setResetOpen] = useState(false)
   const [moveTarget, setMoveTarget] = useState<Category | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
+  const [newCardOpen, setNewCardOpen] = useState(false)
   const history = useActionHistory()
   const notifications = useVencimentoNotifications(categories)
   const [includeReceivables, setIncludeReceivables] = useState<boolean>(() => {
@@ -102,9 +104,8 @@ export default function Home() {
 
   const euroRate = parseFloat(config.euroToBrl ?? '6') || 6
 
-  // Fetch workbook name when workbookId changes
+  // Fetch workbook name when workbookId changes — also sets a default workbook if none is selected
   useEffect(() => {
-    if (!workbookId) return
     let cancelled = false
     ;(async () => {
       try {
@@ -113,10 +114,12 @@ export default function Home() {
         const data = await r.json()
         if (cancelled) return
         const wb = data.workbooks.find((w: any) => w.id === workbookId)
-        if (wb) setWorkbookName(wb.name)
-        else if (data.workbooks.length > 0) {
-          // Current workbook not found, switch to first
+        if (wb) {
+          setWorkbookName(wb.name)
+        } else if (data.workbooks.length > 0) {
+          // Current workbook not found or empty — switch to first available
           setWorkbook(data.workbooks[0].id)
+          setWorkbookName(data.workbooks[0].name)
         }
       } catch {}
     })()
@@ -197,7 +200,7 @@ export default function Home() {
   // Build the recursive group tree (filtered by search)
   const groupTree = useMemo(() => {
     const filterSet = (search.trim() || showOnlyFilled) ? filteredCategoryIds : undefined
-    return buildGroupTree(categories, subgroups, labels, filterSet)
+    return buildGroupTree(categories, subgroups, labels, topGroups, filterSet)
   }, [categories, subgroups, labels, filteredCategoryIds, search, showOnlyFilled])
 
   const totals = useMemo(() => {
@@ -844,8 +847,14 @@ export default function Home() {
               euroRate={euroRate}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
               onAddCategory={(grp, parentCategoryId) => {
-                setNewCatGroup(grp as CategoryGroup)
-                setNewCatParent(parentCategoryId ?? null)
+                // If adding to a top-level group (no dots in key) and no parent category,
+                // create a Subgroup instead so it looks like "Cartões BR" etc.
+                if (!grp.includes('.') && !parentCategoryId) {
+                  setNewSubgroupParent({ key: grp, label: getGroupLabel(grp, labels, subgroups) })
+                } else {
+                  setNewCatGroup(grp as CategoryGroup)
+                  setNewCatParent(parentCategoryId ?? null)
+                }
               }}
               onDeleteCategory={handleDeleteCategory}
               onRename={handleRename}
@@ -856,9 +865,67 @@ export default function Home() {
               })}
               onDeleteSubgroup={handleDeleteSubgroup}
               onMoveCategory={(cat) => setMoveTarget(cat)}
+              onColorChange={async (node, color) => {
+                try {
+                  const tg = topGroups.find((t) => t.key === node.key)
+                  if (!tg) return
+                  await fetch('/api/topgroups', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: tg.id, color, user }),
+                  })
+                  // Update local state
+                  const updated = topGroups.map((t) => t.id === tg.id ? { ...t, color } : t)
+                  // Trigger re-render by dispatching a change
+                  dispatchChange('config', 'update', { key: 'topGroups', value: '' }, `Mudou cor do card "${node.label}"`, {
+                    user, action: 'update', entity: 'config', detail: `Mudou cor do card "${node.label}"`, createdAt: new Date().toISOString(),
+                  })
+                  // Force reload of data
+                  const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
+                  const data = await r.json()
+                  if (data.topGroups) {
+                    // The hook will re-render with new topGroups
+                  }
+                  toast.success("Cor atualizada"); setTimeout(() => location.reload(), 500)
+                } catch (e: any) {
+                  toast.error(e.message || 'Erro ao mudar cor')
+                }
+              }}
+              onDeleteTopGroup={async (node) => {
+                if (!confirm(`Remover o card "${node.label}"? As categorias serão movidas para o primeiro card.`)) return
+                try {
+                  const tg = topGroups.find((t) => t.key === node.key)
+                  if (!tg) return
+                  await fetch('/api/topgroups', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: tg.id, user }),
+                  })
+                  toast.success(`Card "${node.label}" removido`); setTimeout(() => location.reload(), 500)
+                  // Reload data
+                  const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
+                  const data = await r.json()
+                  if (data.topGroups) {
+                    dispatchChange('config', 'update', { key: 'topGroups', value: '' }, `Removeu card "${node.label}"`, {
+                      user, action: 'delete', entity: 'config', detail: `Removeu card "${node.label}"`, createdAt: new Date().toISOString(),
+                    })
+                  }
+                } catch (e: any) {
+                  toast.error(e.message || 'Erro ao remover card')
+                }
+              }}
             />
           ))
         )}
+
+        {/* New card button */}
+        <button
+          onClick={() => setNewCardOpen(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 text-sm text-muted-foreground border-2 border-dashed border-border rounded-lg hover:bg-muted/30 hover:border-primary/50 transition-all touch-manipulation"
+        >
+          <Plus className="h-4 w-4" />
+          Novo card
+        </button>
 
         {/* Caderninho — lined-paper notes for the current month (above activity) */}
         <NotesPanel year={year} month={month} user={user} workbookId={workbookId} />
@@ -1011,6 +1078,25 @@ export default function Home() {
             toast.success('Planilha removida')
           } catch (e: any) {
             toast.error(e.message || 'Erro ao remover planilha')
+          }
+        }}
+      />
+
+      <NewCardDialog
+        open={newCardOpen}
+        onOpenChange={setNewCardOpen}
+        onCreate={async (name, type, color) => {
+          try {
+            const r = await fetch('/api/topgroups', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ workbookId, name, color, type, user }),
+            })
+            if (!r.ok) throw new Error('Falha')
+            toast.success(`Card "${name}" criado`)
+            setTimeout(() => location.reload(), 500)
+          } catch (e: any) {
+            toast.error(e.message || 'Erro ao criar card')
           }
         }}
       />

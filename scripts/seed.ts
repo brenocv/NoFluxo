@@ -40,6 +40,34 @@ async function main() {
   })
   console.log(`Created workbook: ${workbook.name} (${workbook.id})`)
 
+  // Create default top-level groups (cards)
+  const defaultGroups = [
+    { key: 'despesas', name: 'Despesas', color: '#dc2626', sortOrder: 0, type: 'EXPENSE', isDefault: true },
+    { key: 'rendimentos', name: 'Rendimentos', color: '#16a34a', sortOrder: 1, type: 'INCOME', isDefault: true },
+    { key: 'reservas', name: 'Reservas', color: '#d97706', sortOrder: 2, type: 'RESERVE', isDefault: true },
+  ]
+  for (const g of defaultGroups) {
+    await db.topGroup.create({
+      data: { workbookId: workbook.id, ...g },
+    })
+  }
+  console.log('Created 3 default top groups')
+
+  // Create default subgroups as Subgroup records
+  const defaultSubgroups = [
+    { key: 'despesas.cartoes', parentKey: 'despesas', name: 'Cartões BR', sortOrder: 0 },
+    { key: 'despesas.contas_casa', parentKey: 'despesas', name: 'Contas casa', sortOrder: 1 },
+    { key: 'rendimentos.brl', parentKey: 'rendimentos', name: 'Em Real (R$)', sortOrder: 0 },
+    { key: 'rendimentos.eur', parentKey: 'rendimentos', name: 'Em Euro (€)', sortOrder: 1 },
+    { key: 'rendimentos.valores_a_receber', parentKey: 'rendimentos', name: 'Valores a receber', sortOrder: 2 },
+  ]
+  for (const sg of defaultSubgroups) {
+    await db.subgroup.create({
+      data: { workbookId: workbook.id, ...sg },
+    })
+  }
+  console.log('Created 5 default subgroups')
+
   const euroRate = 6
   await db.config.create({ data: { key: 'euroToBrl', value: String(euroRate) } })
   await db.config.create({ data: { key: 'year', value: '2026' } })

@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   const catWhere = workbookId ? { workbookId } : {}
   const subWhere = workbookId ? { workbookId } : {}
 
-  const [categories, transactions, configRows, activity, subgroups] = await Promise.all([
+  const [categories, transactions, configRows, activity, subgroups, topGroups] = await Promise.all([
     db.category.findMany({ where: catWhere, orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }] }),
     db.transaction.findMany({
       where: { year, category: workbookId ? { workbookId } : undefined },
@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
     db.config.findMany(),
     db.activityLog.findMany({ orderBy: { createdAt: 'desc' }, take: 30 }),
     db.subgroup.findMany({ where: subWhere, orderBy: [{ parentKey: 'asc' }, { sortOrder: 'asc' }] }),
+    db.topGroup.findMany({ where: workbookId ? { workbookId } : {}, orderBy: { sortOrder: 'asc' } }),
   ])
 
   const config: Record<string, string> = {}
@@ -35,6 +36,7 @@ export async function GET(req: NextRequest) {
     labels,
     activity,
     subgroups,
+    topGroups,
     year,
   })
 }

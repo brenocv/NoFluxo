@@ -22,6 +22,25 @@ model Workbook {
   categories Category[]
   subgroups  Subgroup[]
   notes      Note[]
+  topGroups  TopGroup[]
+}
+
+// User-customizable top-level groups (cards). Default ones (despesas, rendimentos,
+// reservas) are seeded, but the user can create new ones, rename, recolor, and delete.
+model TopGroup {
+  id         String   @id @default(cuid())
+  workbookId String
+  workbook   Workbook @relation(fields: [workbookId], references: [id], onDelete: Cascade)
+  key        String   // slug like "despesas", "investimentos", "viagens"
+  name       String   // display name
+  color      String   @default("#64748b") // hex color for the card background accent
+  sortOrder  Int      @default(0)
+  type       String   @default("EXPENSE") // "EXPENSE" | "INCOME" | "RESERVE"
+  isDefault  Boolean  @default(false) // true for despesas/rendimentos/reservas
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([workbookId, key])
 }
 
 // A category groups transactions (e.g. "Aluguel", "Nubank Kiki", "Salario Breno")
