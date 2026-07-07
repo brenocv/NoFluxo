@@ -196,8 +196,16 @@ export default function Home() {
         reservasBRL += v
       }
     }
+    // Integrate the previous month's closing balance into the current month
+    if (prevMonthBalance !== null && prevMonthBalance !== 0) {
+      if (prevMonthBalance < 0) {
+        saidasBRL += Math.abs(prevMonthBalance)
+      } else {
+        entradasBRL += prevMonthBalance
+      }
+    }
     return { entradasBRL, saidasBRL, entradasEUR, saidasEUR, reservasBRL, receivablesBRL, receivablesEUR }
-  }, [categories, txByCat])
+  }, [categories, txByCat, prevMonthBalance])
 
   const chartData = useMemo(() => {
     const months: { month: string; monthIdx: number; entradas: number; saidas: number; saldo: number }[] = []
