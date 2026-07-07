@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { useFinanceData } from '@/hooks/use-finance-data'
 import { useCurrentUser } from '@/hooks/use-current-user'
 import { useActionHistory } from '@/hooks/use-action-history'
+import { useCurrentWorkbook } from '@/hooks/use-current-workbook'
 import {
   saveTransaction,
   stopRecurringSeries,
@@ -51,6 +52,7 @@ import { AnnualDashboard } from '@/components/finance/annual-dashboard'
 import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
 import { BackupDialog } from '@/components/finance/backup-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
+import { WorkbookSwitcher } from '@/components/finance/workbook-switcher'
 import { PrevBalanceCard } from '@/components/finance/prev-balance-card'
 import { useVencimentoNotifications } from '@/hooks/use-vencimento-notifications'
 import { Button } from '@/components/ui/button'
@@ -68,11 +70,14 @@ const RECEIVABLES_TOGGLE_KEY = 'porto_finance_include_receivables'
 
 export default function Home() {
   const { user, setUser, hydrated } = useCurrentUser()
+  const { workbookId, setWorkbook } = useCurrentWorkbook()
   const [year, setYear] = useState<number>(2026)
+  const [workbookOpen, setWorkbookOpen] = useState(false)
+  const [workbookName, setWorkbookName] = useState<string>('')
   const {
     categories, transactions, config, labels, subgroups, activity,
     loading, error, live, broadcast,
-  } = useFinanceData(user, year)
+  } = useFinanceData(user, year, workbookId)
 
   const [month, setMonth] = useState<number>(() => new Date().getMonth() + 1)
   const [editTarget, setEditTarget] = useState<{ category: Category; tx: Transaction | null } | null>(null)
@@ -97,12 +102,33 @@ export default function Home() {
 
   const euroRate = parseFloat(config.euroToBrl ?? '6') || 6
 
+  // Fetch workbook name when workbookId changes
+  useEffect(() => {
+    if (!workbookId) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const r = await fetch('/api/workbooks')
+        if (!r.ok) return
+        const data = await r.json()
+        if (cancelled) return
+        const wb = data.workbooks.find((w: any) => w.id === workbookId)
+        if (wb) setWorkbookName(wb.name)
+        else if (data.workbooks.length > 0) {
+          // Current workbook not found, switch to first
+          setWorkbook(data.workbooks[0].id)
+        }
+      } catch {}
+    })()
+    return () => { cancelled = true }
+  }, [workbookId, setWorkbook])
+
   // Fetch previous month's closing balance whenever month or year changes
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const r = await fetch(`/api/previous-month-balance?year=${year}&month=${month}`)
+        const r = await fetch(`/api/previous-month-balance?year=${year}&month=${month}&workbookId=${workbookId}`)
         if (!r.ok) throw new Error('Falha')
         const data = await r.json()
         if (cancelled) return
@@ -354,7 +380,7 @@ export default function Home() {
     note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null
   }) {
     try {
-      const r = await createCategory({ ...args, parentCategoryId: newCatParent, user })
+      const r = await createCategory({ ...args, parentCategoryId: newCatParent, workbookId, user })
       const detail = newCatParent
         ? `Criou sub-item "${r.category.name}"`
         : `Criou categoria "${r.category.name}"`
@@ -396,7 +422,7 @@ export default function Home() {
 
   async function handleRename(key: string, value: string) {
     try {
-      await updateLabel(key, value, user)
+      await updateLabel(key, value, user, workbookId)
       const detail = value === '' ? `Resetou rótulo` : `Renomeou para "${value}"`
       dispatchChange('label', 'update', { key, value }, detail, {
         user, action: 'update', entity: 'label', detail, createdAt: new Date().toISOString(),
@@ -410,7 +436,7 @@ export default function Home() {
   async function handleCreateSubgroup(name: string) {
     if (!newSubgroupParent) return
     try {
-      const r = await createSubgroup(newSubgroupParent.key, name, user)
+      const r = await createSubgroup(newSubgroupParent.key, name, user, workbookId)
       const detail = `Criou subgrupo "${r.subgroup.name}" dentro de ${newSubgroupParent.label}`
       dispatchChange('subgroup', 'create', { subgroup: r.subgroup }, detail, {
         user, action: 'create', entity: 'subgroup', detail, createdAt: new Date().toISOString(),
@@ -424,7 +450,7 @@ export default function Home() {
   async function handleDeleteSubgroup(node: GroupTreeNode) {
     if (!confirm(`Remover o subgrupo "${node.label}"? As categorias dentro dele serão movidas para o grupo pai.`)) return
     try {
-      const r = await deleteSubgroup(node.key, user)
+      const r = await deleteSubgroup(node.key, user, workbookId)
       // Collect all descendant keys for local state update
       const deletedKeys = collectDescendantKeys(node)
       const detail = `Removeu subgrupo "${node.label}"`
@@ -664,10 +690,13 @@ export default function Home() {
             <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
               €
             </div>
-            <div>
-              <h1 className="text-sm font-semibold leading-none">Porto {year}</h1>
-              <p className="text-[10px] text-muted-foreground">Controle financeiro</p>
-            </div>
+            <button
+              onClick={() => setWorkbookOpen(true)}
+              className="text-left touch-manipulation hover:opacity-80 transition-opacity"
+            >
+              <h1 className="text-sm font-semibold leading-none">{workbookName || 'Porto 2026'}</h1>
+              <p className="text-[10px] text-muted-foreground">Controle financeiro • {year}</p>
+            </button>
           </div>
           <div className="flex items-center gap-1">
             <Badge variant="outline" className={cn(
@@ -749,7 +778,7 @@ export default function Home() {
         />
 
         {/* Budget card — meta de poupança */}
-        <BudgetCard year={year} user={user} />
+        <BudgetCard year={year} user={user} workbookId={workbookId} />
 
         {/* Vencimento alerts */}
         <VencimentoAlerts
@@ -812,7 +841,7 @@ export default function Home() {
         )}
 
         {/* Caderninho — lined-paper notes for the current month (above activity) */}
-        <NotesPanel year={year} month={month} user={user} />
+        <NotesPanel year={year} month={month} user={user} workbookId={workbookId} />
 
         <ActivityPanel activity={activity} presences={live.presences} currentUser={user} />
 
@@ -911,6 +940,59 @@ export default function Home() {
         onOpenChange={setBackupOpen}
         onExport={handleExportBackup}
         onImport={handleImportBackup}
+      />
+
+      <WorkbookSwitcher
+        open={workbookOpen}
+        onOpenChange={setWorkbookOpen}
+        currentWorkbookId={workbookId}
+        onSelect={(id) => setWorkbook(id)}
+        onCreate={async (name, copyFrom) => {
+          try {
+            const r = await fetch('/api/workbooks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name, user, copyFrom }),
+            })
+            if (!r.ok) throw new Error('Falha')
+            const data = await r.json()
+            setWorkbook(data.workbook.id)
+            setWorkbookName(data.workbook.name)
+            toast.success(`Planilha "${name}" criada`)
+          } catch (e: any) {
+            toast.error(e.message || 'Erro ao criar planilha')
+          }
+        }}
+        onRename={async (id, name) => {
+          try {
+            const r = await fetch('/api/workbooks', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, name, user }),
+            })
+            if (!r.ok) throw new Error('Falha')
+            if (id === workbookId) setWorkbookName(name)
+            toast.success('Planilha renomeada')
+          } catch (e: any) {
+            toast.error(e.message || 'Erro ao renomear')
+          }
+        }}
+        onDelete={async (id) => {
+          try {
+            const r = await fetch('/api/workbooks', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id, user }),
+            })
+            if (!r.ok) {
+              const err = await r.json().catch(() => ({}))
+              throw new Error(err.error || 'Falha')
+            }
+            toast.success('Planilha removida')
+          } catch (e: any) {
+            toast.error(e.message || 'Erro ao remover planilha')
+          }
+        }}
       />
     </div>
   )

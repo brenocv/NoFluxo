@@ -110,6 +110,7 @@ export interface SaveCategoryArgs {
   excludeFromTotal?: boolean
   monthlyGoal?: number | null
   parentCategoryId?: string | null
+  workbookId?: string
   user: string
 }
 
@@ -174,11 +175,11 @@ export async function updateConfig(key: string, value: string, user: string): Pr
   return r.json()
 }
 
-export async function updateLabel(key: string, value: string, user: string): Promise<{ ok: boolean; labels: Record<string, string> }> {
+export async function updateLabel(key: string, value: string, user: string, workbookId?: string): Promise<{ ok: boolean; labels: Record<string, string> }> {
   const r = await fetch('/api/labels', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, value, user }),
+    body: JSON.stringify({ key, value, user, workbookId }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({}))
@@ -190,12 +191,13 @@ export async function updateLabel(key: string, value: string, user: string): Pro
 export async function createSubgroup(
   parentKey: string,
   name: string,
-  user: string
+  user: string,
+  workbookId?: string
 ): Promise<{ ok: boolean; subgroup: any }> {
   const r = await fetch('/api/subgroups', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ parentKey, name, user }),
+    body: JSON.stringify({ parentKey, name, user, workbookId }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({}))
@@ -206,12 +208,13 @@ export async function createSubgroup(
 
 export async function deleteSubgroup(
   key: string,
-  user: string
+  user: string,
+  workbookId?: string
 ): Promise<{ ok: boolean; movedToParent: string }> {
   const r = await fetch('/api/subgroups', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, user }),
+    body: JSON.stringify({ key, user, workbookId }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({}))

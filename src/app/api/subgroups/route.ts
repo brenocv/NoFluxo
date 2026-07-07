@@ -44,23 +44,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'parentKey inválido' }, { status: 400 })
   }
 
-  // Generate a unique key
+  // Generate a unique key within this workbook
   const baseSlug = slugify(name)
   let key = `${parentKey}.${baseSlug}`
   let suffix = 2
-  while (await db.subgroup.findUnique({ where: { key } })) {
+  const wbid = String(body.workbookId)
+  while (await db.subgroup.findFirst({ where: { key, workbookId: wbid } })) {
     key = `${parentKey}.${baseSlug}_${suffix++}`
   }
 
   // Compute sortOrder
   const maxOrder = await db.subgroup.aggregate({
-    where: { parentKey },
+    where: { parentKey, workbookId: wbid },
     _max: { sortOrder: true },
   })
   const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1
 
   const sg = await db.subgroup.create({
-    data: { key, parentKey, name, sortOrder },
+    data: { workbookId: wbid, key, parentKey, name, sortOrder },
   })
 
   await db.activityLog.create({
@@ -81,28 +82,29 @@ export async function DELETE(req: NextRequest) {
   const user = String(body.user || 'Anônimo').slice(0, 30)
   const key = String(body.key)
 
-  const sg = await db.subgroup.findUnique({ where: { key } })
+  const wbid = String(body.workbookId)
+  const sg = await db.subgroup.findFirst({ where: { key, workbookId: wbid } })
   if (!sg) return NextResponse.json({ error: 'subgroup not found' }, { status: 404 })
 
   const parentKey = sg.parentKey
 
-  // Find all descendant subgroup keys (recursive)
-  const allSubgroups = await db.subgroup.findMany()
+  // Find all descendant subgroup keys (recursive) within this workbook
+  const allSubgroups = await db.subgroup.findMany({ where: { workbookId: wbid } })
   const descendants = collectDescendants(key, allSubgroups)
 
   // Move all categories in this subgroup and its descendants to the parent
   const allKeys = [key, ...descendants]
   await db.category.updateMany({
-    where: { group: { in: allKeys } },
+    where: { group: { in: allKeys }, workbookId: wbid },
     data: { group: parentKey },
   })
 
   // Delete all descendant subgroups
   await db.subgroup.deleteMany({
-    where: { key: { in: descendants } },
+    where: { key: { in: descendants }, workbookId: wbid },
   })
   // Delete the subgroup itself
-  await db.subgroup.delete({ where: { key } })
+  await db.subgroup.delete({ where: { id: sg.id } })
 
   await db.activityLog.create({
     data: {

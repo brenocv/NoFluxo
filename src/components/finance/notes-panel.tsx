@@ -11,9 +11,10 @@ interface Props {
   year: number
   month: number
   user: string
+  workbookId: string
 }
 
-export function NotesPanel({ year, month, user }: Props) {
+export function NotesPanel({ year, month, user, workbookId }: Props) {
   const [text, setText] = useState('')
   const [isRecurring, setIsRecurring] = useState(false)
   const [isRecurringFrom, setIsRecurringFrom] = useState(false)
@@ -28,7 +29,7 @@ export function NotesPanel({ year, month, user }: Props) {
     setLoaded(false)
     ;(async () => {
       try {
-        const r = await fetch(`/api/notes?year=${year}&month=${month}`)
+        const r = await fetch(`/api/notes?year=${year}&month=${month}&workbookId=${workbookId}`)
         if (!r.ok) throw new Error('fail')
         const data = await r.json()
         if (cancelled) return
@@ -57,7 +58,7 @@ export function NotesPanel({ year, month, user }: Props) {
     saveTimer.current = setTimeout(async () => {
       setSaving(true)
       try {
-        const r = await fetch('/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year, month, text, user, isRecurring }) })
+        const r = await fetch('/api/notes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ year, month, text, user, isRecurring, workbookId }) })
         if (r.ok) { lastSaved.current = { text, isRecurring }; setIsRecurringFrom(false) }
       } catch {} finally { setSaving(false) }
     }, 800)

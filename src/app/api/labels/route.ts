@@ -1,17 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// GET /api/labels -> returns the labels map { "group:despesas": "...", ... }
-// PATCH /api/labels -> body: { key, value, user } — upserts a single label
-//   key examples: "group:despesas", "subgroup:despesas.contas_casa"
-//   value: the new label string (empty string to reset to default)
+// GET /api/labels?workbookId=xxx -> returns the labels map for this workbook
+// PATCH /api/labels -> body: { key, value, workbookId, user }
 
-export async function GET() {
-  const cfg = await db.config.findUnique({ where: { key: 'labels' } })
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url)
+  const workbookId = url.searchParams.get('workbookId') ?? ''
+  const labelsKey = workbookId ? `labels:${workbookId}` : 'labels'
+  const cfg = await db.config.findUnique({ where: { key: labelsKey } })
   let labels: Record<string, string> = {}
-  if (cfg) {
-    try { labels = JSON.parse(cfg.value) } catch {}
-  }
+  if (cfg) { try { labels = JSON.parse(cfg.value) } catch {} }
   return NextResponse.json({ labels })
 }
 
@@ -23,33 +22,25 @@ export async function PATCH(req: NextRequest) {
   const user = String(body.user || 'Anônimo').slice(0, 30)
   const key = String(body.key)
   const value = String(body.value)
+  const workbookId = String(body.workbookId ?? '')
+  const labelsKey = workbookId ? `labels:${workbookId}` : 'labels'
 
-  // Load current labels
-  const cfg = await db.config.findUnique({ where: { key: 'labels' } })
+  const cfg = await db.config.findUnique({ where: { key: labelsKey } })
   let labels: Record<string, string> = {}
-  if (cfg) {
-    try { labels = JSON.parse(cfg.value) } catch {}
-  }
+  if (cfg) { try { labels = JSON.parse(cfg.value) } catch {} }
 
-  if (value.trim() === '') {
-    delete labels[key]
-  } else {
-    labels[key] = value
-  }
+  if (value.trim() === '') delete labels[key]
+  else labels[key] = value
 
   await db.config.upsert({
-    where: { key: 'labels' },
+    where: { key: labelsKey },
     update: { value: JSON.stringify(labels) },
-    create: { key: 'labels', value: JSON.stringify(labels) },
+    create: { key: labelsKey, value: JSON.stringify(labels) },
   })
 
   await db.activityLog.create({
-    data: {
-      user, action: 'update', entity: 'label',
-      detail: value.trim() === ''
-        ? `Resetou rótulo "${key}"`
-        : `Renomeou "${key}" para "${value}"`,
-    },
+    data: { user, action: 'update', entity: 'label',
+      detail: value.trim() === '' ? `Resetou rótulo` : `Renomeou para "${value}"` },
   })
 
   return NextResponse.json({ ok: true, labels })

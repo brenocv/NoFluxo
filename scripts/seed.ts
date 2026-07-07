@@ -29,7 +29,16 @@ async function main() {
   await db.activityLog.deleteMany()
   await db.transaction.deleteMany()
   await db.category.deleteMany()
+  await db.subgroup.deleteMany()
+  await db.note.deleteMany()
+  await db.workbook.deleteMany()
   await db.config.deleteMany()
+
+  // Create the default workbook
+  const workbook = await db.workbook.create({
+    data: { name: 'Porto 2026', sortOrder: 0 },
+  })
+  console.log(`Created workbook: ${workbook.name} (${workbook.id})`)
 
   const euroRate = 6
   await db.config.create({ data: { key: 'euroToBrl', value: String(euroRate) } })
@@ -105,6 +114,7 @@ async function main() {
     const c = categories[i]
     const created = await db.category.create({
       data: {
+        workbookId: workbook.id,
         name: c.name,
         group: c.group,
         type: c.type,

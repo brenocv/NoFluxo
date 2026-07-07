@@ -6,14 +6,15 @@ import { db } from '@/lib/db'
 export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const year = parseInt(url.searchParams.get('year') ?? '2026', 10) || 2026
+  const workbookId = url.searchParams.get('workbookId') ?? ''
 
-  const row = await db.config.findUnique({ where: { key: `budget:${year}` } })
+  const budgetKey = `budget:${workbookId}:${year}`
+  const row = await db.config.findUnique({ where: { key: budgetKey } })
   const goal = row ? parseFloat(row.value) : 0
 
-  // Compute current cumulative savings (sum of all months' saldo)
   const [categories, transactions, euroRateRow] = await Promise.all([
-    db.category.findMany(),
-    db.transaction.findMany({ where: { year } }),
+    db.category.findMany({ where: workbookId ? { workbookId } : {} }),
+    db.transaction.findMany({ where: { year, category: workbookId ? { workbookId } : undefined } }),
     db.config.findUnique({ where: { key: 'euroToBrl' } }),
   ])
   const euroRate = parseFloat(euroRateRow?.value ?? '6') || 6
@@ -46,11 +47,13 @@ export async function POST(req: NextRequest) {
   const year = Number(body.year)
   const goal = Number(body.goal)
   const user = String(body.user || 'Anônimo').slice(0, 30)
+  const workbookId = String(body.workbookId ?? '')
+  const budgetKey = `budget:${workbookId}:${year}`
 
   await db.config.upsert({
-    where: { key: `budget:${year}` },
+    where: { key: budgetKey },
     update: { value: String(goal) },
-    create: { key: `budget:${year}`, value: String(goal) },
+    create: { key: budgetKey, value: String(goal) },
   })
 
   await db.activityLog.create({

@@ -17,6 +17,7 @@ import { formatBRL } from '@/lib/finance'
 interface Props {
   year: number
   user: string
+  workbookId: string
 }
 
 interface BudgetData {
@@ -26,7 +27,7 @@ interface BudgetData {
   progress: number
 }
 
-export function BudgetCard({ year, user }: Props) {
+export function BudgetCard({ year, user, workbookId }: Props) {
   const [data, setData] = useState<BudgetData | null>(null)
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(false)
@@ -37,7 +38,7 @@ export function BudgetCard({ year, user }: Props) {
     setLoading(true)
     ;(async () => {
       try {
-        const r = await fetch(`/api/budget?year=${year}`)
+        const r = await fetch(`/api/budget?year=${year}&workbookId=${workbookId}`)
         if (!r.ok) throw new Error('fail')
         const d = await r.json()
         if (cancelled) return
@@ -59,7 +60,7 @@ export function BudgetCard({ year, user }: Props) {
       const r = await fetch('/api/budget', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ year, goal, user }),
+        body: JSON.stringify({ year, goal, user, workbookId }),
       })
       if (!r.ok) throw new Error('fail')
       const d = await r.json()

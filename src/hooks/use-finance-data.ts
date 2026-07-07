@@ -28,7 +28,7 @@ interface LiveMeta {
   lastChange: { by: string; detail: string; at: number } | null
 }
 
-export function useFinanceData(currentUser: string, year: number) {
+export function useFinanceData(currentUser: string, year: number, workbookId: string) {
   const [state, setState] = useState<State>({
     categories: [],
     transactions: [],
@@ -51,7 +51,7 @@ export function useFinanceData(currentUser: string, year: number) {
     setState((s) => ({ ...s, loading: true, error: null }))
     ;(async () => {
       try {
-        const r = await fetch(`/api/data?year=${year}`)
+        const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
         if (!r.ok) throw new Error('Falha ao carregar dados')
         const data = await r.json()
         if (cancelled) return
@@ -71,7 +71,7 @@ export function useFinanceData(currentUser: string, year: number) {
       }
     })()
     return () => { cancelled = true }
-  }, [year])
+  }, [year, workbookId])
 
   // Socket.io connection (does not depend on year)
   useEffect(() => {

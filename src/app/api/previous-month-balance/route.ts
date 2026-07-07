@@ -10,17 +10,19 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const year = parseInt(url.searchParams.get('year') ?? '2026', 10) || 2026
   const month = parseInt(url.searchParams.get('month') ?? '1', 10) || 1
+  const workbookId = url.searchParams.get('workbookId') ?? undefined
 
   const prevMonth = month === 1 ? 12 : month - 1
   const prevYear = month === 1 ? year - 1 : year
 
-  // Fetch euroRate from config
   const euroRateRow = await db.config.findUnique({ where: { key: 'euroToBrl' } })
   const euroRate = parseFloat(euroRateRow?.value ?? '6') || 6
 
   const [categories, transactions] = await Promise.all([
-    db.category.findMany(),
-    db.transaction.findMany({ where: { year: prevYear, month: prevMonth } }),
+    db.category.findMany({ where: workbookId ? { workbookId } : {} }),
+    db.transaction.findMany({
+      where: { year: prevYear, month: prevMonth, category: workbookId ? { workbookId } : undefined },
+    }),
   ])
 
   let entradas = 0, saidas = 0
