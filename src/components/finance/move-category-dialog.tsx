@@ -17,7 +17,7 @@ interface Props {
   onMove: (newGroup: string, newParentCategoryId: string | null) => Promise<void>
 }
 
-export function MoveCategoryDialog({ open, category, labels, subgroups, onOpenChange, onMove }: Props) {
+export function MoveCategoryDialog({ open, category, labels, subgroups, topGroups, onOpenChange, onMove }: Props) {
   const [targetGroup, setTargetGroup] = useState<string>('')
   const [saving, setSaving] = useState(false)
   if (!category) return null
