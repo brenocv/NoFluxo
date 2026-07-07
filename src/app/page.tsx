@@ -174,7 +174,20 @@ export default function Home() {
     return m
   }, [transactions, month, year])
 
-  // Filter category IDs based on search + showOnlyFilled
+  // Highlighted category IDs for search (does NOT filter — all remain visible)
+  const highlightedCategoryIds = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const ids = new Set<string>()
+    if (!q) return ids
+    for (const c of categories) {
+      if (c.name.toLowerCase().includes(q) || (c.note?.toLowerCase().includes(q) ?? false)) {
+        ids.add(c.id)
+      }
+    }
+    return ids
+  }, [categories, search])
+
+  // Filter category IDs based on showOnlyFilled only (not search)
   const filteredCategoryIds = useMemo(() => {
     const q = search.trim().toLowerCase()
     const ids = new Set<string>()
@@ -682,7 +695,7 @@ export default function Home() {
 
   // ---- Render ----
 
-  if (!hydrated || loading) {
+  if (!hydrated || loading || !workbookId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center space-y-3">
@@ -811,7 +824,7 @@ export default function Home() {
         />
 
         <div className="space-y-2">
-          <SearchBar value={search} onChange={setSearch} resultsCount={search.trim() ? filteredCategoryIds.size : undefined} />
+          <SearchBar value={search} onChange={setSearch} resultsCount={search.trim() ? highlightedCategoryIds.size : undefined} />
           <div className="flex items-center justify-between px-1">
             <Label htmlFor="only-filled" className="text-xs text-muted-foreground flex items-center gap-1.5 cursor-pointer">
               {showOnlyFilled ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
@@ -845,6 +858,8 @@ export default function Home() {
               transactionsByCat={txByCat}
               allCategories={categories}
               euroRate={euroRate}
+              highlightedCategoryIds={highlightedCategoryIds}
+              onClearSearch={() => setSearch('')}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
               onAddCategory={(grp, parentCategoryId) => {
                 // If adding to a top-level group (no dots in key) and no parent category,
@@ -976,6 +991,7 @@ export default function Home() {
         group={newCatGroup}
         labels={labels}
         subgroups={subgroups}
+        topGroups={topGroups}
         onOpenChange={(o) => !o && setNewCatGroup(null)}
         onCreate={handleCreateCategory}
       />
@@ -1018,6 +1034,7 @@ export default function Home() {
         category={moveTarget}
         labels={labels}
         subgroups={subgroups}
+        topGroups={topGroups}
         onOpenChange={(o) => !o && setMoveTarget(null)}
         onMove={handleMoveCategory}
       />

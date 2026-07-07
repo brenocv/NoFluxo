@@ -28,6 +28,7 @@ import {
   CategoryType,
   Currency,
   Subgroup,
+  TopGroup,
 } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 
@@ -42,6 +43,7 @@ interface Props {
   group: CategoryGroup | null
   labels: Record<string, string>
   subgroups: Subgroup[]
+  topGroups: TopGroup[]
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
@@ -120,7 +122,7 @@ export function CategoryEditor({ open, group, labels, subgroups, onOpenChange, o
   }
 
   // Build select options dynamically from the tree (including user-created subgroups at any depth)
-  const groupOptions = collectGroupPaths(subgroups, labels)
+  const groupOptions = collectGroupPaths(subgroups, labels, topGroups)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

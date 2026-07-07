@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
 import {
   Category, formatMoney, GroupTreeNode, computeNodeTotal,
@@ -53,80 +53,80 @@ export function GroupNode(props: Props) {
   const isReceivable = node.isReceivable
   const cardColor = isTopLevel && node.color ? node.color : null
 
-  const totalSign = isReserve || isReceivable
-    ? ''
-    : isIncome
-      ? (total >= 0 ? '+' : '-')
-      : (total >= 0 ? '-' : '+')
-
+  const totalSign = isReserve || isReceivable ? '' : isIncome ? (total >= 0 ? '+' : '-') : (total >= 0 ? '-' : '+')
   const categoryTree = buildCategoryTree(node.categories, null)
-  const childCount = countAll(node, allCategories)
-
-  // Card styles based on color
-  const cardStyle: React.CSSProperties = {}
-  if (!isTopLevel) {
-    cardStyle.marginLeft = `${(node.depth - 1) * 20}px`
-    cardStyle.borderLeft = '2px solid oklch(0.85 0 0)'
-  }
-  if (isTopLevel && cardColor) {
-    cardStyle.borderLeft = `6px solid ${cardColor}`
-    cardStyle.background = `${cardColor}08`
-  }
-
-  const headerStyle: React.CSSProperties = {}
-  if (isTopLevel && cardColor) {
-    headerStyle.background = `${cardColor}25`
-  }
-
-  const totalStyle: React.CSSProperties = {}
-  if (cardColor) {
-    totalStyle.color = cardColor
-  }
 
   return (
-    <Card className="overflow-hidden shadow-sm" id={isTopLevel ? `group-${node.key}` : undefined} style={cardStyle}>
+    <Card
+      className="overflow-hidden shadow-sm"
+      id={isTopLevel ? 'group-' + node.key : undefined}
+      style={{
+        marginLeft: !isTopLevel ? (node.depth - 1) * 20 : 0,
+        borderLeft: cardColor ? '6px solid ' + cardColor : (!isTopLevel ? '2px solid oklch(0.85 0 0)' : 'none'),
+        background: cardColor ? cardColor + '0A' : undefined,
+      }}
+    >
       {/* Header */}
-      <div className="w-full flex items-center justify-between p-3 transition-colors" style={headerStyle}>
-        <button onClick={() => setOpen(o => !o)} className="flex items-center gap-2 flex-1 touch-manipulation min-w-0">
-          <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform flex-shrink-0', !open && '-rotate-90')} />
-          <span className={cn('truncate', isTopLevel ? 'font-bold text-sm' : 'font-medium text-sm')} style={cardColor && isTopLevel ? { color: cardColor } : undefined}>
+      <div
+        className="w-full flex items-center justify-between p-3 transition-colors"
+        style={cardColor ? { background: cardColor + '22' } : undefined}
+      >
+        <button
+          onClick={() => setOpen(!open)}
+          className="flex items-center gap-2 flex-1 touch-manipulation min-w-0"
+        >
+          <ChevronDown className={cn('h-4 w-4 flex-shrink-0 transition-transform', !open && '-rotate-90')} style={cardColor ? { color: cardColor } : undefined} />
+          <span className={cn('truncate', isTopLevel ? 'font-bold text-sm' : 'font-medium text-sm')} style={cardColor ? { color: cardColor } : undefined}>
             {node.label}
           </span>
           {isReceivable && (
             <Badge variant="outline" className="h-5 px-1 text-[10px] gap-0.5 border-amber-300 bg-amber-50 text-amber-700 flex-shrink-0">
-              <Clock className="h-2.5 w-2.5" /> a receber
+              <Clock className="h-2.5 w-2.5" />a receber
             </Badge>
           )}
-          <span className={cn('text-xs flex-shrink-0', isTopLevel && cardColor ? '' : 'text-muted-foreground')} style={isTopLevel && cardColor ? { color: cardColor, opacity: 0.7 } : undefined}>
-            ({childCount})
-          </span>
+          <span className="text-xs text-muted-foreground flex-shrink-0">({countAll(node, allCategories)})</span>
         </button>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Color button for top-level */}
           {isTopLevel && props.onColorChange && (
-            <ColorButton currentColor={cardColor} onColorChange={c => props.onColorChange!(node, c)} />
+            <ColorButton currentColor={cardColor} onColorChange={(c) => props.onColorChange!(node, c)} />
           )}
-          {/* Rename */}
-          <RenameButton currentLabel={node.label} onRename={v => props.onRename(isTopLevel ? `group:${node.key}` : `subgroup:${node.key}`, v)} small={!isTopLevel} />
-          {/* New subgroup */}
-          <button onClick={e => { e.stopPropagation(); props.onAddSubgroup(node.key) }} className="p-1 rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation" aria-label="Novo subgrupo" title="Criar subgrupo aqui">
+          <RenameButton
+            currentLabel={node.label}
+            onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
+            small={!isTopLevel}
+          />
+          <button
+            onClick={(e) => { e.stopPropagation(); props.onAddSubgroup(node.key) }}
+            className="p-1 rounded-md hover:bg-black/5 text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation"
+            aria-label="Novo subgrupo"
+            title="Criar subgrupo aqui"
+          >
             <FolderPlus className="h-3.5 w-3.5" />
           </button>
-          {/* Delete subgroup or custom top group */}
           {!isTopLevel && (
-            <button onClick={e => { e.stopPropagation(); props.onDeleteSubgroup(node) }} className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation" aria-label="Remover subgrupo" title="Remover subgrupo">
+            <button
+              onClick={(e) => { e.stopPropagation(); props.onDeleteSubgroup(node) }}
+              className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
+              aria-label="Remover subgrupo"
+            >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
           {isTopLevel && !node.isDefaultTop && props.onDeleteTopGroup && (
-            <button onClick={e => { e.stopPropagation(); props.onDeleteTopGroup!(node) }} className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation" aria-label="Remover card" title="Remover card">
+            <button
+              onClick={(e) => { e.stopPropagation(); props.onDeleteTopGroup!(node) }}
+              className="p-1 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
+              aria-label="Remover card"
+              title="Remover card"
+            >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
-          {/* Total */}
-          <span className={cn('text-sm font-semibold tabular-nums ml-1', !cardColor && (isIncome ? 'text-emerald-600' : (isReserve || isReceivable) ? 'text-amber-600' : 'text-rose-600'))} style={cardColor ? totalStyle : undefined}>
+          <span className={cn('text-sm font-semibold tabular-nums')} style={cardColor ? { color: cardColor } : (isIncome ? { color: 'oklch(0.55 0.18 145)' } : isReserve ? { color: 'oklch(0.70 0.15 75)' } : { color: 'oklch(0.55 0.20 25)' })}>
             {totalSign}{formatMoney(Math.abs(total), 'BRL')}
-            <span className="text-[10px] text-muted-foreground ml-1 font-normal">({formatMoney(Math.abs(total) / euroRate, 'EUR')})</span>
+            <span className="text-[10px] text-muted-foreground ml-1 font-normal">
+              ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+            </span>
           </span>
         </div>
       </div>
@@ -137,22 +137,25 @@ export function GroupNode(props: Props) {
           {/* Direct categories */}
           {categoryTree.length > 0 && (
             <div className="divide-y divide-border/50 border-t border-border/50">
-              {categoryTree.map(catNode => (
-                <CategoryNodeRow key={catNode.category.id} catNode={catNode} depth={0} allProps={props} />
+              {categoryTree.map((catNode) => (
+                <CategoryNodeRow key={catNode.category.id} catNode={catNode} depth={0} allProps={props} cardColor={cardColor} />
               ))}
             </div>
           )}
 
           {/* Child subgroups */}
-          {node.children.map(child => (
+          {node.children.map((child) => (
             <div key={child.key} className="border-t border-border">
               <GroupNode {...props} node={child} />
             </div>
           ))}
 
-          {/* Add category */}
-          <button onClick={() => props.onAddCategory(node.key, null)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs text-muted-foreground hover:bg-muted/50 transition-colors touch-manipulation border-t border-border">
-            <Plus className="h-3.5 w-3.5" /> Adicionar categoria
+          {/* Add category button */}
+          <button
+            onClick={() => props.onAddCategory(node.key, null)}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs text-muted-foreground hover:bg-black/5 transition-colors touch-manipulation border-t border-border"
+          >
+            <Plus className="h-3.5 w-3.5" />Adicionar categoria
           </button>
         </div>
       )}
@@ -166,10 +169,11 @@ function countAll(node: GroupTreeNode, allCategories: Category[]): number {
 
 // ---- Recursive category row ----
 
-function CategoryNodeRow({ catNode, depth, allProps }: {
+function CategoryNodeRow({ catNode, depth, allProps, cardColor }: {
   catNode: ReturnType<typeof buildCategoryTree>[0]
   depth: number
   allProps: Props
+  cardColor: string | null
 }) {
   const { category, children } = catNode
   const { transactionsByCat, euroRate } = allProps
@@ -194,26 +198,22 @@ function CategoryNodeRow({ catNode, depth, allProps }: {
 
   const totalWithChildren = hasChildren ? computeCategoryNodeTotal(catNode, transactionsByCat, euroRate) : null
   const displayValue = totalWithChildren !== null ? totalWithChildren : value
-
-  const sign = displayValue === null
-    ? ''
-    : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber'
-      ? (displayValue < 0 ? '-' : '')
-      : category.type === 'INCOME'
-        ? (displayValue >= 0 ? '+' : '-')
-        : (displayValue >= 0 ? '-' : '+')
-
-  const rowStyle: React.CSSProperties = { paddingLeft: depth > 0 ? `${12 + depth * 20}px` : undefined }
-  if (!isHighlighted || !hasSearch) rowStyle.background = undefined
-  if (hasSearch && !isHighlighted) rowStyle.opacity = 0.25
+  const sign = displayValue === null ? '' : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber' ? (displayValue < 0 ? '-' : '') : category.type === 'INCOME' ? (displayValue >= 0 ? '+' : '-') : (displayValue >= 0 ? '-' : '+')
 
   return (
     <>
-      <div className={cn('flex items-center justify-between px-3 py-2.5 group transition-colors', !hasSearch && 'hover:bg-black/5')} style={rowStyle}>
-        {/* Left */}
+      <div
+        className={cn(
+          'flex items-center justify-between px-3 py-2.5 group transition-colors',
+          hasSearch && !isHighlighted && 'opacity-25',
+          isHighlighted && 'bg-yellow-100 ring-2 ring-yellow-400 ring-inset z-10 relative',
+          !hasSearch && 'hover:bg-black/5'
+        )}
+        style={{ paddingLeft: depth > 0 ? 12 + depth * 20 : undefined }}
+      >
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           {hasChildren ? (
-            <button onClick={() => setUserOpen(o => !o)} className="p-0.5 rounded hover:bg-muted text-muted-foreground touch-manipulation flex-shrink-0" aria-label={open ? 'Recolher' : 'Expandir'}>
+            <button onClick={() => setUserOpen(!userOpen)} className="p-0.5 rounded hover:bg-muted text-muted-foreground touch-manipulation flex-shrink-0" aria-label={open ? 'Recolher' : 'Expandir'}>
               {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
           ) : (
@@ -228,12 +228,12 @@ function CategoryNodeRow({ catNode, depth, allProps }: {
               {category.name}
               {isRecurring && (
                 <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded">
-                  <RefreshCw className="h-2 w-2" />{installmentsTotal ? `${installmentNumber}/${installmentsTotal}` : 'recorrente'}
+                  <RefreshCw className="h-2 w-2" />{installmentsTotal ? installmentNumber + '/' + installmentsTotal : 'recorrente'}
                 </span>
               )}
               {goalExceeded && (
                 <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded">
-                  <AlertTriangle className="h-2 w-2" /> meta
+                  <AlertTriangle className="h-2 w-2" />meta
                 </span>
               )}
               {hasChildren && <span className="text-[9px] text-muted-foreground">({children.length})</span>}
@@ -241,13 +241,11 @@ function CategoryNodeRow({ catNode, depth, allProps }: {
             {category.note && <span className="text-xs text-muted-foreground truncate">{category.note}</span>}
           </button>
         </div>
-
-        {/* Right */}
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={e => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
+          <button onClick={(e) => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
             <Plus className="h-3 w-3" />
           </button>
-          <button onClick={e => { e.stopPropagation(); allProps.onMoveCategory(category) }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation" aria-label="Mover categoria" title="Mover para outro grupo">
+          <button onClick={(e) => { e.stopPropagation(); allProps.onMoveCategory(category) }} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all touch-manipulation" aria-label="Mover categoria" title="Mover para outro grupo">
             <Move className="h-3 w-3" />
           </button>
           {isRecurring && (
@@ -260,7 +258,7 @@ function CategoryNodeRow({ catNode, depth, allProps }: {
               <span className="text-sm font-normal text-muted-foreground italic">--</span>
             ) : (
               <div className="flex flex-col items-end leading-tight">
-                <span className={cn('text-sm font-semibold tabular-nums', category.type === 'INCOME' ? 'text-emerald-600' : (category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber') ? 'text-amber-600' : 'text-rose-600')}>
+                <span className={cn('text-sm font-semibold tabular-nums', category.type === 'INCOME' ? 'text-emerald-600' : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber' ? 'text-amber-600' : 'text-rose-600')}>
                   {sign}{formatMoney(Math.abs(displayValue), category.currency)}
                 </span>
                 <span className="text-[10px] text-muted-foreground tabular-nums">
@@ -278,11 +276,15 @@ function CategoryNodeRow({ catNode, depth, allProps }: {
       {/* Children */}
       {hasChildren && open && (
         <div className="border-l-2 border-l-muted-foreground/15 ml-4">
-          {children.map(child => (
-            <CategoryNodeRow key={child.category.id} catNode={child} depth={depth + 1} allProps={allProps} />
+          {children.map((child) => (
+            <CategoryNodeRow key={child.category.id} catNode={child} depth={depth + 1} allProps={allProps} cardColor={cardColor} />
           ))}
-          <button onClick={() => allProps.onAddCategory(category.group, category.id)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors touch-manipulation" style={{ paddingLeft: `${12 + (depth + 1) * 20}px` }}>
-            <Plus className="h-3 w-3" /> Adicionar sub-item em {category.name}
+          <button
+            onClick={() => allProps.onAddCategory(category.group, category.id)}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/30 transition-colors touch-manipulation"
+            style={{ paddingLeft: 12 + (depth + 1) * 20 }}
+          >
+            <Plus className="h-3 w-3" />Adicionar sub-item em {category.name}
           </button>
         </div>
       )}
@@ -291,19 +293,25 @@ function CategoryNodeRow({ catNode, depth, allProps }: {
 }
 
 // ---- Color button ----
-function ColorButton({ currentColor, onColorChange }: { currentColor: string | null; onColorChange: (c: string) => void }) {
+
+function ColorButton({ currentColor, onColorChange }: { currentColor: string | null; onColorChange: (color: string) => void }) {
   const [open, setOpen] = useState(false)
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button onClick={e => e.stopPropagation()} className="p-1 rounded-md hover:bg-muted transition-colors touch-manipulation" aria-label="Mudar cor" title="Mudar cor do card">
+        <button onClick={(e) => e.stopPropagation()} className="p-1 rounded-md hover:bg-black/5 transition-colors touch-manipulation" aria-label="Mudar cor" title="Mudar cor do card">
           <span className="block h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: currentColor || '#64748b' }} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-48" onClick={e => e.stopPropagation()}>
+      <PopoverContent className="w-48" onClick={(e) => e.stopPropagation()}>
         <div className="grid grid-cols-7 gap-1.5">
-          {CARD_COLORS.map(c => (
-            <button key={c} onClick={() => { onColorChange(c); setOpen(false) }} className={cn('h-6 w-6 rounded-full border-2 transition-all touch-manipulation', currentColor === c ? 'border-primary ring-2 ring-primary/20 scale-110' : 'border-transparent')} style={{ backgroundColor: c }} />
+          {CARD_COLORS.map((c) => (
+            <button
+              key={c}
+              onClick={() => { onColorChange(c); setOpen(false) }}
+              className={cn('h-6 w-6 rounded-full border-2 transition-all touch-manipulation', currentColor === c ? 'border-primary ring-2 ring-primary/20 scale-110' : 'border-transparent')}
+              style={{ backgroundColor: c }}
+            />
           ))}
         </div>
       </PopoverContent>
@@ -312,23 +320,24 @@ function ColorButton({ currentColor, onColorChange }: { currentColor: string | n
 }
 
 // ---- Rename button ----
+
 function RenameButton({ currentLabel, onRename, small }: { currentLabel: string; onRename: (v: string) => void; small?: boolean }) {
   const [open, setOpen] = useState(false)
   const [value, setValue] = useState(currentLabel)
   return (
-    <Popover open={open} onOpenChange={o => { setOpen(o); if (o) setValue(currentLabel) }}>
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setValue(currentLabel) }}>
       <PopoverTrigger asChild>
-        <button onClick={e => e.stopPropagation()} className="p-1 rounded-md hover:bg-muted text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation" aria-label="Renomear">
+        <button onClick={(e) => e.stopPropagation()} className="p-1 rounded-md hover:bg-black/5 text-muted-foreground/50 hover:text-foreground transition-colors touch-manipulation" aria-label="Renomear">
           <Pencil className={small ? 'h-3 w-3' : 'h-3.5 w-3.5'} />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-64" onClick={e => e.stopPropagation()}>
+      <PopoverContent className="w-64" onClick={(e) => e.stopPropagation()}>
         <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground">Renomear</label>
-          <Input value={value} onChange={e => setValue(e.target.value)} placeholder={currentLabel} autoFocus onKeyDown={e => { if (e.key === 'Enter') { onRename(value.trim()); setOpen(false) } }} />
+          <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={currentLabel} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { onRename(value.trim()); setOpen(false) } }} />
           <div className="flex gap-2 justify-end">
             <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancelar</Button>
-            <Button size="sm" onClick={() => { onRename(value.trim()); setOpen(false) }}><Check className="h-3 w-3 mr-1" /> Salvar</Button>
+            <Button size="sm" onClick={() => { onRename(value.trim()); setOpen(false) }}><Check className="h-3 w-3 mr-1" />Salvar</Button>
           </div>
         </div>
       </PopoverContent>

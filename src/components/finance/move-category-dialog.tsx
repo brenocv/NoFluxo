@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Category, collectGroupPaths, Subgroup } from '@/lib/finance'
+import { Category, collectGroupPaths, Subgroup, TopGroup } from '@/lib/finance'
 import { Move } from 'lucide-react'
 
 interface Props {
@@ -12,6 +12,7 @@ interface Props {
   category: Category | null
   labels: Record<string, string>
   subgroups: Subgroup[]
+  topGroups: TopGroup[]
   onOpenChange: (open: boolean) => void
   onMove: (newGroup: string, newParentCategoryId: string | null) => Promise<void>
 }
@@ -20,7 +21,7 @@ export function MoveCategoryDialog({ open, category, labels, subgroups, onOpenCh
   const [targetGroup, setTargetGroup] = useState<string>('')
   const [saving, setSaving] = useState(false)
   if (!category) return null
-  const groupOptions = collectGroupPaths(subgroups, labels)
+  const groupOptions = collectGroupPaths(subgroups, labels, topGroups)
 
   async function handleMove() {
     if (!targetGroup) return
