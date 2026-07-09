@@ -52,6 +52,7 @@ import { UndoRedoButtons } from '@/components/finance/undo-redo-buttons'
 import { VencimentoAlerts } from '@/components/finance/vencimento-alerts'
 import { AnnualDashboard } from '@/components/finance/annual-dashboard'
 import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
+import { DeleteSubgroupDialog } from '@/components/finance/delete-subgroup-dialog'
 import { BackupDialog } from '@/components/finance/backup-dialog'
 import { ImportStatementDialog } from '@/components/finance/import-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
@@ -94,6 +95,7 @@ export default function Home() {
   const [copyOpen, setCopyOpen] = useState(false)
   const [resetOpen, setResetOpen] = useState(false)
   const [moveTarget, setMoveTarget] = useState<Category | null>(null)
+  const [pendingDeleteSubgroup, setPendingDeleteSubgroup] = useState<GroupTreeNode | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
@@ -301,8 +303,9 @@ export default function Home() {
         { user, action: result.action, entity: 'transaction', detail, createdAt: new Date().toISOString() }
       )
 
-      // Record undo/redo
+      // Record undo/redo — use mutable ref to track the latest tx IDs across cycles
       const newTxs = txs
+      const txIdsRef = { current: newTxs.map((t: any) => t.id) }
       history.push({
         description: detail,
         undo: async () => {
@@ -314,13 +317,14 @@ export default function Home() {
             for (const t of newTxs) {
               await saveTransaction({ categoryId: cat.id, month: t.month, year: t.year, value: null, note: null, user })
             }
-            dispatchChange('transaction', 'delete', { ids: newTxs.map((t: any) => t.id) }, `Desfez: ${detail}`,
+            dispatchChange('transaction', 'delete', { ids: txIdsRef.current }, `Desfez: ${detail}`,
               { user, action: 'delete', entity: 'transaction', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString() })
           }
         },
         redo: async () => {
           const r = await saveTransaction({ categoryId: cat.id, month, year, value: args.value, note: args.note, user, isRecurring: args.isRecurring, installmentsTotal: args.installmentsTotal })
           const rTxs = r.transactions ?? (r.transaction ? [r.transaction] : [])
+          txIdsRef.current = rTxs.map((t: any) => t.id)
           dispatchChange('transaction', r.action as 'create' | 'update' | 'delete',
             rTxs.length > 0 ? { transactions: rTxs } : { id: prevTx?.id },
             `Refazendo: ${detail}`,
@@ -416,16 +420,18 @@ export default function Home() {
         user, action: 'create', entity: 'category', detail, createdAt: new Date().toISOString(),
       })
       const createdCat = r.category
+      const idRef = { current: createdCat.id }
       history.push({
         description: detail,
         undo: async () => {
-          await deleteCategory(createdCat.id, user)
-          dispatchChange('category', 'delete', { id: createdCat.id }, `Desfez: ${detail}`, {
+          await deleteCategory(idRef.current, user)
+          dispatchChange('category', 'delete', { id: idRef.current }, `Desfez: ${detail}`, {
             user, action: 'delete', entity: 'category', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
           })
         },
         redo: async () => {
           const rr = await createCategory({ ...args, parentCategoryId: newCatParent, workbookId, user })
+          idRef.current = rr.category.id
           dispatchChange('category', 'create', { category: rr.category }, `Refazendo: ${detail}`, {
             user, action: 'create', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
           })
@@ -447,6 +453,7 @@ export default function Home() {
       if (!confirm(msg)) return
     }
     const prevCat = { ...cat }
+    const idRef = { current: prevCat.id }
     try {
       await deleteCategory(cat.id, user)
       const detail = `Removeu categoria "${cat.name}"`
@@ -463,13 +470,14 @@ export default function Home() {
             color: prevCat.color, parentCategoryId: prevCat.parentCategoryId,
             workbookId, user,
           })
+          idRef.current = r.category.id
           dispatchChange('category', 'create', { category: r.category }, `Desfez: ${detail}`, {
             user, action: 'create', entity: 'category', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
           })
         },
         redo: async () => {
-          await deleteCategory(prevCat.id, user)
-          dispatchChange('category', 'delete', { id: prevCat.id }, `Refazendo: ${detail}`, {
+          await deleteCategory(idRef.current, user)
+          dispatchChange('category', 'delete', { id: idRef.current }, `Refazendo: ${detail}`, {
             user, action: 'delete', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
           })
         },
@@ -529,16 +537,18 @@ export default function Home() {
         user, action: 'create', entity: 'subgroup', detail, createdAt: new Date().toISOString(),
       })
       const createdSg = r.subgroup
+      const keyRef = { current: createdSg.key }
       history.push({
         description: detail,
         undo: async () => {
-          await deleteSubgroup(createdSg.key, user, workbookId)
-          dispatchChange('subgroup', 'delete', { key: createdSg.key, deletedKeys: [createdSg.key], parentKey: createdSg.parentKey }, `Desfez: ${detail}`, {
+          await deleteSubgroup(keyRef.current, user, workbookId, 'move')
+          dispatchChange('subgroup', 'delete', { key: keyRef.current, deletedKeys: [keyRef.current], parentKey: createdSg.parentKey }, `Desfez: ${detail}`, {
             user, action: 'delete', entity: 'subgroup', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
           })
         },
         redo: async () => {
           const rr = await createSubgroup(newSubgroupParent.key, name, user, workbookId)
+          keyRef.current = rr.subgroup.key
           dispatchChange('subgroup', 'create', { subgroup: rr.subgroup }, `Refazendo: ${detail}`, {
             user, action: 'create', entity: 'subgroup', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
           })
@@ -550,22 +560,49 @@ export default function Home() {
     }
   }
 
-  async function handleDeleteSubgroup(node: GroupTreeNode) {
-    if (!confirm(`Remover o subgrupo "${node.label}"? As categorias dentro dele serão movidas para o grupo pai.`)) return
+  // Subgroup deletion now uses a dialog (pendingDeleteSubgroup) so the user can
+  // choose between moving categories to parent OR deleting everything.
+  async function handleDeleteSubgroupConfirm(mode: 'move' | 'delete') {
+    if (!pendingDeleteSubgroup) return
+    const node = pendingDeleteSubgroup
     try {
-      const r = await deleteSubgroup(node.key, user, workbookId)
+      const r = await deleteSubgroup(node.key, user, workbookId, mode)
       // Collect all descendant keys for local state update
       const deletedKeys = collectDescendantKeys(node)
-      const detail = `Removeu subgrupo "${node.label}"`
+      const detail = mode === 'delete'
+        ? `Removeu subgrupo "${node.label}" (categorias excluídas)`
+        : `Removeu subgrupo "${node.label}" (categorias movidas)`
       dispatchChange('subgroup', 'delete',
-        { key: node.key, deletedKeys, parentKey: r.movedToParent },
+        {
+          key: node.key,
+          deletedKeys,
+          parentKey: r.movedToParent || node.key,
+          mode,
+          deletedCategoryIds: r.deletedCategoryIds ?? [],
+        },
         detail,
         { user, action: 'delete', entity: 'subgroup', detail, createdAt: new Date().toISOString() }
       )
+      // If mode === 'delete', also dispatch a category delete for each affected category
+      if (mode === 'delete' && r.deletedCategoryIds && r.deletedCategoryIds.length > 0) {
+        for (const catId of r.deletedCategoryIds) {
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: {
+              type: 'category', action: 'delete', payload: { id: catId },
+              by: { name: user, color: USER_COLOR }, at: Date.now(),
+            }
+          }))
+        }
+      }
       toast.success(`Subgrupo "${node.label}" removido`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao remover subgrupo')
     }
+  }
+
+  // Old name kept for compatibility — now just opens the dialog
+  function handleDeleteSubgroup(node: GroupTreeNode) {
+    setPendingDeleteSubgroup(node)
   }
 
   function collectDescendantKeys(node: GroupTreeNode): string[] {
@@ -979,33 +1016,59 @@ export default function Home() {
               })}
               onDeleteSubgroup={handleDeleteSubgroup}
               onMoveCategory={(cat) => setMoveTarget(cat)}
-              onReorder={async (catId, direction) => {
-                const cat = categories.find((c) => c.id === catId)
-                if (!cat) return
+              onDropCategory={async (draggedId, targetId, position) => {
+                const dragged = categories.find((c) => c.id === draggedId)
+                const target = categories.find((c) => c.id === targetId)
+                if (!dragged || !target) return
+                if (draggedId === targetId) return
+
+                // Determine the new siblings list (target's parent's children, with dragged inserted)
+                const targetParent = target.parentCategoryId ?? null
+                const targetGroup = target.group
                 const siblings = categories
-                  .filter((c) => c.group === cat.group && (!c.parentCategoryId || c.parentCategoryId === cat.parentCategoryId))
+                  .filter((c) =>
+                    c.group === targetGroup &&
+                    (c.parentCategoryId ?? null) === targetParent &&
+                    c.id !== draggedId
+                  )
                   .sort((a, b) => a.sortOrder - b.sortOrder)
-                const idx = siblings.findIndex((c) => c.id === catId)
-                if (idx === -1) return
-                const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-                if (swapIdx < 0 || swapIdx >= siblings.length) return
-                const swapCat = siblings[swapIdx]
-                const items = [
-                  { id: catId, sortOrder: swapCat.sortOrder },
-                  { id: swapCat.id, sortOrder: cat.sortOrder },
-                ]
+                const targetIdx = siblings.findIndex((c) => c.id === targetId)
+                if (targetIdx === -1) return
+                const insertIdx = position === 'before' ? targetIdx : targetIdx + 1
+                siblings.splice(insertIdx, 0, dragged)
+                const items = siblings.map((c, i) => ({ id: c.id, sortOrder: i + 1 }))
+
                 try {
-                  await reorderCategories(items)
-                  // Re-fetch data instead of reloading
-                  const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
-                  if (r.ok) {
-                    const data = await r.json()
-                    window.dispatchEvent(new CustomEvent('finance:patch', {
-                      detail: { type: 'category', action: 'update', payload: { category: data.categories }, by: { name: user, color: USER_COLOR }, at: Date.now() }
-                    }))
+                  // If moving across parents/groups, update parent first
+                  const crossParent = (dragged.parentCategoryId ?? null) !== targetParent
+                  const crossGroup = dragged.group !== targetGroup
+                  if (crossParent || crossGroup) {
+                    await updateCategory(draggedId, {
+                      group: targetGroup,
+                      parentCategoryId: targetParent,
+                    }, user)
                   }
+                  await reorderCategories(items)
+                  // Broadcast the dragged category's new state so other devices sync
+                  const updatedCat = {
+                    ...dragged,
+                    group: targetGroup,
+                    parentCategoryId: targetParent,
+                    sortOrder: items.find((it) => it.id === draggedId)!.sortOrder,
+                  }
+                  dispatchChange('category', 'update', { category: updatedCat }, `Reordenou categoria "${dragged.name}"`, {
+                    user, action: 'update', entity: 'category', detail: `Reordenou categoria "${dragged.name}"`, createdAt: new Date().toISOString(),
+                  })
+                  // Also reload local data to refresh sort orders of all siblings
+                  window.dispatchEvent(new CustomEvent('finance:patch', {
+                    detail: {
+                      type: 'reload', action: 'update', payload: {},
+                      by: { name: user, color: USER_COLOR }, at: Date.now(),
+                    }
+                  }))
+                  toast.success('Categoria movida')
                 } catch (e: any) {
-                  toast.error(e.message || 'Erro ao reordenar')
+                  toast.error(e.message || 'Erro ao mover categoria')
                 }
               }}
               onReorderTopGroup={async (key, direction) => {
@@ -1190,6 +1253,17 @@ export default function Home() {
         topGroups={topGroups}
         onOpenChange={(o) => !o && setMoveTarget(null)}
         onMove={handleMoveCategory}
+      />
+
+      <DeleteSubgroupDialog
+        open={!!pendingDeleteSubgroup}
+        node={pendingDeleteSubgroup}
+        parentLabel={pendingDeleteSubgroup ? getGroupLabel(
+          pendingDeleteSubgroup.key.split('.').slice(0, -1).join('.') || pendingDeleteSubgroup.key,
+          labels, subgroups
+        ) : ''}
+        onOpenChange={(o) => !o && setPendingDeleteSubgroup(null)}
+        onConfirm={handleDeleteSubgroupConfirm}
       />
 
       <BackupDialog

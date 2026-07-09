@@ -366,3 +366,63 @@ Stage Summary:
 - Orçamento: meta de poupança anual com progress bar e status visual
 - Todos os componentes perdidos foram recriados (undo-redo-buttons, vencimento-alerts, annual-dashboard, move-category-dialog, theme-toggle, theme-provider, notes-panel, use-action-history)
 - Lint limpo
+
+---
+Task ID: v17
+Agent: super-z (main)
+Task: 3 correções: refazer não funciona ("not found"), exclusão de subgrupo com opção mover/excluir tudo, drag-and-drop de categorias (sem setas).
+
+Work Log:
+1. Corrigir bug do refazer ("not found"):
+   - Causa raiz: ao desfazer a deleção de uma categoria, ela é recriada com NOVO ID no banco. Mas a função redo ainda referenciava o ID ANTIGO. A API retornava 404 "not found".
+   - Padrão aplicado: usar um objeto mutável `idRef = { current: id }` capturado no closure. Undo atualiza `idRef.current = novo_id` após recriar. Redo usa `idRef.current` para deletar.
+   - Aplicado em 4 lugares:
+     - `handleDeleteCategory` (undo recria, redo deleta pelo idRef)
+     - `handleCreateCategory` (undo deleta pelo idRef, redo recria e atualiza idRef)
+     - `handleCreateSubgroup` (mesmo padrão com keyRef)
+     - `handleSaveTransaction` (mesmo padrão com txIdsRef)
+   - Testado: 3 ciclos undo→redo sem erro.
+
+2. Exclusão de subgrupo com opção mover OU excluir tudo:
+   - API `/api/subgroups` DELETE atualizada para aceitar `mode: 'move' | 'delete'`:
+     - mode=move (default): move categorias para o grupo pai (comportamento antigo)
+     - mode=delete: deleta categorias + transações junto com o subgrupo
+   - Retorna `deletedCategoryIds` quando mode=delete para sincronização
+   - `deleteSubgroup()` action atualizada com parâmetro mode
+   - Novo componente `DeleteSubgroupDialog` com dois botões grandes:
+     - "Mover para o grupo pai" (azul, ícone FolderInput)
+     - "Excluir tudo" (vermelho, ícone Trash2)
+   - `handleDeleteSubgroup` agora apenas abre o dialog; `handleDeleteSubgroupConfirm(mode)` faz o trabalho
+   - Hook `useFinanceData` atualizado para tratar `mode: 'delete'` em ChangeMessage:
+     - Remove categorias (e suas transações) quando mode=delete
+     - Mantém comportamento de mover quando mode=move
+   - Testado: mode=move (categorias aparecem no grupo pai), mode=delete (categorias somem junto com subgrupo)
+
+3. Drag-and-drop de categorias (sem setas):
+   - Removidos botões ArrowUp/ArrowDown das categorias (mantidos apenas nos top-level cards)
+   - Criado singleton store `category-dnd.ts` com `useSyncExternalStore` para estado global de drag
+   - Implementação com pointer events (funciona em mouse e touch):
+     - On pointerdown: registra posição inicial (não inicia drag ainda)
+     - On pointermove > 5px threshold: entra em modo drag (evita conflito com click)
+     - Durante drag: ghost element segue o ponteiro (portal no body, com rotação/sombra)
+     - Detecção de drop target via `document.elementFromPoint()` + `closest('[data-cat-id]')`
+     - Indicador visual: linha azul acima (before) ou abaixo (after) do target
+     - On pointerup: chama `onDropCategory(draggedId, targetId, position)`
+     - `touch-action: none` no row previne scroll durante drag
+     - `document.body.style.overflow='hidden'` durante drag
+   - Cada row tem `data-cat-id` para hit-testing
+   - GripVertical icon como pista visual de área arrastável
+   - Handler `onDropCategory` em page.tsx:
+     - Calcula nova ordem dos siblings (incluindo cross-parent move)
+     - Se mudou grupo/pai: updateCategory primeiro (muda group + parentCategoryId)
+     - reorderCategories com nova sortOrder (i+1)
+     - dispatchChange + reload para sincronizar
+   - Suporta drag dentro do mesmo pai E cross-parent (drag categoria de um subgrupo para outro)
+   - Testado: SORT TEST movido abaixo de API TEST 2 com sucesso
+
+Stage Summary:
+- Refazer funciona em múltiplos ciclos (undo→redo→undo→redo) sem erro "not found"
+- Dialog de exclusão de subgrupo pergunta: "Mover para o grupo pai" ou "Excluir tudo"
+- Drag-and-drop com pointer events (mouse + touch), ghost visual, indicadores de drop
+- Setas removidas das categorias (mantidas apenas nos top-level cards)
+- Lint limpo, dev server compilando sem erros

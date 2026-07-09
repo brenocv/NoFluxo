@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -14,8 +15,9 @@ import {
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
   AlertTriangle, RefreshCw, Check, FolderPlus, Move,
-  TrendingUp, TrendingDown, PiggyBank, ArrowUp, ArrowDown,
+  TrendingUp, TrendingDown, PiggyBank, ArrowUp, ArrowDown, GripVertical,
 } from 'lucide-react'
+import { useCategoryDnd, dnd } from './category-dnd'
 
 interface Props {
   node: GroupTreeNode
@@ -33,7 +35,7 @@ interface Props {
   onAddSubgroup: (parentKey: string) => void
   onDeleteSubgroup: (node: GroupTreeNode) => void
   onMoveCategory: (cat: Category) => void
-  onReorder?: (catId: string, direction: 'up' | 'down') => void
+  onDropCategory?: (draggedId: string, targetId: string, position: 'before' | 'after') => void
   onColorChange?: (node: GroupTreeNode, color: string) => void
   onDeleteTopGroup?: (node: GroupTreeNode) => void
   onReorderTopGroup?: (key: string, direction: 'up' | 'down') => void
@@ -59,6 +61,9 @@ function alpha(hex: string, a: number): string {
   const b = parseInt(hex.slice(5, 7), 16)
   return `rgba(${r},${g},${b},${a})`
 }
+
+// Distance threshold (px) to differentiate a click from a drag
+const DRAG_THRESHOLD = 5
 
 export function GroupNode(props: Props) {
   const { node, transactionsByCat, euroRate, allCategories } = props
@@ -215,12 +220,48 @@ export function GroupNode(props: Props) {
           ))}
         </div>
       )}
+
+      <DragGhost />
     </Card>
   )
 }
 
 function countAll(node: GroupTreeNode, allCategories: Category[]): number {
   return node.categories.length + node.children.reduce((acc, c) => acc + countAll(c, allCategories), 0)
+}
+
+// ---- Drag ghost (portal, follows pointer) ----
+
+function DragGhost() {
+  const dndState = useCategoryDnd()
+  if (!dndState.draggedId) return null
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
+    <div
+      className="fixed pointer-events-none z-[100] shadow-2xl rounded-md border-2 border-primary/60 bg-background"
+      style={{
+        left: dndState.pointerX - dndState.offsetX,
+        top: dndState.pointerY - dndState.offsetY,
+        width: dndState.rowWidth,
+        padding: '8px 12px',
+        transform: 'rotate(-1deg) scale(1.02)',
+        opacity: 0.95,
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <GripVertical className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+        <span
+          className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+          style={{ backgroundColor: dndState.draggedColor }}
+        />
+        <span className="text-[13px] font-medium text-foreground truncate">
+          {dndState.draggedName}
+        </span>
+      </div>
+    </div>,
+    document.body
+  )
 }
 
 // ---- Recursive category row (like file tree) ----
@@ -234,6 +275,12 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
   const { category, children } = catNode
   const { transactionsByCat, euroRate } = allProps
   const [userOpen, setUserOpen] = useState(false)
+
+  // Subscribe to DnD state so we can render visual feedback for this row
+  const dndState = useCategoryDnd()
+  const isBeingDragged = dndState.draggedId === category.id
+  const isDropTarget = dndState.targetId === category.id
+  const dropPosition = isDropTarget ? dndState.targetPosition : null
 
   const hasSearch = allProps.highlightedCategoryIds.size > 0
   const hasHighlightedDescendant = (n: typeof catNode): boolean => {
@@ -259,26 +306,124 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
   // Indentation: each depth level adds 20px
   const indent = 16 + depth * 20
 
+  // ---- Pointer-based drag handler ----
+  function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Don't start drag if user pressed on a button, input, or other interactive element
+    const target = e.target as HTMLElement
+    if (target.closest('button, input, [role="button"], a, [data-no-drag]')) return
+    // Only respond to primary pointer (left mouse button or any touch)
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+
+    const startX = e.clientX
+    const startY = e.clientY
+    const rowEl = e.currentTarget
+    const rect = rowEl.getBoundingClientRect()
+    let dragging = false
+    let pointerId = e.pointerId
+
+    const handleMove = (ev: PointerEvent) => {
+      const dx = Math.abs(ev.clientX - startX)
+      const dy = Math.abs(ev.clientY - startY)
+      if (!dragging && (dx > DRAG_THRESHOLD || dy > DRAG_THRESHOLD)) {
+        dragging = true
+        // Enter drag mode
+        dnd.start({
+          id: category.id,
+          name: category.name,
+          color: category.color || color,
+          pointerX: ev.clientX,
+          pointerY: ev.clientY,
+          offsetX: startX - rect.left,
+          offsetY: startY - rect.top,
+          rowWidth: rect.width,
+        })
+        // Prevent touch scrolling during drag
+        document.body.style.overflow = 'hidden'
+        document.body.style.touchAction = 'none'
+      }
+      if (dragging) {
+        ev.preventDefault()
+        dnd.move(ev.clientX, ev.clientY)
+        // Find drop target
+        // Temporarily hide this row so elementFromPoint doesn't return it
+        rowEl.style.pointerEvents = 'none'
+        const el = document.elementFromPoint(ev.clientX, ev.clientY)
+        rowEl.style.pointerEvents = ''
+        const targetRow = el?.closest('[data-cat-id]') as HTMLElement | null
+        if (targetRow && targetRow.dataset.catId !== category.id) {
+          const targetRect = targetRow.getBoundingClientRect()
+          const isAbove = ev.clientY < targetRect.top + targetRect.height / 2
+          dnd.setTarget(targetRow.dataset.catId, isAbove ? 'before' : 'after')
+        } else {
+          dnd.setTarget(null, null)
+        }
+      }
+    }
+
+    const handleUp = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', handleMove)
+      window.removeEventListener('pointerup', handleUp)
+      window.removeEventListener('pointercancel', handleUp)
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+      if (dragging) {
+        const result = dnd.end()
+        if (result && allProps.onDropCategory) {
+          allProps.onDropCategory(category.id, result.targetId, result.position)
+        }
+      }
+    }
+
+    window.addEventListener('pointermove', handleMove, { passive: false })
+    window.addEventListener('pointerup', handleUp)
+    window.addEventListener('pointercancel', handleUp)
+    // Suppress unused var warning
+    void pointerId
+  }
+
   return (
     <>
       <div
+        data-cat-id={category.id}
+        onPointerDown={handlePointerDown}
         className={cn(
-          'flex items-center justify-between py-2 pr-3 group transition-colors',
+          'flex items-center justify-between py-2 pr-3 group transition-all relative',
           hasSearch && !isHighlighted && 'opacity-20',
-          isHighlighted && 'ring-2 ring-yellow-500 ring-inset z-10 relative',
-          !hasSearch && 'hover:bg-black/5'
+          isHighlighted && 'ring-2 ring-yellow-500 ring-inset z-10',
+          !hasSearch && 'hover:bg-black/5',
+          isBeingDragged && 'opacity-30',
         )}
         style={{
           paddingLeft: indent + 'px',
           borderLeft: '2px solid ' + alpha(color, 0.15),
-          background: isHighlighted ? 'rgba(250, 204, 21, 0.25)' : undefined,
-          opacity: hasSearch && !isHighlighted ? 0.2 : undefined,
+          background: isHighlighted ? 'rgba(250, 204, 21, 0.25)' : isBeingDragged ? 'rgba(0,0,0,0.04)' : undefined,
+          cursor: 'grab',
+          touchAction: 'none',
         }}
       >
-        {/* Left: chevron + colored dot + name */}
+        {/* Drop indicator line — before */}
+        {dropPosition === 'before' && (
+          <div
+            className="absolute left-0 right-0 top-0 h-0.5 bg-primary z-20"
+            style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }}
+          />
+        )}
+        {/* Drop indicator line — after */}
+        {dropPosition === 'after' && (
+          <div
+            className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary z-20"
+            style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }}
+          />
+        )}
+
+        {/* Left: grip + chevron + colored dot + name */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          {/* Drag handle (visual cue, but entire row is draggable) */}
+          <span className="text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0" data-no-drag>
+            <GripVertical className="h-3.5 w-3.5" />
+          </span>
           {hasChildren ? (
-            <button onClick={() => setUserOpen(!userOpen)} className="p-0.5 rounded hover:bg-muted text-muted-foreground touch-manipulation flex-shrink-0" aria-label={open ? 'Recolher' : 'Expandir'}>
+            <button onClick={(e) => { e.stopPropagation(); setUserOpen(!userOpen) }} className="p-0.5 rounded hover:bg-muted text-muted-foreground touch-manipulation flex-shrink-0" aria-label={open ? 'Recolher' : 'Expandir'}>
               {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
             </button>
           ) : (
@@ -318,18 +463,8 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           <button onClick={(e) => { e.stopPropagation(); allProps.onMoveCategory(category) }} className="p-1.5 rounded-md hover:bg-black/5 transition-all touch-manipulation" aria-label="Mover" title="Mover para outro grupo">
             <Move className="h-3 w-3" />
           </button>
-          {allProps.onReorder && (
-            <>
-              <button onClick={(e) => { e.stopPropagation(); allProps.onReorder!(category.id, 'up') }} className="p-1 rounded-md hover:bg-black/5 transition-all touch-manipulation" aria-label="Subir" title="Mover para cima">
-                <ArrowUp className="h-3 w-3" />
-              </button>
-              <button onClick={(e) => { e.stopPropagation(); allProps.onReorder!(category.id, 'down') }} className="p-1 rounded-md hover:bg-black/5 transition-all touch-manipulation" aria-label="Descer" title="Mover para baixo">
-                <ArrowDown className="h-3 w-3" />
-              </button>
-            </>
-          )}
           {isRecurring && (
-            <button onClick={() => tx && tx.seriesId && allProps.onStopRecurring(tx.seriesId, tx.month)} className="p-1.5 rounded-md hover:bg-cyan-50 hover:text-cyan-600 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
+            <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1.5 rounded-md hover:bg-cyan-50 hover:text-cyan-600 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
               <RefreshCw className="h-3 w-3" />
             </button>
           )}
@@ -347,7 +482,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
               </div>
             )}
           </button>
-          <button onClick={() => allProps.onDeleteCategory(category)} className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation" aria-label="Remover">
+          <button onClick={(e) => { e.stopPropagation(); allProps.onDeleteCategory(category) }} className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation" aria-label="Remover">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>

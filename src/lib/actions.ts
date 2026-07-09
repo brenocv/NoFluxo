@@ -214,12 +214,13 @@ export async function createSubgroup(
 export async function deleteSubgroup(
   key: string,
   user: string,
-  workbookId?: string
-): Promise<{ ok: boolean; movedToParent: string }> {
+  workbookId?: string,
+  mode: 'move' | 'delete' = 'move'
+): Promise<{ ok: boolean; movedToParent: string; deletedCategoryIds?: string[] }> {
   const r = await fetch('/api/subgroups', {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, user, workbookId }),
+    body: JSON.stringify({ key, user, workbookId, mode }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({}))

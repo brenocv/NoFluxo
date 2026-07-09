@@ -68,6 +68,7 @@ export async function DELETE(req: NextRequest) {
   const user = String(body.user || 'Anônimo').slice(0, 30)
   const key = String(body.key)
   const wbid = String(body.workbookId)
+  const mode: 'move' | 'delete' = body.mode === 'delete' ? 'delete' : 'move'
 
   const sg = await db.subgroup.findFirst({ where: { key, workbookId: wbid } })
   if (!sg) return NextResponse.json({ error: 'subgroup not found' }, { status: 404 })
@@ -78,12 +79,33 @@ export async function DELETE(req: NextRequest) {
   const allSubgroups = await db.subgroup.findMany({ where: { workbookId: wbid } })
   const descendants = collectDescendants(key, allSubgroups)
 
-  // Move all categories in this subgroup and its descendants to the parent
+  // All subgroup keys involved (the subgroup + descendants)
   const allKeys = [key, ...descendants]
-  await db.category.updateMany({
+
+  // Find all categories that belong to these subgroups (for either mode)
+  const affectedCategories = await db.category.findMany({
     where: { group: { in: allKeys }, workbookId: wbid },
-    data: { group: parentKey },
+    select: { id: true },
   })
+  const deletedCategoryIds = affectedCategories.map((c) => c.id)
+
+  if (mode === 'delete') {
+    // Delete all categories (and their transactions) in this subgroup + descendants
+    if (deletedCategoryIds.length > 0) {
+      await db.transaction.deleteMany({
+        where: { categoryId: { in: deletedCategoryIds } },
+      })
+      await db.category.deleteMany({
+        where: { id: { in: deletedCategoryIds } },
+      })
+    }
+  } else {
+    // Move all categories in this subgroup and its descendants to the parent
+    await db.category.updateMany({
+      where: { group: { in: allKeys }, workbookId: wbid },
+      data: { group: parentKey },
+    })
+  }
 
   // Delete all descendant subgroups
   await db.subgroup.deleteMany({
@@ -93,10 +115,18 @@ export async function DELETE(req: NextRequest) {
   await db.subgroup.delete({ where: { id: sg.id } })
 
   await db.activityLog.create({
-    data: { user, action: 'delete', entity: 'subgroup', detail: 'Removeu subgrupo "' + sg.name + '"' },
+    data: {
+      user, action: 'delete', entity: 'subgroup',
+      detail: 'Removeu subgrupo "' + sg.name + '"' + (mode === 'delete' ? ' (categorias excluídas)' : ' (categorias movidas)'),
+    },
   })
 
-  return NextResponse.json({ ok: true, movedToParent: parentKey })
+  return NextResponse.json({
+    ok: true,
+    movedToParent: mode === 'delete' ? '' : parentKey,
+    deletedCategoryIds: mode === 'delete' ? deletedCategoryIds : [],
+    mode,
+  })
 }
 
 function collectDescendants(parentKey: string, all: { key: string; parentKey: string }[]): string[] {

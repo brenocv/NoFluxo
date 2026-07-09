@@ -185,9 +185,24 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
           }
           case 'subgroup': {
             if (msg.action === 'delete') {
-              // Move categories from deleted subgroup (and descendants) to parent
               const deletedKeys = new Set(msg.payload.deletedKeys as string[] ?? [msg.payload.key])
               const parentKey = msg.payload.parentKey as string
+              const mode = (msg.payload.mode as 'move' | 'delete' | undefined) ?? 'move'
+              if (mode === 'delete') {
+                // Categories are deleted along with the subgroup
+                const deletedCatIds = new Set((msg.payload.deletedCategoryIds as string[]) ?? [])
+                // If we have explicit IDs, use them; otherwise fall back to filtering by group
+                const catsToDelete = deletedCatIds.size > 0
+                  ? deletedCatIds
+                  : new Set(s.categories.filter((c) => deletedKeys.has(c.group)).map((c) => c.id))
+                return {
+                  ...s,
+                  subgroups: s.subgroups.filter((sg) => !deletedKeys.has(sg.key)),
+                  categories: s.categories.filter((c) => !catsToDelete.has(c.id)),
+                  transactions: s.transactions.filter((t) => !catsToDelete.has(t.categoryId)),
+                }
+              }
+              // Move categories from deleted subgroup (and descendants) to parent
               return {
                 ...s,
                 subgroups: s.subgroups.filter((sg) => !deletedKeys.has(sg.key)),
