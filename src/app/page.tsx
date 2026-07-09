@@ -33,7 +33,7 @@ import {
 } from '@/lib/finance'
 import { MonthSelector } from '@/components/finance/month-selector'
 import { SummaryCard } from '@/components/finance/summary-card'
-import { GroupNode } from '@/components/finance/group-node'
+import { GroupNode } from '@/components/finance/grpnode'
 import { TransactionEditor } from '@/components/finance/transaction-editor'
 import { CategoryEditor } from '@/components/finance/cat-editor'
 import { SubgroupEditor } from '@/components/finance/subgroup-editor'
@@ -51,6 +51,7 @@ import { VencimentoAlerts } from '@/components/finance/vencimento-alerts'
 import { AnnualDashboard } from '@/components/finance/annual-dashboard'
 import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
 import { BackupDialog } from '@/components/finance/backup-dialog'
+import { ImportStatementDialog } from '@/components/finance/import-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
 import { WorkbookSwitcher } from '@/components/finance/workbook-switcher'
 import { NewCardDialog } from '@/components/finance/new-card-dialog'
@@ -62,7 +63,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Download, Copy, Eraser,
-  Database, Bell, BellOff,
+  Database, Bell, BellOff, Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -92,6 +93,7 @@ export default function Home() {
   const [resetOpen, setResetOpen] = useState(false)
   const [moveTarget, setMoveTarget] = useState<Category | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
   const history = useActionHistory()
   const notifications = useVencimentoNotifications(categories)
@@ -756,6 +758,9 @@ export default function Home() {
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setResetOpen(true)} aria-label="Zerar valores" title="Zerar valores do mês ou ano">
               <Eraser className="h-4 w-4" />
             </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setImportOpen(true)} aria-label="Importar extrato" title="Importar extrato bancário (OFX/CSV)">
+              <Upload className="h-4 w-4" />
+            </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setBackupOpen(true)} aria-label="Backup" title="Backup e restauração">
               <Database className="h-4 w-4" />
             </Button>
@@ -862,14 +867,9 @@ export default function Home() {
               onClearSearch={() => setSearch('')}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
               onAddCategory={(grp, parentCategoryId) => {
-                // If adding to a top-level group (no dots in key) and no parent category,
-                // create a Subgroup instead so it looks like "Cartões BR" etc.
-                if (!grp.includes('.') && !parentCategoryId) {
-                  setNewSubgroupParent({ key: grp, label: getGroupLabel(grp, labels, subgroups) })
-                } else {
-                  setNewCatGroup(grp as CategoryGroup)
-                  setNewCatParent(parentCategoryId ?? null)
-                }
+                // Always open the CategoryEditor — the + button creates a category
+                setNewCatGroup(grp as CategoryGroup)
+                setNewCatParent(parentCategoryId ?? null)
               }}
               onDeleteCategory={handleDeleteCategory}
               onRename={handleRename}
@@ -1044,6 +1044,21 @@ export default function Home() {
         onOpenChange={setBackupOpen}
         onExport={handleExportBackup}
         onImport={handleImportBackup}
+      />
+
+      <ImportStatementDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        workbookId={workbookId}
+        year={year}
+        month={month}
+        user={user}
+        onImported={() => {
+          // Reload data after import
+          dispatchChange('config', 'update', { key: 'reload', value: '' }, 'Importou extrato', {
+            user, action: 'create', entity: 'transaction', detail: 'Importou extrato', createdAt: new Date().toISOString(),
+          })
+        }}
       />
 
       <WorkbookSwitcher

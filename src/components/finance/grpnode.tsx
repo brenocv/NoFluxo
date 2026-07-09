@@ -129,12 +129,12 @@ export function GroupNode(props: Props) {
             onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
             small={!isTopLevel}
           />
-          {/* + button to create a new item inside this group */}
+          {/* + button: top-level creates subgroup (card), subgroup creates category (row) */}
           <button
-            onClick={(e) => { e.stopPropagation(); props.onAddCategory(node.key, null) }}
+            onClick={(e) => { e.stopPropagation(); if (isTopLevel) { props.onAddSubgroup(node.key) } else { props.onAddCategory(node.key, null) } }}
             className="p-1.5 rounded-md hover:bg-black/10 transition-colors touch-manipulation"
-            aria-label="Adicionar item"
-            title="Adicionar item aqui"
+            aria-label={isTopLevel ? 'Novo grupo' : 'Nova categoria'}
+            title={isTopLevel ? 'Criar grupo aqui (como Cartões BR)' : 'Adicionar categoria aqui'}
             style={{ color }}
           >
             <Plus className="h-4 w-4" />

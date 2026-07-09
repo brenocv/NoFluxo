@@ -249,7 +249,7 @@ function buildNode(
     return buildNode(
       ck.key, childLabel, depth + 1, false, ck.isUserCreated,
       categories, userSubgroups, labels, filterCategoryIds,
-      null, false, 'EXPENSE'
+      color, false, groupType
     )
   }).filter((n) => {
     if (countCategoriesRecursive(n) > 0) return true

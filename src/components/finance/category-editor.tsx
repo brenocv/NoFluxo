@@ -87,15 +87,30 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, onOp
   }, [groupVal])
 
   function applyDefaults(g: string) {
-    if (g === 'rendimentos.brl') { setType('INCOME'); setCurrency('BRL') }
+    // Top-level groups
+    if (g === 'despesas') { setType('EXPENSE'); setCurrency('BRL') }
+    else if (g === 'rendimentos') { setType('INCOME'); setCurrency('BRL') }
+    else if (g === 'reservas') { setType('RESERVE'); setCurrency('BRL') }
+    // Default subgroups
+    else if (g === 'rendimentos.brl') { setType('INCOME'); setCurrency('BRL') }
     else if (g === 'rendimentos.eur') { setType('INCOME'); setCurrency('EUR') }
     else if (g === 'rendimentos.valores_a_receber') { setType('INCOME'); setCurrency('BRL') }
-    else if (g === 'reservas') { setType('RESERVE'); setCurrency('BRL') }
     else if (g === 'despesas.contas_casa') { setType('EXPENSE'); setCurrency('EUR') }
-    // For user-created subgroups, inherit from parent top-level
+    // User-created subgroups — inherit from parent top-level
     else if (g.startsWith('despesas')) { setType('EXPENSE'); setCurrency('BRL') }
     else if (g.startsWith('rendimentos')) { setType('INCOME'); setCurrency('BRL') }
     else if (g.startsWith('reservas')) { setType('RESERVE'); setCurrency('BRL') }
+    // Custom top-level groups — check by group type from the groupOptions
+    else {
+      // Try to find the topGroup this belongs to
+      const tg = topGroups?.find((t) => g === t.key || g.startsWith(t.key + '.'))
+      if (tg) {
+        setType(tg.type as CategoryType)
+        setCurrency(tg.type === 'INCOME' ? 'BRL' : 'BRL')
+      } else {
+        setType('EXPENSE'); setCurrency('BRL')
+      }
+    }
   }
 
   if (!group) return null
