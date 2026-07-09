@@ -542,3 +542,38 @@ Stage Summary:
 - Grip tem cursor-grab para indicar visualmente que é arrastável
 - Testado: categoria (Santander Kiki movida via grip ✓), subgrupo (Cartões BR movido via grip ✓)
 - Lint limpo
+
+---
+Task ID: v21
+Agent: super-z (main)
+Task: Nomes de categorias, subgrupos e cards em até 2 linhas (em vez de truncar com reticências).
+
+Work Log:
+- Problema: nomes longos eram truncados com "..." (class `truncate`), cortando informação importante no mobile
+- Solução: trocar `truncate` por `break-words + overflow-hidden + max-h-[2.25rem/2.5rem]`
+  - `break-words`: permite quebra de palavra quando necessário
+  - `overflow-hidden`: corta após 2 linhas
+  - `max-h-[2.25rem]` (subgrupos/categorias): 2 linhas a 13px
+  - `max-h-[2.5rem]` (top-level): 2 linhas a 14px
+- Tentativa com `line-clamp-2` falhou: `display: -webkit-box` conflita com flexbox em WebKit — elemento flex child com line-clamp recebe width=0
+- Solução alternativa sem line-clamp: `overflow-hidden + max-h + break-words` (sem reticências, mas funciona em flex)
+
+- Layout do header reestruturado para dar mais espaço ao nome:
+  - `justify-between` removido → substituído por `gap-1` (permite flex-1 funcionar)
+  - Total value (BRL + EUR) movido PARA FORA do div de ações (era junto com botões)
+  - Total value: `flex-shrink-0 whitespace-nowrap` removido → agora pode encolher
+  - EUR equivalente: `hidden sm:inline` (oculto no mobile, visível no desktop)
+  - Label div: `min-w-[80px]` (garante mínimo de 80px para o nome)
+  - Label div: `flex-1` (cresce para preencher espaço disponível)
+
+- Categoria row: mesmo tratamento
+  - Nome: `div` com `break-words overflow-hidden max-h-[2.25rem] flex-1 min-w-0`
+  - Badges (recorrente, meta, count): `flex-shrink-0` (não encolhem)
+  - Outer span: `flex items-start gap-1 flex-wrap` (badges podem quebrar para próxima linha)
+
+Stage Summary:
+- Nomes curtos (Despesas, Mercado, FIES): cabem em 1 linha ✓
+- Nomes longos (Empréstimo Nubank Breno, Rendimentos): quebram para 2 linhas ✓
+- Sem reticências cortando o texto no meio
+- Total value no mobile mostra apenas BRL (EUR oculto) para economizar espaço
+- Lint limpo

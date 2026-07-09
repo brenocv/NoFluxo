@@ -202,7 +202,7 @@ export function GroupNode(props: Props) {
         {...headerAttr}
         onPointerDown={handleHeaderPointerDown}
         className={cn(
-          'w-full flex items-center justify-between p-2.5 transition-colors relative',
+          'w-full flex items-center gap-1 p-2.5 transition-colors relative',
           isBeingDragged && 'opacity-40',
         )}
         style={{
@@ -236,13 +236,13 @@ export function GroupNode(props: Props) {
           }
           {/* Block icon */}
           <BlockIcon className={cn('flex-shrink-0', isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5')} style={{ color }} />
-          {/* Label */}
-          <span
-            className={cn('truncate', isTopLevel ? 'font-bold text-sm' : 'font-medium text-[13px]')}
+          {/* Label — wraps to 2 lines on small screens instead of truncating */}
+          <div
+            className={cn('flex-1 min-w-[80px] overflow-hidden break-words leading-tight', isTopLevel ? 'font-bold text-sm max-h-[2.5rem]' : 'font-medium text-[13px] max-h-[2.25rem]')}
             style={{ color }}
           >
             {node.label}
-          </span>
+          </div>
           {isReceivable && (
             <Badge variant="outline" className="h-5 px-1 text-[10px] gap-0.5 border-amber-300 bg-amber-50 text-amber-700 flex-shrink-0">
               <Clock className="h-2.5 w-2.5" />a receber
@@ -287,13 +287,14 @@ export function GroupNode(props: Props) {
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
-          <span className="text-sm font-semibold tabular-nums ml-1" style={{ color }}>
-            {totalSign}{formatMoney(Math.abs(total), 'BRL')}
-            <span className="text-[10px] text-muted-foreground ml-1 font-normal">
-              ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
-            </span>
-          </span>
         </div>
+        {/* Total value — separate from action buttons so label has room */}
+        <span className="text-sm font-semibold tabular-nums ml-1 text-right" style={{ color }}>
+          {totalSign}{formatMoney(Math.abs(total), 'BRL')}
+          <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
+            ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+          </span>
+        </span>
       </div>
 
       {/* Body */}
@@ -515,19 +516,19 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }}
             className="flex flex-col items-start text-left touch-manipulation min-w-0"
           >
-            <span className="text-[13px] font-medium text-foreground flex items-center gap-1 truncate">
-              {category.name}
+            <span className="text-[13px] font-medium text-foreground flex items-start gap-1 flex-wrap min-w-0 w-full">
+              <div className="break-words leading-tight flex-1 min-w-0 overflow-hidden max-h-[2.25rem]">{category.name}</div>
               {isRecurring && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded">
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded flex-shrink-0">
                   <RefreshCw className="h-2 w-2" />{installmentsTotal ? installmentNumber + '/' + installmentsTotal : 'recorrente'}
                 </span>
               )}
               {goalExceeded && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded">
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded flex-shrink-0">
                   <AlertTriangle className="h-2 w-2" />meta
                 </span>
               )}
-              {hasChildren && <span className="text-[9px] text-muted-foreground">({children.length})</span>}
+              {hasChildren && <span className="text-[9px] text-muted-foreground flex-shrink-0">({children.length})</span>}
             </span>
             {category.note && <span className="text-xs text-muted-foreground truncate">{category.note}</span>}
           </button>
