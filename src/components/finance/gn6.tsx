@@ -14,7 +14,7 @@ import {
 } from '@/lib/finance'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
-  AlertTriangle, RefreshCw, Check, FolderPlus, Move,
+  AlertTriangle, RefreshCw, Check, FolderPlus,
   TrendingUp, TrendingDown, PiggyBank, GripVertical,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType } from './category-dnd'
@@ -187,17 +187,158 @@ export function GroupNode(props: Props) {
 
   const headerAttr = isTopLevel ? { 'data-tg-key': node.key } : { 'data-sg-key': node.key }
 
+  // Common header content — used for both top-level Card and flat subgroup sections
+  const headerContent = (
+    <>
+      {/* Drop indicators */}
+      {dropPosition === 'before' && (
+        <div className="absolute left-0 right-0 top-0 h-0.5 bg-primary z-20" />
+      )}
+      {dropPosition === 'after' && (
+        <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary z-20" />
+      )}
+
+      {/* Drag handle (6 dots) — only this area starts a drag */}
+      <span
+        className="text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing touch-none py-1"
+        data-drag-handle
+        aria-hidden="true"
+      >
+        <GripVertical className={isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
+      </span>
+      <button
+        onClick={() => setUserOpen(!userOpen)}
+        className="flex items-center gap-1.5 sm:gap-2 flex-1 touch-manipulation min-w-0"
+      >
+        {/* Expand/collapse chevron */}
+        {open
+          ? <ChevronDown className={cn('flex-shrink-0', isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5')} style={{ color }} />
+          : <ChevronRight className={cn('flex-shrink-0', isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5')} style={{ color }} />
+        }
+        {/* Colored dot — the only color indicator for subgroups (Nubank style) */}
+        {isTopLevel ? (
+          <BlockIcon className="flex-shrink-0 h-4 w-4" style={{ color }} />
+        ) : (
+          <span
+            className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+            style={{ backgroundColor: color }}
+          />
+        )}
+        {/* Label — wraps to 2 lines on small screens */}
+        <div
+          className={cn('flex-1 min-w-0 overflow-hidden break-words leading-tight', isTopLevel ? 'font-bold text-sm max-h-[2.5rem]' : 'font-semibold text-[13px] max-h-[2.25rem]')}
+          style={{ color: isTopLevel ? color : undefined }}
+        >
+          {node.label}
+        </div>
+        {isReceivable && (
+          <Badge variant="outline" className="h-5 px-1 text-[10px] gap-0.5 border-amber-300 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800 flex-shrink-0">
+            <Clock className="h-2.5 w-2.5" />a receber
+          </Badge>
+        )}
+        <span className="text-xs text-muted-foreground flex-shrink-0">({countAll(node, allCategories)})</span>
+      </button>
+      <div className="flex items-center gap-0.5 flex-shrink-0">
+        {isTopLevel && props.onColorChange && (
+          <div className="hidden sm:block">
+            <ColorButton currentColor={color} onColorChange={(c) => props.onColorChange!(node, c)} />
+          </div>
+        )}
+        <RenameButton
+          currentLabel={node.label}
+          onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
+          small={!isTopLevel}
+        />
+        {/* + button: top-level creates subgroup (card), subgroup creates category (row) */}
+        <button
+          onClick={(e) => { e.stopPropagation(); if (isTopLevel) { props.onAddSubgroup(node.key) } else { props.onAddCategory(node.key, null) } }}
+          className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors touch-manipulation"
+          aria-label={isTopLevel ? 'Novo grupo' : 'Nova categoria'}
+          title={isTopLevel ? 'Criar grupo aqui (como Cartões BR)' : 'Adicionar categoria aqui'}
+          style={{ color }}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+        {!isTopLevel && (
+          <button
+            onClick={(e) => { e.stopPropagation(); props.onDeleteSubgroup(node) }}
+            className="p-1 sm:p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
+            aria-label="Remover"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {isTopLevel && !node.isDefaultTop && props.onDeleteTopGroup && (
+          <button
+            onClick={(e) => { e.stopPropagation(); props.onDeleteTopGroup!(node) }}
+            className="p-1 sm:p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
+            aria-label="Remover card"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        )}
+        {/* Total value — inside actions div so the whole group is flex-shrink-0 */}
+        <span className="text-xs sm:text-sm font-semibold tabular-nums ml-0.5 sm:ml-1 text-right" style={{ color }}>
+          {totalSign}{formatMoney(Math.abs(total), 'BRL')}
+          <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
+            ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+          </span>
+        </span>
+      </div>
+    </>
+  )
+
+  // Body content — shared between top-level and subgroup
+  const bodyContent = open ? (
+    <div>
+      {/* Direct categories */}
+      {categoryTree.length > 0 && (
+        <div>
+          {categoryTree.map((catNode) => (
+            <CategoryNodeRow key={catNode.category.id} catNode={catNode} depth={0} allProps={props} color={color} />
+          ))}
+        </div>
+      )}
+      {/* Child subgroups — rendered as flat sections inside the same card */}
+      {node.children.map((child) => (
+        <GroupNode key={child.key} {...props} node={child} />
+      ))}
+    </div>
+  ) : null
+
+  // Subgroups: flat section inside the parent card (no Card wrapper, no border)
+  if (!isTopLevel) {
+    return (
+      <div
+        className="relative"
+        style={{ marginLeft: 0 }}
+      >
+        {/* Subtle separator line + colored accent */}
+        <div
+          {...headerAttr}
+          onPointerDown={handleHeaderPointerDown}
+          className={cn(
+            'w-full flex items-center gap-1 px-2.5 py-2 transition-colors relative border-t border-border/40',
+            isBeingDragged && 'opacity-40',
+          )}
+        >
+          {headerContent}
+        </div>
+        {bodyContent}
+        <DragGhost />
+      </div>
+    )
+  }
+
+  // Top-level: keep the Card with soft shadow (Nubank style)
   return (
     <Card
-      className="overflow-hidden shadow-sm relative"
-      id={isTopLevel ? 'group-' + node.key : undefined}
+      className="overflow-hidden shadow-sm relative rounded-xl"
+      id={'group-' + node.key}
       style={{
-        marginLeft: !isTopLevel ? (node.depth - 1) * 24 + 8 : 0,
         borderLeft: '4px solid ' + color,
-        background: alpha(color, 0.04),
       }}
     >
-      {/* Header */}
       <div
         {...headerAttr}
         onPointerDown={handleHeaderPointerDown}
@@ -206,120 +347,12 @@ export function GroupNode(props: Props) {
           isBeingDragged && 'opacity-40',
         )}
         style={{
-          background: alpha(color, isTopLevel ? 0.14 : 0.06),
+          background: alpha(color, 0.08),
         }}
       >
-        {/* Drop indicators */}
-        {dropPosition === 'before' && (
-          <div className="absolute left-0 right-0 top-0 h-0.5 bg-primary z-20" style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }} />
-        )}
-        {dropPosition === 'after' && (
-          <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary z-20" style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }} />
-        )}
-
-        {/* Drag handle (6 dots) — only this area starts a drag */}
-        <span
-          className="text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing touch-none py-1"
-          data-drag-handle
-          aria-hidden="true"
-        >
-          <GripVertical className="h-4 w-4" />
-        </span>
-        <button
-          onClick={() => setUserOpen(!userOpen)}
-          className="flex items-center gap-2 flex-1 touch-manipulation min-w-0"
-        >
-          {/* Expand/collapse chevron */}
-          {open
-            ? <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color }} />
-            : <ChevronRight className="h-4 w-4 flex-shrink-0" style={{ color }} />
-          }
-          {/* Block icon */}
-          <BlockIcon className={cn('flex-shrink-0', isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5')} style={{ color }} />
-          {/* Label — wraps to 2 lines on small screens instead of truncating */}
-          <div
-            className={cn('flex-1 min-w-0 overflow-hidden break-words leading-tight', isTopLevel ? 'font-bold text-sm max-h-[2.5rem]' : 'font-medium text-[13px] max-h-[2.25rem]')}
-            style={{ color }}
-          >
-            {node.label}
-          </div>
-          {isReceivable && (
-            <Badge variant="outline" className="h-5 px-1 text-[10px] gap-0.5 border-amber-300 bg-amber-50 text-amber-700 flex-shrink-0">
-              <Clock className="h-2.5 w-2.5" />a receber
-            </Badge>
-          )}
-          <span className="text-xs text-muted-foreground flex-shrink-0">({countAll(node, allCategories)})</span>
-        </button>
-        <div className="flex items-center gap-0.5 flex-shrink-0">
-          {isTopLevel && props.onColorChange && (
-            <div className="hidden sm:block">
-              <ColorButton currentColor={color} onColorChange={(c) => props.onColorChange!(node, c)} />
-            </div>
-          )}
-          <RenameButton
-            currentLabel={node.label}
-            onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
-            small={!isTopLevel}
-          />
-          {/* + button: top-level creates subgroup (card), subgroup creates category (row) */}
-          <button
-            onClick={(e) => { e.stopPropagation(); if (isTopLevel) { props.onAddSubgroup(node.key) } else { props.onAddCategory(node.key, null) } }}
-            className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 transition-colors touch-manipulation"
-            aria-label={isTopLevel ? 'Novo grupo' : 'Nova categoria'}
-            title={isTopLevel ? 'Criar grupo aqui (como Cartões BR)' : 'Adicionar categoria aqui'}
-            style={{ color }}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-          {!isTopLevel && (
-            <button
-              onClick={(e) => { e.stopPropagation(); props.onDeleteSubgroup(node) }}
-              className="p-1 sm:p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
-              aria-label="Remover"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {isTopLevel && !node.isDefaultTop && props.onDeleteTopGroup && (
-            <button
-              onClick={(e) => { e.stopPropagation(); props.onDeleteTopGroup!(node) }}
-              className="p-1 sm:p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
-              aria-label="Remover card"
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {/* Total value — inside actions div so the whole group is flex-shrink-0 */}
-          <span className="text-xs sm:text-sm font-semibold tabular-nums ml-0.5 sm:ml-1 text-right" style={{ color }}>
-            {totalSign}{formatMoney(Math.abs(total), 'BRL')}
-            <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
-              ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
-            </span>
-          </span>
-        </div>
+        {headerContent}
       </div>
-
-      {/* Body */}
-      {open && (
-        <div>
-          {/* Direct categories */}
-          {categoryTree.length > 0 && (
-            <div className="divide-y divide-border/30">
-              {categoryTree.map((catNode) => (
-                <CategoryNodeRow key={catNode.category.id} catNode={catNode} depth={0} allProps={props} color={color} />
-              ))}
-            </div>
-          )}
-
-          {/* Child subgroups — indented with connector line */}
-          {node.children.map((child) => (
-            <div key={child.key} className="border-t border-border/30">
-              <GroupNode {...props} node={child} />
-            </div>
-          ))}
-        </div>
-      )}
-
+      {bodyContent}
       <DragGhost />
     </Card>
   )
@@ -479,20 +512,19 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           'flex items-center justify-between py-2 pr-3 group transition-all relative',
           hasSearch && !isHighlighted && 'opacity-20',
           isHighlighted && 'ring-2 ring-yellow-500 ring-inset z-10',
-          !hasSearch && 'hover:bg-black/5',
+          !hasSearch && 'hover:bg-muted/50',
           isBeingDragged && 'opacity-30',
         )}
         style={{
           paddingLeft: indent + 'px',
-          borderLeft: '2px solid ' + alpha(color, 0.15),
-          background: isHighlighted ? 'rgba(250, 204, 21, 0.25)' : isBeingDragged ? 'rgba(0,0,0,0.04)' : undefined,
+          background: isHighlighted ? 'rgba(250, 204, 21, 0.18)' : isBeingDragged ? 'rgba(0,0,0,0.04)' : undefined,
         }}
       >
         {dropPosition === 'before' && (
-          <div className="absolute left-0 right-0 top-0 h-0.5 bg-primary z-20" style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }} />
+          <div className="absolute left-0 right-0 top-0 h-0.5 bg-primary z-20" />
         )}
         {dropPosition === 'after' && (
-          <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary z-20" style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }} />
+          <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary z-20" />
         )}
 
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -521,33 +553,30 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             <span className="text-[13px] font-medium text-foreground flex items-start gap-1 flex-wrap min-w-0 w-full">
               <div className="break-words leading-tight flex-1 min-w-0 overflow-hidden max-h-[2.25rem]">{category.name}</div>
               {isRecurring && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 bg-cyan-50 px-1 py-0.5 rounded flex-shrink-0">
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 px-1 py-0.5 rounded flex-shrink-0">
                   <RefreshCw className="h-2 w-2" />{installmentsTotal ? installmentNumber + '/' + installmentsTotal : 'recorrente'}
                 </span>
               )}
               {goalExceeded && (
-                <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded flex-shrink-0">
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 px-1 py-0.5 rounded flex-shrink-0">
                   <AlertTriangle className="h-2 w-2" />meta
                 </span>
               )}
               {hasChildren && <span className="text-[9px] text-muted-foreground flex-shrink-0">({children.length})</span>}
             </span>
-            {category.note && <span className="text-xs text-muted-foreground truncate">{category.note}</span>}
+            {category.note && <span className="text-xs text-muted-foreground truncate max-w-[180px]">{category.note}</span>}
           </button>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button onClick={(e) => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="p-1.5 rounded-md hover:bg-black/5 transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
+          <button onClick={(e) => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
             <Plus className="h-3 w-3" style={{ color }} />
           </button>
-          <button onClick={(e) => { e.stopPropagation(); allProps.onMoveCategory(category) }} className="p-1.5 rounded-md hover:bg-black/5 transition-all touch-manipulation" aria-label="Mover" title="Mover para outro grupo">
-            <Move className="h-3 w-3" />
-          </button>
           {isRecurring && (
-            <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1.5 rounded-md hover:bg-cyan-50 hover:text-cyan-600 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
+            <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1.5 rounded-md hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
               <RefreshCw className="h-3 w-3" />
             </button>
           )}
-          <button onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }} className="px-2.5 py-1.5 rounded-md hover:bg-black/5 transition-colors touch-manipulation text-right">
+          <button onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }} className="px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right">
             {displayValue === null ? (
               <span className="text-sm font-normal text-muted-foreground italic">--</span>
             ) : (

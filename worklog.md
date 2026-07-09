@@ -615,3 +615,49 @@ Stage Summary:
 - Padding dos botões menor no mobile (p-1 vs p-1.5)
 - Total value menor no mobile (text-xs vs text-sm)
 - Lint limpo
+
+---
+Task ID: v23
+Agent: super-z (main)
+Task: Simplificar visual dos subgrupos (sem Card com borda), remover botão Mover, estética Nubank, corrigir dark mode no dialog de zerar.
+
+Work Log:
+1. Subgrupos simplificados (sem Card wrapper):
+   - Antes: cada subgrupo era um <Card> com borda, sombra e background colorido
+   - Agora: subgrupos são seções "flat" dentro do card pai, com apenas uma linha separadora sutil (border-t border-border/40)
+   - Top-level cards mantêm o Card com sombra suave e rounded-xl (estilo Nubank)
+   - Refatoração: headerContent e bodyContent extraídos como variáveis compartilhadas entre os dois retornos (subgroup flat vs top-level Card)
+   - Subgrupos agora usam apenas uma bolinha colorida (h-2.5 w-2.5) como indicador visual (antes usavam BlockIcon)
+   - Top-level mantém BlockIcon (TrendingUp/Down/PiggyBank)
+
+2. Botão "Mover" removido das linhas de categoria:
+   - Antes: 4 botões de ação (+, Mover, Recorrência, Valor, Lixeira)
+   - Agora: 3-4 botões (+, [Recorrência], Valor, Lixeira) — drag substitui o Mover
+   - Import Move removido de gn6.tsx
+   - MoveCategoryDialog e state moveTarget mantidos em page.tsx (não causam erro, mas não são mais acionados pela UI)
+
+3. Estética Nubank (mantendo nossas cores):
+   - Hover backgrounds: `hover:bg-black/5` → `hover:bg-muted/50` (funciona em light/dark)
+   - `hover:bg-black/10` → `dark:hover:bg-white/10` (variantes explícitas)
+   - Badges (recorrente, meta): adicionadas variantes `dark:` para texto e fundo
+   - Card top-level: `rounded-xl` (antes era retangular), sem background colorido no card (só no header)
+   - Linha de categoria: removido `borderLeft: 2px solid color` (era pesado); agora usa background sutil no hover
+   - Highlights de busca: `ring-2 ring-yellow-500` mantido; background amarelo mais suave (0.18 vs 0.25)
+
+4. Dark mode corrigido no ResetDialog:
+   - Title: `text-rose-600` → `text-rose-600 dark:text-rose-400`
+   - Scope buttons selected: `border-rose-400 bg-rose-50` → `border-rose-400 dark:border-rose-500 bg-rose-50 dark:bg-rose-950/40`
+   - Warning box: `bg-amber-50 border-amber-200` → `bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800`
+   - Warning icon: `text-amber-600` → `text-amber-600 dark:text-amber-400`
+   - Warning text: `text-amber-800` → `text-amber-800 dark:text-amber-200`
+   - Input: adicionado `text-foreground placeholder:text-muted-foreground/60`
+   - Badge "a receber": adicionadas variantes dark (amber-950/40, amber-300, amber-800)
+
+Stage Summary:
+- Subgrupos agora são seções flat dentro do card pai (sem Card próprio, sem borda pesada)
+- Apenas bolinha colorida indica o subgrupo (estilo Nubank clean)
+- Botão Mover removido — drag é suficiente
+- Hover usa cores semânticas (muted) que funcionam em light/dark
+- Dialog de zerar valores totalmente legível no dark mode
+- 0 sobreposições em headers e category rows
+- Lint limpo

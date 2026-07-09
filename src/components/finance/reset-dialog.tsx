@@ -46,7 +46,7 @@ export function ResetDialog({ open, onOpenChange, year, month, onReset }: Props)
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setConfirmText('') }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-rose-600">
+          <DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
             <Trash2 className="h-4 w-4" />
             Zerar valores
           </DialogTitle>
@@ -63,7 +63,7 @@ export function ResetDialog({ open, onOpenChange, year, month, onReset }: Props)
               className={cn(
                 'p-3 rounded-lg border-2 text-left transition-all touch-manipulation',
                 scope === 'month'
-                  ? 'border-rose-400 bg-rose-50'
+                  ? 'border-rose-400 dark:border-rose-500 bg-rose-50 dark:bg-rose-950/40'
                   : 'border-border bg-muted/50 hover:bg-muted'
               )}
             >
@@ -75,7 +75,7 @@ export function ResetDialog({ open, onOpenChange, year, month, onReset }: Props)
               className={cn(
                 'p-3 rounded-lg border-2 text-left transition-all touch-manipulation',
                 scope === 'year'
-                  ? 'border-rose-400 bg-rose-50'
+                  ? 'border-rose-400 dark:border-rose-500 bg-rose-50 dark:bg-rose-950/40'
                   : 'border-border bg-muted/50 hover:bg-muted'
               )}
             >
@@ -85,9 +85,9 @@ export function ResetDialog({ open, onOpenChange, year, month, onReset }: Props)
           </div>
 
           {/* Warning */}
-          <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 flex gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-800">
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 flex gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-800 dark:text-amber-200">
               {scope === 'month'
                 ? `Todos os valores de ${monthLabel} serão removidos permanentemente. As categorias e configurações não serão afetadas.`
                 : `Todos os valores de ${year} (todos os 12 meses) serão removidos permanentemente. As categorias e configurações não serão afetadas.`}
@@ -104,7 +104,7 @@ export function ResetDialog({ open, onOpenChange, year, month, onReset }: Props)
               value={confirmText}
               onChange={(e) => setConfirmText(e.target.value)}
               placeholder="ZERAR"
-              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm uppercase tracking-wider"
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-foreground text-sm uppercase tracking-wider placeholder:text-muted-foreground/60"
               autoComplete="off"
             />
           </div>
