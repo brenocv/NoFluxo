@@ -66,7 +66,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
-  Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Download, Copy, Eraser,
+  Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Copy, Eraser,
   Database, Bell, BellOff, Upload,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -991,27 +991,30 @@ export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
-        <div className="max-w-3xl mx-auto px-3 py-2.5 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+        <div className="max-w-3xl mx-auto px-3 py-2 space-y-2">
+          {/* Title row — full width, written in a flowing way */}
+          <button
+            onClick={() => setWorkbookOpen(true)}
+            className="w-full flex items-center gap-2 text-left touch-manipulation hover:opacity-80 transition-opacity"
+          >
+            <div className="h-7 w-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm flex-shrink-0">
               €
             </div>
-            <button
-              onClick={() => setWorkbookOpen(true)}
-              className="text-left touch-manipulation hover:opacity-80 transition-opacity"
-            >
-              <h1 className="text-sm font-semibold leading-none">{workbookName || 'Porto 2026'}</h1>
-              <p className="text-[10px] text-muted-foreground">Controle financeiro • {year}</p>
-            </button>
-          </div>
-          <div className="flex items-center gap-1">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm font-semibold leading-tight truncate">
+                {workbookName || 'Porto 2026'} <span className="text-muted-foreground font-normal">• Controle financeiro • {year}</span>
+              </h1>
+            </div>
             <Badge variant="outline" className={cn(
-              'gap-1 px-1.5 py-0 h-7 text-[10px] hidden sm:flex',
+              'gap-1 px-1.5 py-0 h-6 text-[10px] flex-shrink-0',
               live.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
             )}>
-              {live.connected ? <><Wifi className="h-3 w-3" /><span>Sincronizando</span></>
+              {live.connected ? <><Wifi className="h-3 w-3" /><span className="hidden sm:inline">Sincronizando</span><span className="sm:hidden">Online</span></>
                 : <><WifiOff className="h-3 w-3" /><span>Offline</span></>}
             </Badge>
+          </button>
+          {/* Icons row — wraps naturally on small screens */}
+          <div className="flex items-center gap-1 flex-wrap">
             <UndoRedoButtons
               canUndo={history.canUndo}
               canRedo={history.canRedo}
@@ -1031,9 +1034,6 @@ export default function Home() {
             </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setBackupOpen(true)} aria-label="Backup" title="Backup e restauração">
               <Database className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleExportExcel} aria-label="Exportar Excel">
-              <Download className="h-4 w-4" />
             </Button>
             {notifications.supported && (
               <Button
@@ -1561,6 +1561,7 @@ export default function Home() {
         onSetUser={setUser}
         euroRate={euroRate}
         onSaveEuroRate={handleSaveEuroRate}
+        onExportExcel={handleExportExcel}
       />
 
       <CopyMonthDialog

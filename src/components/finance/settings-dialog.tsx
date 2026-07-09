@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { Download } from 'lucide-react'
 
 interface Props {
   open: boolean
@@ -21,6 +22,7 @@ interface Props {
   onSetUser: (name: string) => void
   euroRate: number
   onSaveEuroRate: (v: number) => Promise<void>
+  onExportExcel?: () => void
 }
 
 const USERS = ['Breno', 'Kiki', 'Visita']
@@ -32,6 +34,7 @@ export function SettingsDialog({
   onSetUser,
   euroRate,
   onSaveEuroRate,
+  onExportExcel,
 }: Props) {
   const [rate, setRate] = useState(String(euroRate))
   const [saving, setSaving] = useState(false)
@@ -104,6 +107,24 @@ export function SettingsDialog({
               Usado para mostrar o saldo total consolidado em Reais.
             </p>
           </div>
+
+          {/* Excel export */}
+          {onExportExcel && (
+            <div className="space-y-2">
+              <Label>Exportar planilha</Label>
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-2"
+                onClick={() => { onExportExcel(); onOpenChange(false) }}
+              >
+                <Download className="h-4 w-4" />
+                Exportar Excel do ano atual
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Gera um arquivo .xlsx com todas as categorias e valores do ano.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

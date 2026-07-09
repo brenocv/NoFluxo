@@ -495,3 +495,24 @@ Stage Summary:
   - Drag de top-level card: Despesas movida para depois de Reservas ✓
   - Undo de delete categoria: Santander Kiki restaurada ✓
   - Undo de delete subgrupo (mode=delete): subgrupo + categoria restaurados ✓
+
+---
+Task ID: v19
+Agent: super-z (main)
+Task: Reorganizar header do mobile — remover ícone Exportar Excel, colocar nome do projeto acima dos ícones (escrito corrido).
+
+Work Log:
+- Header reestruturado em 2 linhas (era 1 linha com nome + ícones lado a lado):
+  - Linha 1: ícone € + "Porto 2026 • Controle financeiro • 2026" + badge Online/Offline (full width, escrito corrido)
+  - Linha 2: todos os ícones de ação (flex-wrap para caber em qualquer tela)
+- Removido botão "Exportar Excel" do header (era 1 ícone a mais apertando o mobile)
+- Função handleExportExcel mantida e agora acessível via Configurações → "Exportar planilha"
+- SettingsDialog atualizado com nova seção "Exportar planilha" (botão outline com ícone Download)
+- Badge de sync: "Sincronizando" em desktop, "Online" em mobile (economiza espaço)
+- Import Download removido de page.tsx (não usado mais), adicionado em settings-dialog.tsx
+
+Stage Summary:
+- Header mobile muito mais limpo: nome do projeto legível em linha única acima dos ícones
+- Ícones de ação ocupam linha própria e quebram naturalmente (flex-wrap)
+- Exportar Excel não sumiu — movido para Configurações
+- Lint limpo
