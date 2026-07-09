@@ -18,6 +18,7 @@ import {
   updateLabel,
   createSubgroup,
   deleteSubgroup,
+  reorderCategories,
 } from '@/lib/actions'
 import {
   ActivityEntry,
@@ -33,7 +34,7 @@ import {
 } from '@/lib/finance'
 import { MonthSelector } from '@/components/finance/month-selector'
 import { SummaryCard } from '@/components/finance/summary-card'
-import { GroupNode } from '@/components/finance/grpnode'
+import { GroupNode } from '@/components/finance/gnode'
 import { TransactionEditor } from '@/components/finance/transaction-editor'
 import { CategoryEditor } from '@/components/finance/cat-editor'
 import { SubgroupEditor } from '@/components/finance/subgroup-editor'
@@ -425,6 +426,22 @@ export default function Home() {
       dispatchChange('category', 'create', { category: r.category }, detail, {
         user, action: 'create', entity: 'category', detail, createdAt: new Date().toISOString(),
       })
+      const createdCat = r.category
+      history.push({
+        description: detail,
+        undo: async () => {
+          await deleteCategory(createdCat.id, user)
+          dispatchChange('category', 'delete', { id: createdCat.id }, `Desfez: ${detail}`, {
+            user, action: 'delete', entity: 'category', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+        redo: async () => {
+          const rr = await createCategory({ ...args, parentCategoryId: newCatParent, workbookId, user })
+          dispatchChange('category', 'create', { category: rr.category }, `Refazendo: ${detail}`, {
+            user, action: 'create', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+      })
       toast.success(newCatParent ? `Sub-item "${r.category.name}" criado` : `Categoria "${r.category.name}" criada`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao criar categoria')
@@ -433,11 +450,33 @@ export default function Home() {
 
   async function handleDeleteCategory(cat: Category) {
     if (!confirm(`Remover a categoria "${cat.name}"? Todas as transações associadas também serão removidas.`)) return
+    const prevCat = { ...cat }
     try {
       await deleteCategory(cat.id, user)
       const detail = `Removeu categoria "${cat.name}"`
       dispatchChange('category', 'delete', { id: cat.id }, detail, {
         user, action: 'delete', entity: 'category', detail, createdAt: new Date().toISOString(),
+      })
+      history.push({
+        description: detail,
+        undo: async () => {
+          const r = await createCategory({
+            name: prevCat.name, group: prevCat.group, type: prevCat.type as any,
+            currency: prevCat.currency, note: prevCat.note ?? undefined,
+            excludeFromTotal: prevCat.excludeFromTotal, monthlyGoal: prevCat.monthlyGoal,
+            color: prevCat.color, parentCategoryId: prevCat.parentCategoryId,
+            workbookId, user,
+          })
+          dispatchChange('category', 'create', { category: r.category }, `Desfez: ${detail}`, {
+            user, action: 'create', entity: 'category', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+        redo: async () => {
+          await deleteCategory(prevCat.id, user)
+          dispatchChange('category', 'delete', { id: prevCat.id }, `Refazendo: ${detail}`, {
+            user, action: 'delete', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
       })
       toast.success(`Categoria "${cat.name}" removida`)
     } catch (e: any) {
@@ -465,6 +504,20 @@ export default function Home() {
       dispatchChange('label', 'update', { key, value }, detail, {
         user, action: 'update', entity: 'label', detail, createdAt: new Date().toISOString(),
       })
+      history.push({
+        description: detail,
+        undo: async () => {
+          // Can't easily undo rename without knowing the previous value
+          // So we reload the page as a fallback
+          window.location.reload()
+        },
+        redo: async () => {
+          await updateLabel(key, value, user, workbookId)
+          dispatchChange('label', 'update', { key, value }, `Refazendo: ${detail}`, {
+            user, action: 'update', entity: 'label', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+      })
       toast.success(value === '' ? 'Rótulo resetado' : 'Renomeado')
     } catch (e: any) {
       toast.error(e.message || 'Erro ao renomear')
@@ -478,6 +531,22 @@ export default function Home() {
       const detail = `Criou subgrupo "${r.subgroup.name}" dentro de ${newSubgroupParent.label}`
       dispatchChange('subgroup', 'create', { subgroup: r.subgroup }, detail, {
         user, action: 'create', entity: 'subgroup', detail, createdAt: new Date().toISOString(),
+      })
+      const createdSg = r.subgroup
+      history.push({
+        description: detail,
+        undo: async () => {
+          await deleteSubgroup(createdSg.key, user, workbookId)
+          dispatchChange('subgroup', 'delete', { key: createdSg.key, deletedKeys: [createdSg.key], parentKey: createdSg.parentKey }, `Desfez: ${detail}`, {
+            user, action: 'delete', entity: 'subgroup', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
+        redo: async () => {
+          const rr = await createSubgroup(newSubgroupParent.key, name, user, workbookId)
+          dispatchChange('subgroup', 'create', { subgroup: rr.subgroup }, `Refazendo: ${detail}`, {
+            user, action: 'create', entity: 'subgroup', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
+          })
+        },
       })
       toast.success(`Subgrupo "${r.subgroup.name}" criado`)
     } catch (e: any) {
@@ -534,6 +603,29 @@ export default function Home() {
         })
       }
       toast.success(`${r.total} valor(es) copiado(s) para ${toLabel}`)
+      const copiedTxs = r.transactions
+      history.push({
+        description: detail,
+        undo: async () => {
+          // Delete the copied transactions
+          for (const t of copiedTxs) {
+            await saveTransaction({ categoryId: t.categoryId, month: t.month, year: t.year, value: null, note: null, user })
+          }
+          if (toYear === year) {
+            dispatchChange('transaction', 'delete', { ids: copiedTxs.map((t: any) => t.id) }, `Desfez: ${detail}`, {
+              user, action: 'delete', entity: 'transaction', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
+            })
+          }
+        },
+        redo: async () => {
+          const rr = await copyMonth({ fromYear: year, fromMonth: month, toYear, toMonth, user })
+          if (toYear === year) {
+            dispatchChange('transaction', 'create', { transactions: rr.transactions }, `Refazendo: ${detail}`, {
+              user, action: 'create', entity: 'transaction', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
+            })
+          }
+        },
+      })
     } catch (e: any) {
       toast.error(e.message || 'Erro ao copiar mês')
     }
@@ -586,13 +678,20 @@ export default function Home() {
   }
 
   async function handleUndo() {
-    try { await history.undo(); toast.success('Ação desfeita') }
-    catch (e: any) { toast.error(e.message || 'Erro ao desfazer') }
+    try {
+      await history.undo()
+      toast.success('Ação desfeita')
+      // Reload to ensure UI is in sync with DB after undo
+      setTimeout(() => location.reload(), 500)
+    } catch (e: any) { toast.error(e.message || 'Erro ao desfazer') }
   }
 
   async function handleRedo() {
-    try { await history.redo(); toast.success('Ação refeita') }
-    catch (e: any) { toast.error(e.message || 'Erro ao refazer') }
+    try {
+      await history.redo()
+      toast.success('Ação refeita')
+      setTimeout(() => location.reload(), 500)
+    } catch (e: any) { toast.error(e.message || 'Erro ao refazer') }
   }
 
   useEffect(() => {
@@ -880,6 +979,31 @@ export default function Home() {
               })}
               onDeleteSubgroup={handleDeleteSubgroup}
               onMoveCategory={(cat) => setMoveTarget(cat)}
+              onReorder={async (catId, direction) => {
+                // Find the category and its siblings
+                const cat = categories.find((c) => c.id === catId)
+                if (!cat) return
+                const siblings = categories
+                  .filter((c) => c.group === cat.group && (!c.parentCategoryId || c.parentCategoryId === cat.parentCategoryId))
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                const idx = siblings.findIndex((c) => c.id === catId)
+                if (idx === -1) return
+                const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+                if (swapIdx < 0 || swapIdx >= siblings.length) return
+                const swapCat = siblings[swapIdx]
+                // Swap sortOrder
+                const items = [
+                  { id: catId, sortOrder: swapCat.sortOrder },
+                  { id: swapCat.id, sortOrder: cat.sortOrder },
+                ]
+                try {
+                  await reorderCategories(items)
+                  // Reload to reflect changes
+                  setTimeout(() => location.reload(), 300)
+                } catch (e: any) {
+                  toast.error(e.message || 'Erro ao reordenar')
+                }
+              }}
               onColorChange={async (node, color) => {
                 try {
                   const tg = topGroups.find((t) => t.key === node.key)

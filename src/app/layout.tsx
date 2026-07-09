@@ -72,33 +72,12 @@ export default function RootLayout({
         >
           {children}
           <Toaster position="top-center" richColors closeButton />
-          <ServiceWorkerRegister />
         </ThemeProvider>
       </body>
     </html>
   );
 }
 
-// Register the service worker for PWA functionality (offline + push notifications)
-function ServiceWorkerRegister() {
-  return (
-    <script
-      dangerouslySetInnerHTML={{
-        __html: `
-          if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js').then(
-                function(registration) {
-                  console.log('Service Worker registrado com sucesso');
-                },
-                function(err) {
-                  console.log('Falha ao registrar Service Worker:', err);
-                }
-              );
-            });
-          }
-        `,
-      }}
-    />
-  );
-}
+// Service worker disabled during development to avoid caching issues
+// It will be re-enabled in production via a separate script
+

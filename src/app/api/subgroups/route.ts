@@ -43,11 +43,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Compute sortOrder
-  const maxOrder = await db.subgroup.aggregate({
+  const minOrder = await db.subgroup.aggregate({
     where: { parentKey, workbookId: wbid },
-    _max: { sortOrder: true },
+    _min: { sortOrder: true },
   })
-  const sortOrder = (maxOrder._max.sortOrder ?? -1) + 1
+  const sortOrder = (minOrder._min.sortOrder ?? 1) - 1
 
   const sg = await db.subgroup.create({
     data: { workbookId: wbid, key, parentKey, name, sortOrder },

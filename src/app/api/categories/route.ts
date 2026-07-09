@@ -15,11 +15,11 @@ export async function POST(req: NextRequest) {
   }
   const user = String(body.user || 'Anônimo').slice(0, 30)
 
-  const maxOrder = await db.category.aggregate({
+  const minOrder = await db.category.aggregate({
     where: { group: body.group, workbookId: body.workbookId },
-    _max: { sortOrder: true },
+    _min: { sortOrder: true },
   })
-  const sortOrder = body.sortOrder ?? (maxOrder._max.sortOrder ?? -1) + 1
+  const sortOrder = body.sortOrder ?? (minOrder._min.sortOrder ?? 1) - 1
 
   const cat = await db.category.create({
     data: {
