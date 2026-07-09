@@ -661,3 +661,55 @@ Stage Summary:
 - Dialog de zerar valores totalmente legível no dark mode
 - 0 sobreposições em headers e category rows
 - Lint limpo
+
+---
+Task ID: v24
+Agent: super-z (main)
+Task: Botão atualizar no footer, botão adicionar valor rápido (FAB), corrigir nome cortado, editor sem auto-focus.
+
+Work Log:
+1. Botão "Atualizar página" no footer:
+   - Adicionado botão circular (rounded-full h-8 w-8) com ícone RefreshCw
+   - Fica sempre visível ao lado do nome do usuário
+   - Chama window.location.reload()
+
+2. Botão "Valor rápido" (FAB) no footer:
+   - Novo componente QuickAddDialog (quick-add-dialog.tsx)
+   - Botão com ícone Zap + texto "Rápido" (mobile) / "Valor rápido" (desktop)
+   - Dialog com:
+     - Seletor de tipo: Despesa / Rendimento / Reserva (3 botões coloridos com ícones)
+     - Campo nome (obrigatório)
+     - Campo valor (obrigatório) + seletor de moeda (R$ / €)
+     - Seletor de grupo (dropdown com hierarquia)
+     - Campo nota (opcional)
+     - Toggle recorrente + Nº de parcelas
+   - handleQuickAdd em page.tsx:
+     - Cria categoria + transação em uma operação
+     - history.push com undo (deleta transações + categoria) e redo
+     - Grupo default automático baseado no tipo (EXPENSE → despesas.cartoes, INCOME → rendimentos.brl, RESERVE → reservas)
+
+3. Nome de categoria cortado corrigido:
+   - Causa: `max-h-[2.25rem]` + `overflow-hidden` no div do nome cortava nomes longos quando combinados com badges (recorrente, meta)
+   - Solução: removido `max-h` e `overflow-hidden` — o nome agora cresce naturalmente
+   - Também removido do header de subgrupos/cards (max-h-[2.5rem] e max-h-[2.25rem])
+   - Button da categoria: adicionado `flex-1` para crescer e ocupar espaço disponível
+   - Action buttons: padding reduzido no mobile (p-1 vs p-1.5) para dar mais espaço ao nome
+   - Valor EUR equivalente: `hidden sm:block` (oculto no mobile, visível no desktop)
+   - Valor: `whitespace-nowrap` para não quebrar o número
+   - Testado: "Salário Breno" + badge "recorrente" agora aparece completo (não clipped)
+
+4. TransactionEditor sem auto-focus:
+   - Removido `autoFocus` do input de valor
+   - Adicionado `onOpenAutoFocus={(e) => e.preventDefault()}` no DialogContent
+     - Radix Dialog foca automaticamente no primeiro elemento focável por padrão
+     - preventDefault desabilita esse comportamento
+   - Placeholder alterado para "Toque aqui para digitar o valor..." (indica que precisa clicar)
+   - Agora o teclado só aparece quando o usuário toca no campo
+   - Testado: activeElement é BODY (não INPUT) ao abrir o dialog
+
+Stage Summary:
+- Footer tem 3 botões: Atualizar (círculo), Valor rápido (Zap), Categoria (Plus)
+- QuickAddDialog cria categoria + transação em um passo (com undo/redo)
+- Nomes de categorias não são mais cortados (crescem naturalmente)
+- Editor não abre com teclado — usuário precisa tocar no campo para digitar
+- Lint limpo

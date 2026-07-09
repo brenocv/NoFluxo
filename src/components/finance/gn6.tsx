@@ -224,9 +224,9 @@ export function GroupNode(props: Props) {
             style={{ backgroundColor: color }}
           />
         )}
-        {/* Label — wraps to 2 lines on small screens */}
+        {/* Label — wraps naturally on small screens */}
         <div
-          className={cn('flex-1 min-w-0 overflow-hidden break-words leading-tight', isTopLevel ? 'font-bold text-sm max-h-[2.5rem]' : 'font-semibold text-[13px] max-h-[2.25rem]')}
+          className={cn('flex-1 min-w-0 break-words leading-tight', isTopLevel ? 'font-bold text-sm' : 'font-semibold text-[13px]')}
           style={{ color: isTopLevel ? color : undefined }}
         >
           {node.label}
@@ -548,10 +548,10 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           />
           <button
             onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }}
-            className="flex flex-col items-start text-left touch-manipulation min-w-0"
+            className="flex flex-col items-start text-left touch-manipulation min-w-0 flex-1"
           >
             <span className="text-[13px] font-medium text-foreground flex items-start gap-1 flex-wrap min-w-0 w-full">
-              <div className="break-words leading-tight flex-1 min-w-0 overflow-hidden max-h-[2.25rem]">{category.name}</div>
+              <div className="break-words leading-tight flex-1 min-w-0">{category.name}</div>
               {isRecurring && (
                 <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 px-1 py-0.5 rounded flex-shrink-0">
                   <RefreshCw className="h-2 w-2" />{installmentsTotal ? installmentNumber + '/' + installmentsTotal : 'recorrente'}
@@ -568,29 +568,29 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           </button>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button onClick={(e) => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
+          <button onClick={(e) => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="p-1 sm:p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
             <Plus className="h-3 w-3" style={{ color }} />
           </button>
           {isRecurring && (
-            <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1.5 rounded-md hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
+            <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1 sm:p-1.5 rounded-md hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
               <RefreshCw className="h-3 w-3" />
             </button>
           )}
-          <button onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }} className="px-2.5 py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right">
+          <button onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }} className="px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right">
             {displayValue === null ? (
               <span className="text-sm font-normal text-muted-foreground italic">--</span>
             ) : (
               <div className="flex flex-col items-end leading-tight">
-                <span className="text-[13px] font-semibold tabular-nums" style={{ color }}>
+                <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap" style={{ color }}>
                   {sign}{formatMoney(Math.abs(displayValue), category.currency)}
                 </span>
-                <span className="text-[10px] text-muted-foreground tabular-nums">
+                <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
                   {category.currency === 'BRL' ? formatMoney(Math.abs(displayValue) / euroRate, 'EUR') : formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
                 </span>
               </div>
             )}
           </button>
-          <button onClick={(e) => { e.stopPropagation(); allProps.onDeleteCategory(category) }} className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation" aria-label="Remover">
+          <button onClick={(e) => { e.stopPropagation(); allProps.onDeleteCategory(category) }} className="p-1 sm:p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-all touch-manipulation" aria-label="Remover">
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>

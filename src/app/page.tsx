@@ -54,6 +54,7 @@ import { VencimentoAlerts } from '@/components/finance/vencimento-alerts'
 import { AnnualDashboard } from '@/components/finance/annual-dashboard'
 import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
 import { DeleteSubgroupDialog } from '@/components/finance/delete-subgroup-dialog'
+import { QuickAddDialog } from '@/components/finance/quick-add-dialog'
 import { BackupDialog } from '@/components/finance/backup-dialog'
 import { ImportStatementDialog } from '@/components/finance/import-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
@@ -67,7 +68,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Copy, Eraser,
-  Database, Bell, BellOff, Upload,
+  Database, Bell, BellOff, Upload, RefreshCw, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -97,6 +98,7 @@ export default function Home() {
   const [resetOpen, setResetOpen] = useState(false)
   const [moveTarget, setMoveTarget] = useState<Category | null>(null)
   const [pendingDeleteSubgroup, setPendingDeleteSubgroup] = useState<GroupTreeNode | null>(null)
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [backupOpen, setBackupOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
@@ -441,6 +443,87 @@ export default function Home() {
       toast.success(newCatParent ? `Sub-item "${r.category.name}" criado` : `Categoria "${r.category.name}" criada`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao criar categoria')
+    }
+  }
+
+  async function handleQuickAdd(args: {
+    name: string; value: number; currency: Currency; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
+    group: string; note?: string; isRecurring: boolean; installmentsTotal?: number | null
+  }) {
+    try {
+      // 1. Create the category
+      const catRes = await createCategory({
+        name: args.name,
+        group: args.group,
+        type: args.type as any,
+        currency: args.currency,
+        note: args.note,
+        workbookId,
+        user,
+      })
+      dispatchChange('category', 'create', { category: catRes.category }, `Criou categoria "${args.name}"`, {
+        user, action: 'create', entity: 'category', detail: `Criou categoria "${args.name}"`, createdAt: new Date().toISOString(),
+      })
+
+      // 2. Create the transaction (with recurrence if applicable)
+      const txRes = await saveTransaction({
+        categoryId: catRes.category.id,
+        month,
+        year,
+        value: args.value,
+        note: args.note ?? null,
+        user,
+        isRecurring: args.isRecurring,
+        installmentsTotal: args.installmentsTotal ?? null,
+      })
+      const txs = txRes.transactions ?? (txRes.transaction ? [txRes.transaction] : [])
+      if (txs.length > 0) {
+        dispatchChange('transaction', txRes.action as any, { transactions: txs }, `Adicionou ${args.name}`, {
+          user, action: 'create', entity: 'transaction', detail: `Adicionou ${args.name}`, createdAt: new Date().toISOString(),
+        })
+      }
+
+      const idRef = { current: catRes.category.id }
+      const txIdsRef = { current: txs.map((t: any) => t.id) }
+      history.push({
+        description: `Adicionou ${args.name} • ${args.currency === 'BRL' ? 'R$' : '€'} ${args.value.toFixed(2)}`,
+        undo: async () => {
+          // Delete transactions
+          for (const t of txs) {
+            await saveTransaction({ categoryId: catRes.category.id, month: t.month, year: t.year, value: null, note: null, user })
+          }
+          // Delete category
+          await deleteCategory(idRef.current, user)
+          dispatchChange('category', 'delete', { id: idRef.current }, `Desfez: adicionou ${args.name}`, {
+            user, action: 'delete', entity: 'category', detail: `Desfez: adicionou ${args.name}`, createdAt: new Date().toISOString(),
+          })
+        },
+        redo: async () => {
+          const rr = await createCategory({
+            name: args.name, group: args.group, type: args.type as any,
+            currency: args.currency, note: args.note, workbookId, user,
+          })
+          idRef.current = rr.category.id
+          dispatchChange('category', 'create', { category: rr.category }, `Refazendo: adicionou ${args.name}`, {
+            user, action: 'create', entity: 'category', detail: `Refazendo: adicionou ${args.name}`, createdAt: new Date().toISOString(),
+          })
+          const rt = await saveTransaction({
+            categoryId: rr.category.id, month, year, value: args.value, note: args.note ?? null, user,
+            isRecurring: args.isRecurring, installmentsTotal: args.installmentsTotal ?? null,
+          })
+          const rTxs = rt.transactions ?? (rt.transaction ? [rt.transaction] : [])
+          txIdsRef.current = rTxs.map((t: any) => t.id)
+          if (rTxs.length > 0) {
+            dispatchChange('transaction', rt.action as any, { transactions: rTxs }, `Refazendo: adicionou ${args.name}`, {
+              user, action: 'create', entity: 'transaction', detail: `Refazendo: adicionou ${args.name}`, createdAt: new Date().toISOString(),
+            })
+          }
+        },
+      })
+
+      toast.success(`"${args.name}" adicionado`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao adicionar')
     }
   }
 
@@ -1511,15 +1594,42 @@ export default function Home() {
       <footer className="sticky bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-muted-foreground">Você é</span>
+            <span className="text-muted-foreground hidden sm:inline">Você é</span>
             <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation">
               {user}
             </button>
+            {/* Refresh button — always visible */}
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => window.location.reload()}
+              aria-label="Atualizar página"
+              title="Atualizar página"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
           </div>
-          <Button size="sm" onClick={() => { setNewCatGroup('despesas.cartoes'); setNewCatParent(null) }} className="h-8">
-            <Plus className="h-4 w-4 mr-1" />
-            Nova categoria
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {/* Quick add — always visible (FAB-style) */}
+            <Button
+              size="sm"
+              variant="default"
+              onClick={() => setQuickAddOpen(true)}
+              className="h-9 rounded-full px-3 shadow-sm"
+              aria-label="Adicionar valor rápido"
+              title="Adicionar valor rápido (despesa, rendimento ou reserva)"
+            >
+              <Zap className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Valor rápido</span>
+              <span className="sm:hidden">Rápido</span>
+            </Button>
+            <Button size="sm" onClick={() => { setNewCatGroup('despesas.cartoes'); setNewCatParent(null) }} className="h-9">
+              <Plus className="h-4 w-4 mr-1" />
+              <span className="hidden sm:inline">Nova categoria</span>
+              <span className="sm:hidden">Categoria</span>
+            </Button>
+          </div>
         </div>
       </footer>
 
@@ -1600,6 +1710,18 @@ export default function Home() {
         ) : ''}
         onOpenChange={(o) => !o && setPendingDeleteSubgroup(null)}
         onConfirm={handleDeleteSubgroupConfirm}
+      />
+
+      <QuickAddDialog
+        open={quickAddOpen}
+        month={month}
+        year={year}
+        categories={categories}
+        subgroups={subgroups}
+        topGroups={topGroups}
+        labels={labels}
+        onOpenChange={setQuickAddOpen}
+        onCreate={handleQuickAdd}
       />
 
       <BackupDialog

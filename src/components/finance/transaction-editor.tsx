@@ -151,7 +151,10 @@ export function TransactionEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-md max-h-[90vh] overflow-y-auto"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex flex-col gap-1">
             <span className="text-base">{category.name}</span>
@@ -181,14 +184,13 @@ export function TransactionEditor({
               autoComplete="off"
               value={raw}
               onChange={(e) => setRaw(e.target.value)}
-              placeholder="0,00"
+              placeholder="Toque aqui para digitar o valor..."
               className={cn(
                 'text-2xl font-semibold tabular-nums h-14',
                 isIncome && valid && 'text-emerald-600',
                 !isIncome && !isReserve && !isReceivable && valid && 'text-rose-600',
                 (isReserve || isReceivable) && valid && 'text-amber-600'
               )}
-              autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
             />
             {valid && (
