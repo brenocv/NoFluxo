@@ -426,3 +426,72 @@ Stage Summary:
 - Drag-and-drop com pointer events (mouse + touch), ghost visual, indicadores de drop
 - Setas removidas das categorias (mantidas apenas nos top-level cards)
 - Lint limpo, dev server compilando sem erros
+
+---
+Task ID: v18
+Agent: super-z (main)
+Task: Drag-and-drop para subgrupos e top-level cards; evitar reload da página; garantir undo/redo em todas as ações (incluindo deleção de subgrupo).
+
+Work Log:
+1. Estendido DnD store (category-dnd.ts) para suportar 3 tipos: 'category', 'subgroup', 'topgroup'
+   - Adicionado campo `type` ao estado
+   - Atributos data-cat-id, data-sg-key, data-tg-key para hit-testing
+   - ATTR_BY_TYPE mapeia tipo → nome do atributo
+
+2. Criada API /api/subgroups/reorder (POST) — aceita items [{id, sortOrder}]
+   - Mesmo padrão de /api/categories/reorder e /api/topgroups/reorder
+   - Adicionada action reorderSubgroups() em actions.ts
+
+3. Drag-and-drop em headers de subgrupos e top-level cards (gn6.tsx):
+   - handleHeaderPointerDown: pointer events no header div
+   - Detecta cliques em botões de ação (aria-label) e ignora (não inicia drag)
+   - O botão expand/colapsar (sem aria-label) É área de drag
+   - cardEl = rowEl.closest('[class*="overflow-hidden"]') — encontra o Card inteiro
+   - Durante drag: cardEl.style.pointerEvents = 'none' — elementFromPoint vê ATRAVÉS do card
+   - Drop indicators (linha azul) no topo (before) ou bottom (after) do header
+   - GripVertical icon como pista visual em todos os headers
+   - Removidos botões ArrowUp/ArrowDown dos top-level cards (substituídos por drag)
+
+4. Handlers em page.tsx:
+   - onDropSubgroup: reordena subgrupos dentro do mesmo parentKey
+     - Se parentKey diferente: toast.error (não permite cross-parent)
+     - reorderSubgroups + dispatch local + history.push (undo/redo)
+   - onDropTopGroup: reordena top-level cards
+     - Bug corrigido: targetIdx era calculado do array original, mas inserção usava array filtrado
+     - Nova lógica: filter → findIndex in filtered → splice → map
+     - reorderTopGroups + reload + history.push (undo/redo)
+   - onDropCategory: atualizado para NÃO fazer reload completo
+     - Dispatcha eventos 'category' update para cada categoria afetada
+     - history.push com undo/redo completo
+
+5. Undo/redo para deleção de subgrupo (handleDeleteSubgroupConfirm):
+   - Snapshot antes de deletar: subgroups + categories + transactions
+   - Undo (mode='delete'): recria subgroups com key original, recria categories com id original, recria transactions
+   - Undo (mode='move'): recria subgroups com key original, move categories de volta
+   - Redo: chama deleteSubgroup novamente
+   - API /api/subgroups POST aceita `key` e `sortOrder` explícitos (para restore)
+   - API /api/categories POST aceita `id` explícito (para restore)
+
+6. Hook use-finance-data atualizado:
+   - case 'subgroup' action 'update': agora atualiza subgroup existente (merge {...x, ...sg})
+   - Antes só tratava create e delete
+
+7. Bug crítico corrigido em gn6.tsx:
+   - handleUp referenciava `allProps` (não definido no escopo do GroupNode)
+   - Corrigido para usar `props` (que é o parâmetro do componente)
+   - Este bug causava ReferenceError silencioso que impedia o drop de funcionar
+
+Stage Summary:
+- Drag-and-drop funciona para: categorias, subgrupos, e top-level cards
+- Sem setas — tudo via arrastar com pointer events (mouse + touch)
+- Ghost visual segue o ponteiro; linha azul indica posição de drop
+- Não há reload completo da página ao reordenar categorias (atualização local)
+- Top-level cards ainda precisam de reload (topGroups são tratados via config)
+- Undo/redo funciona para: criar/deletar categoria, criar/deletar subgrupo (ambos modos), reordenar categoria, reordenar subgrupo, reordenar card, salvar transação, copiar mês, zerar valores
+- Lint limpo, sem erros no browser
+- Testado via agent-browser:
+  - Drag de categoria: Santander Kiki movida de posição ✓
+  - Drag de subgrupo: Cartões BR movido para depois de Contas casa ✓
+  - Drag de top-level card: Despesas movida para depois de Reservas ✓
+  - Undo de delete categoria: Santander Kiki restaurada ✓
+  - Undo de delete subgrupo (mode=delete): subgrupo + categoria restaurados ✓

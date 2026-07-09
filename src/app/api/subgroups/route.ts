@@ -34,20 +34,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'parentKey inválido' }, { status: 400 })
   }
 
-  // Generate a unique key within this workbook
-  const baseSlug = slugify(name)
-  let key = parentKey + '.' + baseSlug
+  // Allow caller to specify an explicit key (used during undo/restore).
+  // Otherwise generate from name.
+  let key: string
+  if (body.key && typeof body.key === 'string' && body.key.startsWith(parentKey + '.')) {
+    key = String(body.key)
+    // If key already exists, fall back to auto-generation
+    if (await db.subgroup.findFirst({ where: { key, workbookId: wbid } })) {
+      key = parentKey + '.' + slugify(name)
+    }
+  } else {
+    const baseSlug = slugify(name)
+    key = parentKey + '.' + baseSlug
+  }
+  // Ensure uniqueness
   let suffix = 2
   while (await db.subgroup.findFirst({ where: { key, workbookId: wbid } })) {
-    key = parentKey + '.' + baseSlug + '_' + suffix++
+    key = parentKey + '.' + slugify(name) + '_' + suffix++
   }
 
-  // Compute sortOrder
-  const minOrder = await db.subgroup.aggregate({
-    where: { parentKey, workbookId: wbid },
-    _min: { sortOrder: true },
-  })
-  const sortOrder = (minOrder._min.sortOrder ?? 1) - 1
+  // Compute sortOrder (allow caller to specify)
+  let sortOrder: number
+  if (typeof body.sortOrder === 'number') {
+    sortOrder = body.sortOrder
+  } else {
+    const minOrder = await db.subgroup.aggregate({
+      where: { parentKey, workbookId: wbid },
+      _min: { sortOrder: true },
+    })
+    sortOrder = (minOrder._min.sortOrder ?? 1) - 1
+  }
 
   const sg = await db.subgroup.create({
     data: { workbookId: wbid, key, parentKey, name, sortOrder },

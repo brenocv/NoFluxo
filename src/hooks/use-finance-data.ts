@@ -211,11 +211,11 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
                 ),
               }
             }
-            // create
+            // create or update
             const sg = msg.payload.subgroup as Subgroup
             const exists = s.subgroups.some((x) => x.key === sg.key)
             const subgroups = exists
-              ? s.subgroups.map((x) => (x.key === sg.key ? sg : x))
+              ? s.subgroups.map((x) => (x.key === sg.key ? { ...x, ...sg } : x))
               : [...s.subgroups, sg]
             return { ...s, subgroups }
           }

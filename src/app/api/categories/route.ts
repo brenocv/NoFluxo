@@ -21,8 +21,13 @@ export async function POST(req: NextRequest) {
   })
   const sortOrder = body.sortOrder ?? (minOrder._min.sortOrder ?? 1) - 1
 
+  // Allow caller to specify an explicit id (used during undo/restore).
+  // Prisma will use this id when creating the record.
+  const idValue = body.id && typeof body.id === 'string' ? String(body.id) : undefined
+
   const cat = await db.category.create({
     data: {
+      ...(idValue ? { id: idValue } : {}),
       workbookId: String(body.workbookId),
       name: String(body.name),
       group: String(body.group),

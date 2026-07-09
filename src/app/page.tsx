@@ -19,6 +19,7 @@ import {
   createSubgroup,
   deleteSubgroup,
   reorderCategories,
+  reorderSubgroups,
   reorderTopGroups,
 } from '@/lib/actions'
 import {
@@ -565,10 +566,25 @@ export default function Home() {
   async function handleDeleteSubgroupConfirm(mode: 'move' | 'delete') {
     if (!pendingDeleteSubgroup) return
     const node = pendingDeleteSubgroup
+
+    // Snapshot for undo — capture all subgroups + categories that will be affected
+    const allKeysToDelete = collectDescendantKeys(node)
+    const snapshotSubgroups = subgroups
+      .filter((s) => allKeysToDelete.includes(s.key))
+      .map((s) => ({ ...s }))
+    const snapshotCategories = categories
+      .filter((c) => allKeysToDelete.includes(c.group))
+      .map((c) => ({ ...c }))
+    // Also capture all transactions of those categories (for mode='delete')
+    const snapshotCatIds = new Set(snapshotCategories.map((c) => c.id))
+    const snapshotTransactions = transactions
+      .filter((t) => snapshotCatIds.has(t.categoryId))
+      .map((t) => ({ ...t }))
+    const parentKey = node.key.split('.').slice(0, -1).join('.') || node.key
+
     try {
       const r = await deleteSubgroup(node.key, user, workbookId, mode)
-      // Collect all descendant keys for local state update
-      const deletedKeys = collectDescendantKeys(node)
+      const deletedKeys = allKeysToDelete
       const detail = mode === 'delete'
         ? `Removeu subgrupo "${node.label}" (categorias excluídas)`
         : `Removeu subgrupo "${node.label}" (categorias movidas)`
@@ -594,6 +610,122 @@ export default function Home() {
           }))
         }
       }
+
+      // Record undo/redo
+      history.push({
+        description: detail,
+        undo: async () => {
+          // Re-create subgroups with their original keys
+          // Sort by depth ascending (parents first) so parent validation passes
+          const sortedSgs = [...snapshotSubgroups].sort((a, b) =>
+            a.key.split('.').length - b.key.split('.').length
+          )
+          for (const sg of sortedSgs) {
+            try {
+              const r = await fetch('/api/subgroups', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  parentKey: sg.parentKey,
+                  name: sg.name,
+                  key: sg.key,
+                  sortOrder: sg.sortOrder,
+                  user,
+                  workbookId,
+                }),
+              })
+              if (r.ok) {
+                const data = await r.json()
+                window.dispatchEvent(new CustomEvent('finance:patch', {
+                  detail: {
+                    type: 'subgroup', action: 'create', payload: { subgroup: data.subgroup },
+                    by: { name: user, color: USER_COLOR }, at: Date.now(),
+                  }
+                }))
+              }
+            } catch {}
+          }
+          // Re-create categories (only for mode='delete'; for mode='move' the categories
+          // still exist, just moved to parent — we need to move them back to the restored subgroups)
+          if (mode === 'delete') {
+            for (const cat of snapshotCategories) {
+              try {
+                const r = await fetch('/api/categories', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    id: cat.id,
+                    name: cat.name,
+                    group: cat.group,
+                    type: cat.type,
+                    currency: cat.currency,
+                    note: cat.note,
+                    sortOrder: cat.sortOrder,
+                    excludeFromTotal: cat.excludeFromTotal,
+                    monthlyGoal: cat.monthlyGoal,
+                    color: cat.color,
+                    parentCategoryId: cat.parentCategoryId,
+                    workbookId,
+                    user,
+                  }),
+                })
+                if (r.ok) {
+                  const data = await r.json()
+                  window.dispatchEvent(new CustomEvent('finance:patch', {
+                    detail: {
+                      type: 'category', action: 'create', payload: { category: data.category },
+                      by: { name: user, color: USER_COLOR }, at: Date.now(),
+                    }
+                  }))
+                }
+              } catch {}
+            }
+            // Restore transactions
+            for (const tx of snapshotTransactions) {
+              try {
+                await fetch('/api/transactions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    categoryId: tx.categoryId,
+                    month: tx.month,
+                    year: tx.year,
+                    value: tx.value,
+                    note: tx.note,
+                    user,
+                  }),
+                })
+              } catch {}
+            }
+          } else {
+            // mode === 'move' — categories still exist but their group was changed to parent.
+            // Move them back to the original subgroup.
+            for (const cat of snapshotCategories) {
+              try {
+                await updateCategory(cat.id, { group: cat.group, parentCategoryId: cat.parentCategoryId }, user)
+                window.dispatchEvent(new CustomEvent('finance:patch', {
+                  detail: {
+                    type: 'category', action: 'update',
+                    payload: { category: { ...cat } },
+                    by: { name: user, color: USER_COLOR }, at: Date.now(),
+                  }
+                }))
+              } catch {}
+            }
+          }
+          // Reload to ensure consistent state
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+          }))
+        },
+        redo: async () => {
+          await deleteSubgroup(node.key, user, workbookId, mode)
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+          }))
+        },
+      })
+
       toast.success(`Subgrupo "${node.label}" removido`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao remover subgrupo')
@@ -1022,7 +1154,6 @@ export default function Home() {
                 if (!dragged || !target) return
                 if (draggedId === targetId) return
 
-                // Determine the new siblings list (target's parent's children, with dragged inserted)
                 const targetParent = target.parentCategoryId ?? null
                 const targetGroup = target.group
                 const siblings = categories
@@ -1039,9 +1170,12 @@ export default function Home() {
                 const items = siblings.map((c, i) => ({ id: c.id, sortOrder: i + 1 }))
 
                 try {
-                  // If moving across parents/groups, update parent first
+                  // Save original state for undo
+                  const prevSortOrders = siblings.map((c) => ({ id: c.id, sortOrder: c.sortOrder }))
+                  const prevDragged = { ...dragged }
                   const crossParent = (dragged.parentCategoryId ?? null) !== targetParent
                   const crossGroup = dragged.group !== targetGroup
+
                   if (crossParent || crossGroup) {
                     await updateCategory(draggedId, {
                       group: targetGroup,
@@ -1049,51 +1183,251 @@ export default function Home() {
                     }, user)
                   }
                   await reorderCategories(items)
-                  // Broadcast the dragged category's new state so other devices sync
-                  const updatedCat = {
-                    ...dragged,
-                    group: targetGroup,
-                    parentCategoryId: targetParent,
-                    sortOrder: items.find((it) => it.id === draggedId)!.sortOrder,
-                  }
-                  dispatchChange('category', 'update', { category: updatedCat }, `Reordenou categoria "${dragged.name}"`, {
-                    user, action: 'update', entity: 'category', detail: `Reordenou categoria "${dragged.name}"`, createdAt: new Date().toISOString(),
-                  })
-                  // Also reload local data to refresh sort orders of all siblings
-                  window.dispatchEvent(new CustomEvent('finance:patch', {
-                    detail: {
-                      type: 'reload', action: 'update', payload: {},
-                      by: { name: user, color: USER_COLOR }, at: Date.now(),
+
+                  // Build the new categories array locally (no reload)
+                  const newSortOrderMap = new Map(items.map((it) => [it.id, it.sortOrder]))
+                  const updatedCategories = categories.map((c) => {
+                    if (c.id === draggedId) {
+                      return {
+                        ...c,
+                        group: targetGroup,
+                        parentCategoryId: targetParent,
+                        sortOrder: newSortOrderMap.get(c.id) ?? c.sortOrder,
+                      }
                     }
-                  }))
+                    if (newSortOrderMap.has(c.id)) {
+                      return { ...c, sortOrder: newSortOrderMap.get(c.id)! }
+                    }
+                    return c
+                  })
+
+                  // Dispatch each updated category to local state + broadcast
+                  const affectedCats = updatedCategories.filter((c) =>
+                    c.id === draggedId || newSortOrderMap.has(c.id)
+                  )
+                  for (const cat of affectedCats) {
+                    window.dispatchEvent(new CustomEvent('finance:patch', {
+                      detail: {
+                        type: 'category', action: 'update', payload: { category: cat },
+                        by: { name: user, color: USER_COLOR }, at: Date.now(),
+                      }
+                    }))
+                  }
+                  broadcast({
+                    type: 'category', action: 'update',
+                    payload: { category: { ...dragged, group: targetGroup, parentCategoryId: targetParent, sortOrder: newSortOrderMap.get(draggedId) ?? dragged.sortOrder } },
+                    detail: `Reordenou categoria "${dragged.name}"`,
+                  })
+
+                  // Record undo/redo
+                  history.push({
+                    description: `Moveu categoria "${dragged.name}"`,
+                    undo: async () => {
+                      if (crossParent || crossGroup) {
+                        await updateCategory(draggedId, {
+                          group: prevDragged.group,
+                          parentCategoryId: prevDragged.parentCategoryId,
+                        }, user)
+                      }
+                      await reorderCategories(prevSortOrders)
+                      const restoredCats = categories.map((c) => {
+                        if (c.id === draggedId) return { ...prevDragged }
+                        const prev = prevSortOrders.find((p) => p.id === c.id)
+                        return prev ? { ...c, sortOrder: prev.sortOrder } : c
+                      })
+                      for (const cat of restoredCats.filter((c) =>
+                        c.id === draggedId || prevSortOrders.some((p) => p.id === c.id)
+                      )) {
+                        window.dispatchEvent(new CustomEvent('finance:patch', {
+                          detail: {
+                            type: 'category', action: 'update', payload: { category: cat },
+                            by: { name: user, color: USER_COLOR }, at: Date.now(),
+                          }
+                        }))
+                      }
+                    },
+                    redo: async () => {
+                      if (crossParent || crossGroup) {
+                        await updateCategory(draggedId, {
+                          group: targetGroup,
+                          parentCategoryId: targetParent,
+                        }, user)
+                      }
+                      await reorderCategories(items)
+                      const redoCats = categories.map((c) => {
+                        if (c.id === draggedId) {
+                          return { ...c, group: targetGroup, parentCategoryId: targetParent, sortOrder: newSortOrderMap.get(c.id) ?? c.sortOrder }
+                        }
+                        if (newSortOrderMap.has(c.id)) return { ...c, sortOrder: newSortOrderMap.get(c.id)! }
+                        return c
+                      })
+                      for (const cat of redoCats.filter((c) =>
+                        c.id === draggedId || newSortOrderMap.has(c.id)
+                      )) {
+                        window.dispatchEvent(new CustomEvent('finance:patch', {
+                          detail: {
+                            type: 'category', action: 'update', payload: { category: cat },
+                            by: { name: user, color: USER_COLOR }, at: Date.now(),
+                          }
+                        }))
+                      }
+                    },
+                  })
+
                   toast.success('Categoria movida')
                 } catch (e: any) {
                   toast.error(e.message || 'Erro ao mover categoria')
                 }
               }}
-              onReorderTopGroup={async (key, direction) => {
+              onDropSubgroup={async (draggedKey, targetKey, position) => {
+                if (draggedKey === targetKey) return
+                const dragged = subgroups.find((s) => s.key === draggedKey)
+                const target = subgroups.find((s) => s.key === targetKey)
+                if (!dragged || !target) return
+                if (dragged.parentKey !== target.parentKey) {
+                  toast.error('Só é possível reordenar subgrupos dentro do mesmo grupo pai')
+                  return
+                }
+                const siblings = subgroups
+                  .filter((s) => s.parentKey === target.parentKey && s.key !== draggedKey)
+                  .sort((a, b) => a.sortOrder - b.sortOrder)
+                const targetIdx = siblings.findIndex((s) => s.key === targetKey)
+                if (targetIdx === -1) return
+                const insertIdx = position === 'before' ? targetIdx : targetIdx + 1
+                siblings.splice(insertIdx, 0, dragged)
+                const items = siblings.map((s, i) => ({ id: s.id, sortOrder: i + 1 }))
+                const prevSortOrders = siblings.map((s) => ({ id: s.id, sortOrder: s.sortOrder }))
+
+                try {
+                  await reorderSubgroups(items)
+                  // Update local state without reload
+                  const newSortOrderMap = new Map(items.map((it) => [it.id, it.sortOrder]))
+                  const updatedSubgroups = subgroups.map((s) =>
+                    newSortOrderMap.has(s.id) ? { ...s, sortOrder: newSortOrderMap.get(s.id)! } : s
+                  )
+                  for (const sg of updatedSubgroups.filter((s) => newSortOrderMap.has(s.id))) {
+                    window.dispatchEvent(new CustomEvent('finance:patch', {
+                      detail: {
+                        type: 'subgroup', action: 'update', payload: { subgroup: sg },
+                        by: { name: user, color: USER_COLOR }, at: Date.now(),
+                      }
+                    }))
+                  }
+                  broadcast({
+                    type: 'subgroup', action: 'update',
+                    payload: { subgroup: { ...dragged, sortOrder: newSortOrderMap.get(dragged.id) ?? dragged.sortOrder } },
+                    detail: `Reordenou subgrupo "${dragged.name}"`,
+                  })
+
+                  history.push({
+                    description: `Moveu subgrupo "${dragged.name}"`,
+                    undo: async () => {
+                      await reorderSubgroups(prevSortOrders)
+                      for (const sg of subgroups) {
+                        const prev = prevSortOrders.find((p) => p.id === sg.id)
+                        if (prev) {
+                          window.dispatchEvent(new CustomEvent('finance:patch', {
+                            detail: {
+                              type: 'subgroup', action: 'update', payload: { subgroup: { ...sg, sortOrder: prev.sortOrder } },
+                              by: { name: user, color: USER_COLOR }, at: Date.now(),
+                            }
+                          }))
+                        }
+                      }
+                    },
+                    redo: async () => {
+                      await reorderSubgroups(items)
+                      for (const sg of subgroups) {
+                        if (newSortOrderMap.has(sg.id)) {
+                          window.dispatchEvent(new CustomEvent('finance:patch', {
+                            detail: {
+                              type: 'subgroup', action: 'update', payload: { subgroup: { ...sg, sortOrder: newSortOrderMap.get(sg.id)! } },
+                              by: { name: user, color: USER_COLOR }, at: Date.now(),
+                            }
+                          }))
+                        }
+                      }
+                    },
+                  })
+
+                  toast.success('Subgrupo movido')
+                } catch (e: any) {
+                  toast.error(e.message || 'Erro ao mover subgrupo')
+                }
+              }}
+              onDropTopGroup={async (draggedKey, targetKey, position) => {
+                if (draggedKey === targetKey) return
                 const sorted = [...topGroups].sort((a, b) => a.sortOrder - b.sortOrder)
-                const idx = sorted.findIndex((t) => t.key === key)
-                if (idx === -1) return
-                const swapIdx = direction === 'up' ? idx - 1 : idx + 1
-                if (swapIdx < 0 || swapIdx >= sorted.length) return
-                const swapTg = sorted[swapIdx]
-                const items = [
-                  { id: sorted[idx].id, sortOrder: swapTg.sortOrder },
-                  { id: swapTg.id, sortOrder: sorted[idx].sortOrder },
-                ]
+                const draggedIdx = sorted.findIndex((t) => t.key === draggedKey)
+                if (draggedIdx === -1) return
+                // Remove the dragged item, then insert it at the right position
+                const filtered = sorted.filter((t) => t.key !== draggedKey)
+                const targetIdxInFiltered = filtered.findIndex((t) => t.key === targetKey)
+                if (targetIdxInFiltered === -1) return
+                const insertIdx = position === 'before' ? targetIdxInFiltered : targetIdxInFiltered + 1
+                filtered.splice(insertIdx, 0, sorted[draggedIdx])
+                const items = filtered.map((t, i) => ({ id: t.id, sortOrder: i + 1 }))
+                const prevSortOrders = sorted.map((t) => ({ id: t.id, sortOrder: t.sortOrder }))
+
                 try {
                   await reorderTopGroups(items)
+                  // Update local state without reload
+                  const newSortOrderMap = new Map(items.map((it) => [it.id, it.sortOrder]))
+                  for (const tg of topGroups) {
+                    if (newSortOrderMap.has(tg.id)) {
+                      window.dispatchEvent(new CustomEvent('finance:patch', {
+                        detail: {
+                          type: 'config', action: 'update',
+                          payload: { key: 'topGroups', value: '' },
+                          by: { name: user, color: USER_COLOR }, at: Date.now(),
+                        }
+                      }))
+                    }
+                  }
+                  // Trigger local re-render via a reload of topGroups
                   const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
                   if (r.ok) {
                     const data = await r.json()
-                    window.dispatchEvent(new CustomEvent('finance:patch', {
-                      detail: { type: 'config', action: 'update', payload: { key: 'topGroups', value: '' }, by: { name: user, color: USER_COLOR }, at: Date.now() }
-                    }))
+                    if (data.topGroups) {
+                      window.dispatchEvent(new CustomEvent('finance:patch', {
+                        detail: {
+                          type: 'reload', action: 'update', payload: {},
+                          by: { name: user, color: USER_COLOR }, at: Date.now(),
+                        }
+                      }))
+                    }
                   }
-                  toast.success('Card reordenado')
+                  broadcast({
+                    type: 'config', action: 'update',
+                    payload: { key: 'topGroups', value: '' },
+                    detail: `Reordenou card`,
+                  })
+
+                  history.push({
+                    description: `Moveu card`,
+                    undo: async () => {
+                      await reorderTopGroups(prevSortOrders)
+                      const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
+                      if (r.ok) {
+                        window.dispatchEvent(new CustomEvent('finance:patch', {
+                          detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+                        }))
+                      }
+                    },
+                    redo: async () => {
+                      await reorderTopGroups(items)
+                      const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
+                      if (r.ok) {
+                        window.dispatchEvent(new CustomEvent('finance:patch', {
+                          detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+                        }))
+                      }
+                    },
+                  })
+
+                  toast.success('Card movido')
                 } catch (e: any) {
-                  toast.error(e.message || 'Erro ao reordenar card')
+                  toast.error(e.message || 'Erro ao mover card')
                 }
               }}
               onColorChange={async (node, color) => {

@@ -2,18 +2,21 @@
 
 import { useSyncExternalStore } from 'react'
 
-// Singleton drag-and-drop state shared across all category rows.
+// Singleton drag-and-drop state shared across all rows/cards (categories, subgroups, top-groups).
 // We use useSyncExternalStore so any row can read the current drag state
 // without prop drilling and without re-rendering the whole tree.
 
+export type DnDType = 'category' | 'subgroup' | 'topgroup'
+
 export interface DnDState {
-  draggedId: string | null
+  type: DnDType | null
+  draggedId: string | null        // category id, subgroup key, or topgroup key
   draggedName: string
   draggedColor: string
   pointerX: number
   pointerY: number
-  offsetX: number  // pointer offset from row's left edge
-  offsetY: number  // pointer offset from row's top edge
+  offsetX: number
+  offsetY: number
   targetId: string | null
   targetPosition: 'before' | 'after' | null
   rowWidth: number
@@ -21,6 +24,7 @@ export interface DnDState {
 }
 
 const IDLE: DnDState = {
+  type: null,
   draggedId: null,
   draggedName: '',
   draggedColor: '#888',
@@ -50,6 +54,7 @@ export function useCategoryDnd() {
 
 export const dnd = {
   start(opts: {
+    type: DnDType
     id: string
     name: string
     color: string
@@ -60,6 +65,7 @@ export const dnd = {
     rowWidth: number
   }) {
     state = {
+      type: opts.type,
       draggedId: opts.id,
       draggedName: opts.name,
       draggedColor: opts.color,
@@ -83,10 +89,10 @@ export const dnd = {
     state = { ...state, targetId, targetPosition: position }
     emit()
   },
-  end(): { targetId: string; position: 'before' | 'after' } | null {
+  end(): { type: DnDType; targetId: string; position: 'before' | 'after' } | null {
     const result =
-      state.targetId && state.targetPosition && state.targetId !== state.draggedId
-        ? { targetId: state.targetId, position: state.targetPosition }
+      state.targetId && state.targetPosition && state.targetId !== state.draggedId && state.type
+        ? { type: state.type, targetId: state.targetId, position: state.targetPosition }
         : null
     state = IDLE
     emit()
@@ -100,3 +106,6 @@ export const dnd = {
     return state.draggedId !== null
   },
 }
+
+// Distance threshold (px) to differentiate a click from a drag
+export const DRAG_THRESHOLD = 5
