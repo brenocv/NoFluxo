@@ -62,7 +62,14 @@ function alpha(hex: string, a: number): string {
 
 export function GroupNode(props: Props) {
   const { node, transactionsByCat, euroRate, allCategories } = props
-  const [open, setOpen] = useState(true)
+  const [userOpen, setUserOpen] = useState(true)
+  // Auto-expand when there's a search with highlighted items inside
+  const hasSearch = props.highlightedCategoryIds.size > 0
+  const hasHighlightedInTree = (n: GroupTreeNode): boolean => {
+    if (n.categories.some((c) => props.highlightedCategoryIds.has(c.id))) return true
+    return n.children.some(hasHighlightedInTree)
+  }
+  const open = hasSearch ? true : userOpen
 
   const total = computeNodeTotal(node, transactionsByCat, euroRate)
   const isTopLevel = node.isTopLevel
@@ -98,7 +105,7 @@ export function GroupNode(props: Props) {
         style={{ background: alpha(color, isTopLevel ? 0.14 : 0.06) }}
       >
         <button
-          onClick={() => setOpen(!open)}
+          onClick={() => setUserOpen(!userOpen)}
           className="flex items-center gap-2 flex-1 touch-manipulation min-w-0"
         >
           {/* Expand/collapse chevron */}
@@ -258,10 +265,14 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         className={cn(
           'flex items-center justify-between py-2 pr-3 group transition-colors',
           hasSearch && !isHighlighted && 'opacity-20',
-          isHighlighted && 'bg-yellow-200 dark:bg-yellow-500/30 ring-2 ring-yellow-500 dark:ring-yellow-400 ring-inset z-10 relative',
+          isHighlighted && 'ring-2 ring-yellow-500 ring-inset z-10 relative',
           !hasSearch && 'hover:bg-black/5'
         )}
-        style={{ paddingLeft: indent + 'px', borderLeft: '2px solid ' + alpha(color, 0.15) }}
+        style={{
+          paddingLeft: indent + 'px',
+          borderLeft: '2px solid ' + alpha(color, 0.15),
+          background: isHighlighted ? 'rgba(250, 204, 21, 0.25)' : undefined,
+        }}
       >
         {/* Left: chevron + colored dot + name */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">

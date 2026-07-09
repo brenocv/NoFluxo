@@ -258,10 +258,14 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         className={cn(
           'flex items-center justify-between py-2 pr-3 group transition-colors',
           hasSearch && !isHighlighted && 'opacity-20',
-          isHighlighted && 'bg-yellow-200 dark:bg-yellow-500/30 ring-2 ring-yellow-500 dark:ring-yellow-400 ring-inset z-10 relative',
+          isHighlighted && 'ring-2 ring-yellow-500 ring-inset z-10 relative',
           !hasSearch && 'hover:bg-black/5'
         )}
-        style={{ paddingLeft: indent + 'px', borderLeft: '2px solid ' + alpha(color, 0.15) }}
+        style={{
+          paddingLeft: indent + 'px',
+          borderLeft: '2px solid ' + alpha(color, 0.15),
+          background: isHighlighted ? 'rgba(250, 204, 21, 0.25)' : undefined,
+        }}
       >
         {/* Left: chevron + colored dot + name */}
         <div className="flex items-center gap-1.5 flex-1 min-w-0">

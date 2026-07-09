@@ -235,6 +235,30 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
 
     const onLocalPatch = (e: Event) => {
       const detail = (e as CustomEvent).detail as ChangeMessage
+      // Handle special 'reload' type — re-fetch all data
+      if (detail.type === ('reload' as any)) {
+        setState((s) => ({ ...s, loading: true }))
+        ;(async () => {
+          try {
+            const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
+            if (r.ok) {
+              const data = await r.json()
+              setState({
+                categories: data.categories,
+                transactions: data.transactions,
+                config: data.config,
+                labels: data.labels ?? {},
+                subgroups: data.subgroups ?? [],
+                topGroups: data.topGroups ?? [],
+                activity: data.activity,
+                loading: false,
+                error: null,
+              })
+            }
+          } catch {}
+        })()
+        return
+      }
       onChange(detail)
       if (detail.detail) {
         setLive((l) => ({

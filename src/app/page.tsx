@@ -19,6 +19,7 @@ import {
   createSubgroup,
   deleteSubgroup,
   reorderCategories,
+  reorderTopGroups,
 } from '@/lib/actions'
 import {
   ActivityEntry,
@@ -34,7 +35,7 @@ import {
 } from '@/lib/finance'
 import { MonthSelector } from '@/components/finance/month-selector'
 import { SummaryCard } from '@/components/finance/summary-card'
-import { GroupNode } from '@/components/finance/gnode'
+import { GroupNode } from '@/components/finance/gn6'
 import { TransactionEditor } from '@/components/finance/transaction-editor'
 import { CategoryEditor } from '@/components/finance/cat-editor'
 import { SubgroupEditor } from '@/components/finance/subgroup-editor'
@@ -191,31 +192,19 @@ export default function Home() {
   }, [categories, search])
 
   // Filter category IDs based on showOnlyFilled only (not search)
+  // Only filter for showOnlyFilled, NOT for search (search uses highlight instead)
   const filteredCategoryIds = useMemo(() => {
-    const q = search.trim().toLowerCase()
+    if (!showOnlyFilled) return undefined
     const ids = new Set<string>()
     for (const c of categories) {
-      let pass = true
-      if (q) {
-        const nameMatch = c.name.toLowerCase().includes(q)
-        const noteMatch = c.note?.toLowerCase().includes(q) ?? false
-        if (!nameMatch && !noteMatch) pass = false
-      }
-      if (pass) ids.add(c.id)
-    }
-    if (showOnlyFilled) {
-      const filled = new Set<string>()
-      for (const id of ids) {
-        if (txByCat[id]) filled.add(id)
-      }
-      return filled
+      if (txByCat[c.id]) ids.add(c.id)
     }
     return ids
   }, [categories, search, showOnlyFilled, txByCat])
 
   // Build the recursive group tree (filtered by search)
   const groupTree = useMemo(() => {
-    const filterSet = (search.trim() || showOnlyFilled) ? filteredCategoryIds : undefined
+    const filterSet = showOnlyFilled ? filteredCategoryIds : undefined
     return buildGroupTree(categories, subgroups, labels, topGroups, filterSet)
   }, [categories, subgroups, labels, filteredCategoryIds, search, showOnlyFilled])
 
@@ -449,7 +438,14 @@ export default function Home() {
   }
 
   async function handleDeleteCategory(cat: Category) {
-    if (!confirm(`Remover a categoria "${cat.name}"? Todas as transações associadas também serão removidas.`)) return
+    const hasTx = transactions.some((t) => t.categoryId === cat.id)
+    let msg = `Remover a categoria "${cat.name}"?`
+    if (hasTx) {
+      msg += `\n\nEsta categoria tem transações associadas.\nDeseja remover também todos os valores?`
+      if (!confirm(msg)) return
+    } else {
+      if (!confirm(msg)) return
+    }
     const prevCat = { ...cat }
     try {
       await deleteCategory(cat.id, user)
@@ -681,8 +677,10 @@ export default function Home() {
     try {
       await history.undo()
       toast.success('Ação desfeita')
-      // Reload to ensure UI is in sync with DB after undo
-      setTimeout(() => location.reload(), 500)
+      // Trigger a full data reload via the hook
+      window.dispatchEvent(new CustomEvent('finance:patch', {
+        detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+      }))
     } catch (e: any) { toast.error(e.message || 'Erro ao desfazer') }
   }
 
@@ -690,7 +688,9 @@ export default function Home() {
     try {
       await history.redo()
       toast.success('Ação refeita')
-      setTimeout(() => location.reload(), 500)
+      window.dispatchEvent(new CustomEvent('finance:patch', {
+        detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+      }))
     } catch (e: any) { toast.error(e.message || 'Erro ao refazer') }
   }
 
@@ -980,7 +980,6 @@ export default function Home() {
               onDeleteSubgroup={handleDeleteSubgroup}
               onMoveCategory={(cat) => setMoveTarget(cat)}
               onReorder={async (catId, direction) => {
-                // Find the category and its siblings
                 const cat = categories.find((c) => c.id === catId)
                 if (!cat) return
                 const siblings = categories
@@ -991,17 +990,47 @@ export default function Home() {
                 const swapIdx = direction === 'up' ? idx - 1 : idx + 1
                 if (swapIdx < 0 || swapIdx >= siblings.length) return
                 const swapCat = siblings[swapIdx]
-                // Swap sortOrder
                 const items = [
                   { id: catId, sortOrder: swapCat.sortOrder },
                   { id: swapCat.id, sortOrder: cat.sortOrder },
                 ]
                 try {
                   await reorderCategories(items)
-                  // Reload to reflect changes
-                  setTimeout(() => location.reload(), 300)
+                  // Re-fetch data instead of reloading
+                  const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
+                  if (r.ok) {
+                    const data = await r.json()
+                    window.dispatchEvent(new CustomEvent('finance:patch', {
+                      detail: { type: 'category', action: 'update', payload: { category: data.categories }, by: { name: user, color: USER_COLOR }, at: Date.now() }
+                    }))
+                  }
                 } catch (e: any) {
                   toast.error(e.message || 'Erro ao reordenar')
+                }
+              }}
+              onReorderTopGroup={async (key, direction) => {
+                const sorted = [...topGroups].sort((a, b) => a.sortOrder - b.sortOrder)
+                const idx = sorted.findIndex((t) => t.key === key)
+                if (idx === -1) return
+                const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+                if (swapIdx < 0 || swapIdx >= sorted.length) return
+                const swapTg = sorted[swapIdx]
+                const items = [
+                  { id: sorted[idx].id, sortOrder: swapTg.sortOrder },
+                  { id: swapTg.id, sortOrder: sorted[idx].sortOrder },
+                ]
+                try {
+                  await reorderTopGroups(items)
+                  const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
+                  if (r.ok) {
+                    const data = await r.json()
+                    window.dispatchEvent(new CustomEvent('finance:patch', {
+                      detail: { type: 'config', action: 'update', payload: { key: 'topGroups', value: '' }, by: { name: user, color: USER_COLOR }, at: Date.now() }
+                    }))
+                  }
+                  toast.success('Card reordenado')
+                } catch (e: any) {
+                  toast.error(e.message || 'Erro ao reordenar card')
                 }
               }}
               onColorChange={async (node, color) => {
@@ -1025,7 +1054,7 @@ export default function Home() {
                   if (data.topGroups) {
                     // The hook will re-render with new topGroups
                   }
-                  toast.success("Cor atualizada"); setTimeout(() => location.reload(), 500)
+                  toast.success("Cor atualizada"); window.dispatchEvent(new CustomEvent("finance:patch", { detail: { type: "reload", action: "update", payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() } }))
                 } catch (e: any) {
                   toast.error(e.message || 'Erro ao mudar cor')
                 }
@@ -1040,7 +1069,7 @@ export default function Home() {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: tg.id, user }),
                   })
-                  toast.success(`Card "${node.label}" removido`); setTimeout(() => location.reload(), 500)
+                  toast.success(`Card "${node.label}" removido`); window.dispatchEvent(new CustomEvent("finance:patch", { detail: { type: "reload", action: "update", payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() } }))
                   // Reload data
                   const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
                   const data = await r.json()
@@ -1250,7 +1279,7 @@ export default function Home() {
             })
             if (!r.ok) throw new Error('Falha')
             toast.success(`Card "${name}" criado`)
-            setTimeout(() => location.reload(), 500)
+            window.dispatchEvent(new CustomEvent("finance:patch", { detail: { type: "reload", action: "update", payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() } }))
           } catch (e: any) {
             toast.error(e.message || 'Erro ao criar card')
           }

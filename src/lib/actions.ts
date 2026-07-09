@@ -236,3 +236,12 @@ export async function reorderCategories(items: { id: string; sortOrder: number }
   })
   if (!r.ok) throw new Error('Falha ao reordenar')
 }
+
+export async function reorderTopGroups(items: { id: string; sortOrder: number }[]): Promise<void> {
+  const r = await fetch('/api/topgroups/reorder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!r.ok) throw new Error('Falha ao reordenar cards')
+}
