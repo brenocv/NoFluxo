@@ -107,22 +107,9 @@ export function GroupNode(props: Props) {
 
   function handleHeaderPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement
-    // Don't start drag if user pressed on explicit no-drag zones, inputs, popovers, or links.
-    if (target.closest('[data-no-drag], input, a, [data-radix-popper-content-wrapper]')) return
-    // Check if the click is on one of the small action buttons in the right side
-    // (these have specific aria-labels). The big expand button (with label) is the drag area.
-    const actionBtn = target.closest('button')
-    if (actionBtn) {
-      const label = actionBtn.getAttribute('aria-label') || ''
-      const isAction =
-        label === 'Mudar cor' || label === 'Renomear' ||
-        label === 'Novo grupo' || label === 'Nova categoria' ||
-        label === 'Remover' || label === 'Remover card' ||
-        label === 'Adicionar item' || label === 'Adicionar sub-item' ||
-        label === 'Mover' || label === 'Parar recorrência' ||
-        label === 'Subir card' || label === 'Descer card'
-      if (isAction) return
-    }
+    // Drag starts ONLY when the user presses on the grip handle (6 dots on the left).
+    // The rest of the row is free for clicks (expand, edit, etc.).
+    if (!target.closest('[data-drag-handle]')) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
 
     const startX = e.clientX
@@ -220,8 +207,6 @@ export function GroupNode(props: Props) {
         )}
         style={{
           background: alpha(color, isTopLevel ? 0.14 : 0.06),
-          cursor: 'grab',
-          touchAction: 'none',
         }}
       >
         {/* Drop indicators */}
@@ -232,14 +217,18 @@ export function GroupNode(props: Props) {
           <div className="absolute left-0 right-0 bottom-0 h-0.5 bg-primary z-20" style={{ boxShadow: '0 0 0 1px rgba(0,0,0,0.1)' }} />
         )}
 
+        {/* Drag handle (6 dots) — only this area starts a drag */}
+        <span
+          className="text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing touch-none py-1"
+          data-drag-handle
+          aria-hidden="true"
+        >
+          <GripVertical className="h-4 w-4" />
+        </span>
         <button
           onClick={() => setUserOpen(!userOpen)}
           className="flex items-center gap-2 flex-1 touch-manipulation min-w-0"
         >
-          {/* Drag handle (visual cue) */}
-          <span className="text-muted-foreground/40 hover:text-muted-foreground flex-shrink-0" data-no-drag>
-            <GripVertical className="h-4 w-4" />
-          </span>
           {/* Expand/collapse chevron */}
           {open
             ? <ChevronDown className="h-4 w-4 flex-shrink-0" style={{ color }} />
@@ -413,7 +402,8 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
 
   function handlePointerDown(e: React.PointerEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement
-    if (target.closest('button, input, [role="button"], a, [data-no-drag]')) return
+    // Drag starts ONLY when the user presses on the grip handle (6 dots on the left).
+    if (!target.closest('[data-drag-handle]')) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
 
     const startX = e.clientX
@@ -493,8 +483,6 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           paddingLeft: indent + 'px',
           borderLeft: '2px solid ' + alpha(color, 0.15),
           background: isHighlighted ? 'rgba(250, 204, 21, 0.25)' : isBeingDragged ? 'rgba(0,0,0,0.04)' : undefined,
-          cursor: 'grab',
-          touchAction: 'none',
         }}
       >
         {dropPosition === 'before' && (
@@ -505,7 +493,11 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         )}
 
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
-          <span className="text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0" data-no-drag>
+          <span
+            className="text-muted-foreground/40 group-hover:text-muted-foreground flex-shrink-0 cursor-grab active:cursor-grabbing touch-none"
+            data-drag-handle
+            aria-hidden="true"
+          >
             <GripVertical className="h-3.5 w-3.5" />
           </span>
           {hasChildren ? (

@@ -516,3 +516,29 @@ Stage Summary:
 - Ícones de ação ocupam linha própria e quebram naturalmente (flex-wrap)
 - Exportar Excel não sumiu — movido para Configurações
 - Lint limpo
+
+---
+Task ID: v20
+Agent: super-z (main)
+Task: Drag-and-drop só inicia ao clicar no grip handle (6 pontinhos) — não em qualquer área da linha.
+
+Work Log:
+- handleHeaderPointerDown e handlePointerDown (category) alterados:
+  - Antes: `if (target.closest('button, input, ...')) return` — arrastava de qualquer lugar que não fosse um botão
+  - Agora: `if (!target.closest('[data-drag-handle]')) return` — só arrasta do grip
+- GripVertical span alterado de `data-no-drag` para `data-drag-handle`
+  - Adicionadas classes: cursor-grab, active:cursor-grabbing, touch-none
+  - aria-hidden="true" para acessibilidade
+- Grip do header movido PARA FORA do botão expand/colapsar (era filho, agora é irmão)
+  - Antes: o grip estava dentro do <button onClick={toggle}>, então clicar no grip também expandia/recolhia
+  - Agora: o grip é um <span> independente antes do <button>
+- Removidos cursor:'grab' e touchAction:'none' do estilo da linha/header inteira
+  - Agora só o grip tem cursor-grab e touch-none
+- O restante da linha (label, ícones, valor) é livre para cliques sem iniciar drag
+
+Stage Summary:
+- Drag inicia APENAS ao pressionar no ícone de 6 pontinhos (GripVertical) na esquerda
+- Clicar no nome, valor, botões de ação NÃO inicia drag
+- Grip tem cursor-grab para indicar visualmente que é arrastável
+- Testado: categoria (Santander Kiki movida via grip ✓), subgrupo (Cartões BR movido via grip ✓)
+- Lint limpo
