@@ -577,3 +577,41 @@ Stage Summary:
 - Sem reticências cortando o texto no meio
 - Total value no mobile mostra apenas BRL (EUR oculto) para economizar espaço
 - Lint limpo
+
+---
+Task ID: v22
+Agent: super-z (main)
+Task: Mover badge Online/Offline para a linha dos ícones; corrigir sobreposição do lápis com informações no mobile.
+
+Work Log:
+1. Badge Online/Offline movido:
+  - Antes: na linha do título (junto com "Porto 2026 • Controle financeiro • 2026")
+  - Agora: no final da linha de ícones, com `ml-auto` (empurrado para a direita)
+  - Altura alterada de h-6 para h-8 (mesma altura dos botões de ícone)
+  - No mobile mostra "Online", no desktop "Sincronizando"
+
+2. Sobreposição do lápis (RenameButton) com informações:
+  - Causa: `min-w-[80px]` no label forçava largura mínima de 80px mesmo quando não havia espaço, empurrando o label por cima dos botões de ação
+  - Correção 1: `min-w-[80px]` → `min-w-0` (permite encolher conforme necessário)
+  - Correção 2: Total value movido de volta PARA DENTRO do div de ações (era separado)
+    - Assim o div de ações (flex-shrink-0) inclui botões + valor total, formando uma unidade
+  - Correção 3: Botões de ação com padding menor no mobile: `p-1 sm:p-1.5` (era `p-1.5` fixo)
+  - Correção 4: Total value com texto menor no mobile: `text-xs sm:text-sm` (era `text-sm` fixo)
+  - Correção 5: ColorButton (mudar cor do card) oculto no mobile: `hidden sm:block`
+    - Ainda acessível no desktop; no mobile o card usa a cor padrão
+
+3. Resultado verificado via agent-browser:
+  - 0 sobreposições em 3 top-level cards (Despesas, Rendimentos, Reservas)
+  - 0 sobreposições em 12 subgrupos
+  - 0 sobreposições em 29 linhas de categoria
+  - "Despesas" agora tem 86px (1 linha), antes tinha 34px (2 linhas apertadas)
+  - "Rendimentos" tem 97px (2 linhas, legível)
+  - Largura do div de ações reduziu de 202px para 150px (no card Despesas)
+
+Stage Summary:
+- Badge Online/Offline agora está na linha dos ícones do menu (não mais no título)
+- Lápis (rename) e outros botões de ação não sobrepõem mais o nome no mobile
+- ColorButton oculto no mobile para economizar espaço (disponível no desktop)
+- Padding dos botões menor no mobile (p-1 vs p-1.5)
+- Total value menor no mobile (text-xs vs text-sm)
+- Lint limpo

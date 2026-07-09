@@ -1005,13 +1005,6 @@ export default function Home() {
                 {workbookName || 'Porto 2026'} <span className="text-muted-foreground font-normal">• Controle financeiro • {year}</span>
               </h1>
             </div>
-            <Badge variant="outline" className={cn(
-              'gap-1 px-1.5 py-0 h-6 text-[10px] flex-shrink-0',
-              live.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
-            )}>
-              {live.connected ? <><Wifi className="h-3 w-3" /><span className="hidden sm:inline">Sincronizando</span><span className="sm:hidden">Online</span></>
-                : <><WifiOff className="h-3 w-3" /><span>Offline</span></>}
-            </Badge>
           </button>
           {/* Icons row — wraps naturally on small screens */}
           <div className="flex items-center gap-1 flex-wrap">
@@ -1051,6 +1044,14 @@ export default function Home() {
               <Settings className="h-4 w-4" />
             </Button>
             <ThemeToggle />
+            {/* Online/Offline status — at the end of icons row */}
+            <Badge variant="outline" className={cn(
+              'gap-1 px-1.5 h-8 text-[10px] flex-shrink-0 ml-auto',
+              live.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
+            )}>
+              {live.connected ? <><Wifi className="h-3 w-3" /><span className="hidden sm:inline">Sincronizando</span><span className="sm:hidden">Online</span></>
+                : <><WifiOff className="h-3 w-3" /><span>Offline</span></>}
+            </Badge>
           </div>
         </div>
       </header>

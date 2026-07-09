@@ -238,7 +238,7 @@ export function GroupNode(props: Props) {
           <BlockIcon className={cn('flex-shrink-0', isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5')} style={{ color }} />
           {/* Label — wraps to 2 lines on small screens instead of truncating */}
           <div
-            className={cn('flex-1 min-w-[80px] overflow-hidden break-words leading-tight', isTopLevel ? 'font-bold text-sm max-h-[2.5rem]' : 'font-medium text-[13px] max-h-[2.25rem]')}
+            className={cn('flex-1 min-w-0 overflow-hidden break-words leading-tight', isTopLevel ? 'font-bold text-sm max-h-[2.5rem]' : 'font-medium text-[13px] max-h-[2.25rem]')}
             style={{ color }}
           >
             {node.label}
@@ -252,7 +252,9 @@ export function GroupNode(props: Props) {
         </button>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {isTopLevel && props.onColorChange && (
-            <ColorButton currentColor={color} onColorChange={(c) => props.onColorChange!(node, c)} />
+            <div className="hidden sm:block">
+              <ColorButton currentColor={color} onColorChange={(c) => props.onColorChange!(node, c)} />
+            </div>
           )}
           <RenameButton
             currentLabel={node.label}
@@ -262,7 +264,7 @@ export function GroupNode(props: Props) {
           {/* + button: top-level creates subgroup (card), subgroup creates category (row) */}
           <button
             onClick={(e) => { e.stopPropagation(); if (isTopLevel) { props.onAddSubgroup(node.key) } else { props.onAddCategory(node.key, null) } }}
-            className="p-1.5 rounded-md hover:bg-black/10 transition-colors touch-manipulation"
+            className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 transition-colors touch-manipulation"
             aria-label={isTopLevel ? 'Novo grupo' : 'Nova categoria'}
             title={isTopLevel ? 'Criar grupo aqui (como Cartões BR)' : 'Adicionar categoria aqui'}
             style={{ color }}
@@ -272,7 +274,7 @@ export function GroupNode(props: Props) {
           {!isTopLevel && (
             <button
               onClick={(e) => { e.stopPropagation(); props.onDeleteSubgroup(node) }}
-              className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
+              className="p-1 sm:p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
               aria-label="Remover"
             >
               <Trash2 className="h-3.5 w-3.5" />
@@ -281,20 +283,20 @@ export function GroupNode(props: Props) {
           {isTopLevel && !node.isDefaultTop && props.onDeleteTopGroup && (
             <button
               onClick={(e) => { e.stopPropagation(); props.onDeleteTopGroup!(node) }}
-              className="p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
+              className="p-1 sm:p-1.5 rounded-md hover:bg-destructive/10 hover:text-destructive transition-colors touch-manipulation"
               aria-label="Remover card"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </button>
           )}
-        </div>
-        {/* Total value — separate from action buttons so label has room */}
-        <span className="text-sm font-semibold tabular-nums ml-1 text-right" style={{ color }}>
-          {totalSign}{formatMoney(Math.abs(total), 'BRL')}
-          <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
-            ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+          {/* Total value — inside actions div so the whole group is flex-shrink-0 */}
+          <span className="text-xs sm:text-sm font-semibold tabular-nums ml-0.5 sm:ml-1 text-right" style={{ color }}>
+            {totalSign}{formatMoney(Math.abs(total), 'BRL')}
+            <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
+              ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+            </span>
           </span>
-        </span>
+        </div>
       </div>
 
       {/* Body */}
