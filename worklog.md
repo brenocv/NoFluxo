@@ -713,3 +713,55 @@ Stage Summary:
 - Nomes de categorias não são mais cortados (crescem naturalmente)
 - Editor não abre com teclado — usuário precisa tocar no campo para digitar
 - Lint limpo
+
+---
+Task ID: v25
+Agent: super-z (main)
+Task: Valores a receber sem nome, merge de subgrupos via drag (2s), "+" vira quick add, FolderPlus para criar subgrupos, quick add com novo subgrupo inline, remover botão categoria do footer.
+
+Work Log:
+1. Valores a receber sem nome:
+   - Em CategoryNodeRow: se category.group === 'rendimentos.valores_a_receber', esconde o nome
+   - Mostra apenas o badge "a receber" em amarelo (com ícone Clock)
+   - Também esconde a nota para receivables
+
+2. Merge de subgrupos via drag (2 segundos):
+   - Em handleHeaderPointerDown: adicionado mergeTimer + lastMergeTarget
+   - Quando arrasta um subgrupo sobre outro por 2+ segundos, dispara onMergeSubgroups
+   - Novo componente MergeSubgroupsDialog: pede o nome do novo grupo pai
+   - handleMergeSubgroups em page.tsx:
+     - Cria novo subgrupo sob o mesmo parentKey dos dois originais
+     - PATCH /api/subgroups para mudar parentKey dos dois subgrupos para o novo
+     - Reload da árvore
+   - Nova API PATCH /api/subgroups: atualiza parentKey (com validação anti-ciclo)
+
+3. "+" dos subgrupos vira quick add:
+   - Antes: "+" no subgrupo chamava onAddCategory (abria CategoryEditor)
+   - Agora: chama onQuickAdd(group) que abre QuickAddDialog pré-preenchido com aquele grupo
+   - Ícone mudou de Plus para Zap (raio)
+   - Mesma mudança para o "+" das linhas de categoria
+
+4. FolderPlus para criar subgrupos:
+   - Top-level cards: ícone mudou de Plus para FolderPlus
+   - aria-label: "Novo subgrupo" (antes "Novo grupo")
+   - O botão continua chamando onAddSubgroup (abre SubgroupEditor)
+
+5. Quick add com novo subgrupo inline:
+   - Adicionado toggle "Novo subgrupo" (FolderPlus) no campo Grupo
+   - Quando ativado: mostra input para nome do novo subgrupo + seletor de grupo pai (só top-level)
+   - handleQuickAdd atualizado: se newSubgroupName informado, cria subgrupo primeiro, depois cria categoria dentro dele
+   - Props: initialGroup (para pré-preencher quando clicado no Zap de um subgrupo)
+
+6. Botão "+ categoria" removido do footer:
+   - Footer agora tem apenas: [usuário] [atualizar] ... [valor rápido]
+   - Criação de categorias agora é sempre via Quick Add (que cria categoria + valor em um passo)
+
+Stage Summary:
+- Receivables mostram apenas badge "a receber" (sem nome)
+- Drag de subgrupo por 2s sobre outro → dialog para agrupar (cria novo pai)
+- "+" em subgrupos e categorias abre Quick Add (Zap)
+- Top-level cards usam FolderPlus para criar subgrupos
+- Quick Add tem opção de criar novo subgrupo inline
+- Footer simplificado: só Atualizar + Valor rápido
+- Nova API PATCH /api/subgroups para mudar parentKey
+- Lint limpo, 0 erros no browser

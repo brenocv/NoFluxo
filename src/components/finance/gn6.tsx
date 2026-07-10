@@ -14,7 +14,7 @@ import {
 } from '@/lib/finance'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
-  AlertTriangle, RefreshCw, Check, FolderPlus,
+  AlertTriangle, RefreshCw, Check, FolderPlus, Zap,
   TrendingUp, TrendingDown, PiggyBank, GripVertical,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType } from './category-dnd'
@@ -40,6 +40,8 @@ interface Props {
   onDropTopGroup?: (draggedKey: string, targetKey: string, position: 'before' | 'after') => void
   onColorChange?: (node: GroupTreeNode, color: string) => void
   onDeleteTopGroup?: (node: GroupTreeNode) => void
+  onQuickAdd?: (group: string) => void
+  onMergeSubgroups?: (draggedKey: string, targetKey: string) => void
 }
 
 // Fixed colors per block type
@@ -107,20 +109,25 @@ export function GroupNode(props: Props) {
 
   function handleHeaderPointerDown(e: React.PointerEvent<HTMLDivElement>) {
     const target = e.target as HTMLElement
-    // Drag starts ONLY when the user presses on the grip handle (6 dots on the left).
-    // The rest of the row is free for clicks (expand, edit, etc.).
     if (!target.closest('[data-drag-handle]')) return
     if (e.pointerType === 'mouse' && e.button !== 0) return
 
     const startX = e.clientX
     const startY = e.clientY
     const rowEl = e.currentTarget
-    // Find the entire Card element (the dragged entity) so we can hide it from
-    // elementFromPoint during drag — otherwise the pointer will keep matching
-    // the dragged card's own body instead of the drop target.
     const cardEl = rowEl.closest('[class*="overflow-hidden"]') as HTMLElement | null
     const rect = rowEl.getBoundingClientRect()
     let dragging = false
+    let mergeTimer: ReturnType<typeof setTimeout> | null = null
+    let lastMergeTarget: string | null = null
+
+    const clearMergeTimer = () => {
+      if (mergeTimer) {
+        clearTimeout(mergeTimer)
+        mergeTimer = null
+      }
+      lastMergeTarget = null
+    }
 
     const handleMove = (ev: PointerEvent) => {
       const dx = Math.abs(ev.clientX - startX)
@@ -144,23 +151,47 @@ export function GroupNode(props: Props) {
       if (dragging) {
         ev.preventDefault()
         dnd.move(ev.clientX, ev.clientY)
-        // Hide the entire dragged Card so elementFromPoint can see through it
         if (cardEl) cardEl.style.pointerEvents = 'none'
         const el = document.elementFromPoint(ev.clientX, ev.clientY)
         if (cardEl) cardEl.style.pointerEvents = ''
         const attrName = ATTR_BY_TYPE[dragType]
         const targetEl = el?.closest(`[${attrName}]`) as HTMLElement | null
         if (targetEl && targetEl.getAttribute(attrName) !== dragId) {
+          const targetKey = targetEl.getAttribute(attrName)!
           const targetRect = targetEl.getBoundingClientRect()
           const isAbove = ev.clientY < targetRect.top + targetRect.height / 2
-          dnd.setTarget(targetEl.getAttribute(attrName), isAbove ? 'before' : 'after')
+          dnd.setTarget(targetKey, isAbove ? 'before' : 'after')
+
+          // Merge detection: if hovering over the SAME subgroup target for 2 seconds,
+          // trigger the merge dialog. Only for subgroups (not topgroups).
+          if (dragType === 'subgroup' && props.onMergeSubgroups) {
+            if (targetKey !== lastMergeTarget) {
+              clearMergeTimer()
+              lastMergeTarget = targetKey
+              mergeTimer = setTimeout(() => {
+                // Trigger merge
+                const result = dnd.end()
+                clearMergeTimer()
+                document.body.style.overflow = ''
+                document.body.style.touchAction = ''
+                window.removeEventListener('pointermove', handleMove)
+                window.removeEventListener('pointerup', handleUp)
+                window.removeEventListener('pointercancel', handleUp)
+                if (result) {
+                  props.onMergeSubgroups!(dragId, targetKey)
+                }
+              }, 2000)
+            }
+          }
         } else {
           dnd.setTarget(null, null)
+          clearMergeTimer()
         }
       }
     }
 
     const handleUp = (ev?: PointerEvent) => {
+      clearMergeTimer()
       window.removeEventListener('pointermove', handleMove)
       window.removeEventListener('pointerup', handleUp)
       window.removeEventListener('pointercancel', handleUp)
@@ -249,15 +280,24 @@ export function GroupNode(props: Props) {
           onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
           small={!isTopLevel}
         />
-        {/* + button: top-level creates subgroup (card), subgroup creates category (row) */}
+        {/* + button: top-level creates subgroup (FolderPlus), subgroup opens quick add (Zap) */}
         <button
-          onClick={(e) => { e.stopPropagation(); if (isTopLevel) { props.onAddSubgroup(node.key) } else { props.onAddCategory(node.key, null) } }}
+          onClick={(e) => {
+            e.stopPropagation()
+            if (isTopLevel) {
+              props.onAddSubgroup(node.key)
+            } else if (props.onQuickAdd) {
+              props.onQuickAdd(node.key)
+            } else {
+              props.onAddCategory(node.key, null)
+            }
+          }}
           className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors touch-manipulation"
-          aria-label={isTopLevel ? 'Novo grupo' : 'Nova categoria'}
-          title={isTopLevel ? 'Criar grupo aqui (como Cartões BR)' : 'Adicionar categoria aqui'}
+          aria-label={isTopLevel ? 'Novo subgrupo' : 'Adicionar valor'}
+          title={isTopLevel ? 'Criar subgrupo aqui' : 'Adicionar valor rápido aqui'}
           style={{ color }}
         >
-          <Plus className="h-4 w-4" />
+          {isTopLevel ? <FolderPlus className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
         </button>
         {!isTopLevel && (
           <button
@@ -551,7 +591,15 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             className="flex flex-col items-start text-left touch-manipulation min-w-0 flex-1"
           >
             <span className="text-[13px] font-medium text-foreground flex items-start gap-1 flex-wrap min-w-0 w-full">
-              <div className="break-words leading-tight flex-1 min-w-0">{category.name}</div>
+              {/* Hide name for receivables — show only the "a receber" badge */}
+              {category.group !== 'rendimentos.valores_a_receber' && (
+                <div className="break-words leading-tight flex-1 min-w-0">{category.name}</div>
+              )}
+              {category.group === 'rendimentos.valores_a_receber' && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                  <Clock className="h-2.5 w-2.5" />a receber
+                </span>
+              )}
               {isRecurring && (
                 <span className="inline-flex items-center gap-0.5 text-[9px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 px-1 py-0.5 rounded flex-shrink-0">
                   <RefreshCw className="h-2 w-2" />{installmentsTotal ? installmentNumber + '/' + installmentsTotal : 'recorrente'}
@@ -564,12 +612,24 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
               )}
               {hasChildren && <span className="text-[9px] text-muted-foreground flex-shrink-0">({children.length})</span>}
             </span>
-            {category.note && <span className="text-xs text-muted-foreground truncate max-w-[180px]">{category.note}</span>}
+            {category.note && category.group !== 'rendimentos.valores_a_receber' && <span className="text-xs text-muted-foreground truncate max-w-[180px]">{category.note}</span>}
           </button>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
-          <button onClick={(e) => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }} className="p-1 sm:p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation" aria-label="Adicionar sub-item" title="Adicionar sub-item">
-            <Plus className="h-3 w-3" style={{ color }} />
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              if (allProps.onQuickAdd) {
+                allProps.onQuickAdd(category.group)
+              } else {
+                allProps.onAddCategory(category.group, category.id)
+              }
+            }}
+            className="p-1 sm:p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation"
+            aria-label="Adicionar valor"
+            title="Adicionar valor rápido"
+          >
+            <Zap className="h-3 w-3" style={{ color }} />
           </button>
           {isRecurring && (
             <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1 sm:p-1.5 rounded-md hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">

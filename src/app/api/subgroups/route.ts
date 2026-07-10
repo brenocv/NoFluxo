@@ -154,3 +154,48 @@ function collectDescendants(parentKey: string, all: { key: string; parentKey: st
   }
   return result
 }
+
+// PATCH /api/subgroups
+//   body: { key, parentKey, workbookId, user }
+//   Updates the parentKey of a subgroup (used for merge/grouping).
+export async function PATCH(req: NextRequest) {
+  const body = await req.json().catch(() => null)
+  if (!body || !body.key || !body.parentKey || !body.workbookId) {
+    return NextResponse.json({ error: 'key, parentKey and workbookId are required' }, { status: 400 })
+  }
+  const user = String(body.user || 'Anônimo').slice(0, 30)
+  const key = String(body.key)
+  const newParentKey = String(body.parentKey)
+  const wbid = String(body.workbookId)
+
+  const sg = await db.subgroup.findFirst({ where: { key, workbookId: wbid } })
+  if (!sg) return NextResponse.json({ error: 'subgroup not found' }, { status: 404 })
+
+  // Validate new parent exists
+  const isTopGroup = await db.topGroup.findFirst({ where: { key: newParentKey, workbookId: wbid } })
+  const isSubgroup = await db.subgroup.findFirst({ where: { key: newParentKey, workbookId: wbid } })
+  if (!isTopGroup && !isSubgroup) {
+    return NextResponse.json({ error: 'parentKey inválido' }, { status: 400 })
+  }
+
+  // Prevent making a subgroup a child of itself or its descendants
+  if (key === newParentKey) {
+    return NextResponse.json({ error: 'Não é possível mover um subgrupo para dentro de si mesmo' }, { status: 400 })
+  }
+  const allSubgroups = await db.subgroup.findMany({ where: { workbookId: wbid } })
+  const descendants = collectDescendants(key, allSubgroups)
+  if (descendants.includes(newParentKey)) {
+    return NextResponse.json({ error: 'Não é possível mover um subgrupo para dentro de um de seus descendentes' }, { status: 400 })
+  }
+
+  const updated = await db.subgroup.update({
+    where: { id: sg.id },
+    data: { parentKey: newParentKey },
+  })
+
+  await db.activityLog.create({
+    data: { user, action: 'update', entity: 'subgroup', detail: 'Moveu subgrupo "' + sg.name + '"' },
+  })
+
+  return NextResponse.json({ ok: true, subgroup: updated })
+}

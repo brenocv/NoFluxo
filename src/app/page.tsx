@@ -55,6 +55,7 @@ import { AnnualDashboard } from '@/components/finance/annual-dashboard'
 import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
 import { DeleteSubgroupDialog } from '@/components/finance/delete-subgroup-dialog'
 import { QuickAddDialog } from '@/components/finance/quick-add-dialog'
+import { MergeSubgroupsDialog } from '@/components/finance/merge-subgroups-dialog'
 import { BackupDialog } from '@/components/finance/backup-dialog'
 import { ImportStatementDialog } from '@/components/finance/import-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
@@ -99,6 +100,11 @@ export default function Home() {
   const [moveTarget, setMoveTarget] = useState<Category | null>(null)
   const [pendingDeleteSubgroup, setPendingDeleteSubgroup] = useState<GroupTreeNode | null>(null)
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [quickAddInitialGroup, setQuickAddInitialGroup] = useState<string | undefined>(undefined)
+  const [mergeTarget, setMergeTarget] = useState<{
+    draggedKey: string; targetKey: string; draggedLabel: string; targetLabel: string
+    parentKey: string; parentLabel: string
+  } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
@@ -449,12 +455,23 @@ export default function Home() {
   async function handleQuickAdd(args: {
     name: string; value: number; currency: Currency; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
     group: string; note?: string; isRecurring: boolean; installmentsTotal?: number | null
+    newSubgroupName?: string
   }) {
     try {
+      // 0. If creating a new subgroup, create it first
+      let finalGroup = args.group
+      if (args.newSubgroupName) {
+        const sgRes = await createSubgroup(args.group, args.newSubgroupName, user, workbookId)
+        dispatchChange('subgroup', 'create', { subgroup: sgRes.subgroup }, `Criou subgrupo "${args.newSubgroupName}"`, {
+          user, action: 'create', entity: 'subgroup', detail: `Criou subgrupo "${args.newSubgroupName}"`, createdAt: new Date().toISOString(),
+        })
+        finalGroup = sgRes.subgroup.key
+      }
+
       // 1. Create the category
       const catRes = await createCategory({
         name: args.name,
-        group: args.group,
+        group: finalGroup,
         type: args.type as any,
         currency: args.currency,
         note: args.note,
@@ -524,6 +541,48 @@ export default function Home() {
       toast.success(`"${args.name}" adicionado`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao adicionar')
+    }
+  }
+
+  async function handleMergeSubgroups(newSubgroupName: string) {
+    if (!mergeTarget) return
+    const { draggedKey, targetKey, parentKey } = mergeTarget
+    try {
+      // 1. Create the new parent subgroup
+      const sgRes = await createSubgroup(parentKey, newSubgroupName, user, workbookId)
+      dispatchChange('subgroup', 'create', { subgroup: sgRes.subgroup }, `Criou subgrupo "${newSubgroupName}"`, {
+        user, action: 'create', entity: 'subgroup', detail: `Criou subgrupo "${newSubgroupName}"`, createdAt: new Date().toISOString(),
+      })
+      const newParentKey = sgRes.subgroup.key
+
+      // 2. Move both dragged and target subgroups inside the new parent
+      // Update each subgroup's parentKey via the API
+      for (const key of [draggedKey, targetKey]) {
+        const sg = subgroups.find((s) => s.key === key)
+        if (!sg) continue
+        // Update parentKey by calling the subgroups API PATCH (or a direct update)
+        // Since there's no PATCH endpoint for subgroups, we'll use a direct approach:
+        // Delete + recreate with new parentKey. But that changes the key.
+        // Better: add a PATCH endpoint. For now, use the reorder approach with a custom call.
+        await fetch('/api/subgroups', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, parentKey: newParentKey, workbookId, user }),
+        })
+      }
+
+      // 3. Reload to get the updated tree
+      window.dispatchEvent(new CustomEvent('finance:patch', {
+        detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+      }))
+      broadcast({
+        type: 'reload', action: 'update', payload: {},
+        detail: `Agrupou subgrupos em "${newSubgroupName}"`,
+      })
+
+      toast.success(`Subgrupos agrupados em "${newSubgroupName}"`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao agrupar subgrupos')
     }
   }
 
@@ -1514,6 +1573,25 @@ export default function Home() {
                   toast.error(e.message || 'Erro ao mover card')
                 }
               }}
+              onQuickAdd={(group) => {
+                setQuickAddInitialGroup(group)
+                setQuickAddOpen(true)
+              }}
+              onMergeSubgroups={(draggedKey, targetKey) => {
+                const dragged = subgroups.find((s) => s.key === draggedKey)
+                const target = subgroups.find((s) => s.key === targetKey)
+                if (!dragged || !target) return
+                const parentKey = dragged.parentKey
+                const parentLabel = getGroupLabel(parentKey, labels, subgroups)
+                setMergeTarget({
+                  draggedKey,
+                  targetKey,
+                  draggedLabel: getGroupLabel(draggedKey, labels, subgroups),
+                  targetLabel: getGroupLabel(targetKey, labels, subgroups),
+                  parentKey,
+                  parentLabel,
+                })
+              }}
               onColorChange={async (node, color) => {
                 try {
                   const tg = topGroups.find((t) => t.key === node.key)
@@ -1615,7 +1693,7 @@ export default function Home() {
             <Button
               size="sm"
               variant="default"
-              onClick={() => setQuickAddOpen(true)}
+              onClick={() => { setQuickAddInitialGroup(undefined); setQuickAddOpen(true) }}
               className="h-9 rounded-full px-3 shadow-sm"
               aria-label="Adicionar valor rápido"
               title="Adicionar valor rápido (despesa, rendimento ou reserva)"
@@ -1623,11 +1701,6 @@ export default function Home() {
               <Zap className="h-4 w-4 mr-1" />
               <span className="hidden sm:inline">Valor rápido</span>
               <span className="sm:hidden">Rápido</span>
-            </Button>
-            <Button size="sm" onClick={() => { setNewCatGroup('despesas.cartoes'); setNewCatParent(null) }} className="h-9">
-              <Plus className="h-4 w-4 mr-1" />
-              <span className="hidden sm:inline">Nova categoria</span>
-              <span className="sm:hidden">Categoria</span>
             </Button>
           </div>
         </div>
@@ -1720,8 +1793,20 @@ export default function Home() {
         subgroups={subgroups}
         topGroups={topGroups}
         labels={labels}
+        initialGroup={quickAddInitialGroup}
         onOpenChange={setQuickAddOpen}
         onCreate={handleQuickAdd}
+      />
+
+      <MergeSubgroupsDialog
+        open={!!mergeTarget}
+        draggedKey={mergeTarget?.draggedKey ?? null}
+        targetKey={mergeTarget?.targetKey ?? null}
+        draggedLabel={mergeTarget?.draggedLabel ?? ''}
+        targetLabel={mergeTarget?.targetLabel ?? ''}
+        parentLabel={mergeTarget?.parentLabel ?? ''}
+        onOpenChange={(o) => !o && setMergeTarget(null)}
+        onConfirm={handleMergeSubgroups}
       />
 
       <BackupDialog
