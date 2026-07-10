@@ -790,3 +790,39 @@ Stage Summary:
 - Categorias sem valor: mostram ícone de nota de dinheiro em vez de "--"
 - 17 Banknote icons, 15 FolderPlus icons, 29 Zap icons (categorias)
 - Lint limpo, 0 erros no browser
+
+---
+Task ID: v27
+Agent: super-z (main)
+Task: Mover desfazer/refazer para footer, voltar Excel no header, FolderPlus nas categorias, "+" no valor vazio.
+
+Work Log:
+1. Desfazer/Refazer movidos do header para o footer:
+   - UndoRedoButtons removido da linha de ícones do header
+   - Adicionado no footer, entre o nome do usuário e o botão Atualizar
+   - Import UndoRedoButtons mantido (ainda usado)
+
+2. Botão Exportar Excel voltou no header:
+   - Adicionado botão com ícone Download entre Backup e Notificações
+   - Import Download re-adicionado aos imports do lucide-react
+   - Chama handleExportExcel (que já existia)
+
+3. FolderPlus nas linhas de categoria (em vez de Zap):
+   - Antes: botão Zap (quick add) nas linhas de categoria
+   - Agora: botão FolderPlus (criar sub-item/sub-categoria)
+   - Chama allProps.onAddCategory(category.group, category.id)
+   - aria-label: "Adicionar sub-item"
+   - Imports Zap e Banknote removidos de gn6.tsx (não usados mais)
+
+4. "+" no valor vazio (em vez de Banknote):
+   - Antes: ícone Banknote quando categoria não tem valor
+   - Agora: ícone Plus (sinal de +)
+   - Classes: h-4 w-4 text-muted-foreground/60 mx-auto
+
+Stage Summary:
+- Header: Copiar, Zerar, Importar, Backup, Exportar Excel, Notificações, Configurações, Theme, Online/Offline
+- Footer: Usuário, Desfazer, Refazer, Atualizar ... Valor rápido
+- Subgrupos: FolderPlus (criar subgrupo dentro)
+- Categorias: FolderPlus (criar sub-item dentro)
+- Valor vazio: ícone "+" (sinal de mais)
+- 0 erros, lint limpo

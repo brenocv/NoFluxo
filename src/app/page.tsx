@@ -69,7 +69,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Copy, Eraser,
-  Database, Bell, BellOff, Upload, RefreshCw, Zap,
+  Database, Bell, BellOff, Upload, RefreshCw, Zap, Download,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -1150,14 +1150,6 @@ export default function Home() {
           </button>
           {/* Icons row — wraps naturally on small screens */}
           <div className="flex items-center gap-1 flex-wrap">
-            <UndoRedoButtons
-              canUndo={history.canUndo}
-              canRedo={history.canRedo}
-              nextUndo={history.nextUndo}
-              nextRedo={history.nextRedo}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-            />
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCopyOpen(true)} aria-label="Copiar mês" title="Copiar valores para outro mês">
               <Copy className="h-4 w-4" />
             </Button>
@@ -1169,6 +1161,9 @@ export default function Home() {
             </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setBackupOpen(true)} aria-label="Backup" title="Backup e restauração">
               <Database className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleExportExcel} aria-label="Exportar Excel" title="Exportar Excel do ano atual">
+              <Download className="h-4 w-4" />
             </Button>
             {notifications.supported && (
               <Button
@@ -1676,6 +1671,15 @@ export default function Home() {
             <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation">
               {user}
             </button>
+            {/* Undo/Redo — always visible */}
+            <UndoRedoButtons
+              canUndo={history.canUndo}
+              canRedo={history.canRedo}
+              nextUndo={history.nextUndo}
+              nextRedo={history.nextRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+            />
             {/* Refresh button — always visible */}
             <Button
               variant="outline"

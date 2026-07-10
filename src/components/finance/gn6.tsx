@@ -14,7 +14,7 @@ import {
 } from '@/lib/finance'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
-  AlertTriangle, RefreshCw, Check, FolderPlus, Zap, Banknote,
+  AlertTriangle, RefreshCw, Check, FolderPlus,
   TrendingUp, TrendingDown, PiggyBank, GripVertical,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType } from './category-dnd'
@@ -611,19 +611,12 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
           <button
-            onClick={(e) => {
-              e.stopPropagation()
-              if (allProps.onQuickAdd) {
-                allProps.onQuickAdd(category.group)
-              } else {
-                allProps.onAddCategory(category.group, category.id)
-              }
-            }}
+            onClick={(e) => { e.stopPropagation(); allProps.onAddCategory(category.group, category.id) }}
             className="p-1 sm:p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation"
-            aria-label="Adicionar valor"
-            title="Adicionar valor rápido"
+            aria-label="Adicionar sub-item"
+            title="Adicionar sub-item"
           >
-            <Zap className="h-3 w-3" style={{ color }} />
+            <FolderPlus className="h-3 w-3" style={{ color }} />
           </button>
           {isRecurring && (
             <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1 sm:p-1.5 rounded-md hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
@@ -632,7 +625,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           )}
           <button onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }} className="px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right">
             {displayValue === null ? (
-              <Banknote className="h-4 w-4 text-muted-foreground/60 mx-auto" />
+              <Plus className="h-4 w-4 text-muted-foreground/60 mx-auto" />
             ) : (
               <div className="flex flex-col items-end leading-tight">
                 <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap" style={{ color }}>
