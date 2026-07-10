@@ -765,3 +765,28 @@ Stage Summary:
 - Footer simplificado: só Atualizar + Valor rápido
 - Nova API PATCH /api/subgroups para mudar parentKey
 - Lint limpo, 0 erros no browser
+
+---
+Task ID: v26
+Agent: super-z (main)
+Task: Subgrupos: "+" vira FolderPlus (criar subgrupo dentro). Valor vazio: "--" vira ícone Banknote.
+
+Work Log:
+1. Botão "+" dos subgrupos agora cria subgrupo (FolderPlus):
+   - Antes: "+" nos subgrupos abria Quick Add (Zap)
+   - Agora: "+" em TODOS os níveis (top-level e subgrupos) usa FolderPlus e cria um novo subgrupo dentro
+   - Top-level: FolderPlus h-4 w-4 (cria subgrupo no card)
+   - Subgrupos: FolderPlus h-3.5 w-3.5 (cria subgrupo aninhado)
+   - Removida a lógica `if (isTopLevel)` — todos chamam props.onAddSubgroup(node.key)
+
+2. Valor vazio: "--" trocado por ícone Banknote:
+   - Antes: quando categoria não tinha valor, mostrava "--" em itálico
+   - Agora: mostra ícone Banknote (nota de dinheiro) do lucide-react
+   - Classes: h-4 w-4 text-muted-foreground/60 mx-auto
+   - Import Banknote adicionado aos imports do lucide-react
+
+Stage Summary:
+- Subgrupos: botão "+" agora é FolderPlus (criar subgrupo dentro dele)
+- Categorias sem valor: mostram ícone de nota de dinheiro em vez de "--"
+- 17 Banknote icons, 15 FolderPlus icons, 29 Zap icons (categorias)
+- Lint limpo, 0 erros no browser

@@ -14,7 +14,7 @@ import {
 } from '@/lib/finance'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
-  AlertTriangle, RefreshCw, Check, FolderPlus, Zap,
+  AlertTriangle, RefreshCw, Check, FolderPlus, Zap, Banknote,
   TrendingUp, TrendingDown, PiggyBank, GripVertical,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType } from './category-dnd'
@@ -280,24 +280,18 @@ export function GroupNode(props: Props) {
           onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
           small={!isTopLevel}
         />
-        {/* + button: top-level creates subgroup (FolderPlus), subgroup opens quick add (Zap) */}
+        {/* + button: creates a new subgroup inside (FolderPlus for both top-level and subgroups) */}
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (isTopLevel) {
-              props.onAddSubgroup(node.key)
-            } else if (props.onQuickAdd) {
-              props.onQuickAdd(node.key)
-            } else {
-              props.onAddCategory(node.key, null)
-            }
+            props.onAddSubgroup(node.key)
           }}
           className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors touch-manipulation"
-          aria-label={isTopLevel ? 'Novo subgrupo' : 'Adicionar valor'}
-          title={isTopLevel ? 'Criar subgrupo aqui' : 'Adicionar valor rápido aqui'}
+          aria-label="Novo subgrupo"
+          title="Criar subgrupo aqui"
           style={{ color }}
         >
-          {isTopLevel ? <FolderPlus className="h-4 w-4" /> : <Zap className="h-4 w-4" />}
+          <FolderPlus className={isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
         </button>
         {!isTopLevel && (
           <button
@@ -638,7 +632,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           )}
           <button onClick={() => { if (isHighlighted) allProps.onClearSearch(); allProps.onEdit(category, tx) }} className="px-1.5 sm:px-2.5 py-1 sm:py-1.5 rounded-md hover:bg-muted transition-colors touch-manipulation text-right">
             {displayValue === null ? (
-              <span className="text-sm font-normal text-muted-foreground italic">--</span>
+              <Banknote className="h-4 w-4 text-muted-foreground/60 mx-auto" />
             ) : (
               <div className="flex flex-col items-end leading-tight">
                 <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap" style={{ color }}>
