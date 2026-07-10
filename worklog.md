@@ -826,3 +826,42 @@ Stage Summary:
 - Categorias: FolderPlus (criar sub-item dentro)
 - Valor vazio: ícone "+" (sinal de mais)
 - 0 erros, lint limpo
+
+---
+Task ID: v28
+Agent: super-z (main)
+Task: Quick Add mostra toda hierarquia (incluindo subitens), FolderPlus em categorias cria sub-item, footer com atualizar+nome e desfazer/refazer centralizado.
+
+Work Log:
+1. Quick Add mostra TODOS os níveis (grupos, subgrupos, categorias, sub-categorias):
+   - Nova função collectAllPaths em finance.ts: percorre topGroups → subgroups → categories → sub-categories
+   - Categorias identificadas por value "cat:<id>" no dropdown
+   - Quando categoria existente selecionada:
+     - Campos Tipo, Nome, Moeda são OCULTOS (usa tipo/moeda da categoria existente)
+     - Mostra mensagem "✓ Adicionando valor a um item existente"
+     - Apenas Valor + Nota + Recorrente são pedidos
+   - handleQuickAdd atualizado: se existingCategoryId, pula criação de categoria e só cria transação
+
+2. FolderPlus em categorias cria sub-item (não categoria):
+   - Novo componente SubItemEditor (sub-item-editor.tsx): dialog simples igual ao SubgroupEditor
+     - Pede apenas o nome
+     - Mostra "dentro de <nome do pai>"
+     - Cria categoria com parentCategoryId = id do pai, herdando group/type/currency
+   - onAddCategory em page.tsx atualizado:
+     - Se parentCategoryId fornecido (veio de categoria) → abre SubItemEditor
+     - Se parentCategoryId nulo (veio de subgrupo) → abre CategoryEditor (form completo)
+   - handleCreateSubItem: cria categoria com parentCategoryId, type e currency herdados do pai
+
+3. Footer reorganizado:
+   - Esquerda: nome do usuário + botão Atualizar (lado a lado)
+   - Centro: Desfazer + Refazer (centralizados com justify-center)
+   - Direita: botão Valor rápido
+   - Layout: flex-1 (esquerda) + centro + flex-1 (direita) para distribuir espaço
+
+Stage Summary:
+- Quick Add: dropdown mostra toda hierarquia até o último subitem (ex: Despesas › Cartões BR › Nubank Breno › Comercio)
+- Selecionar item existente: só pede valor (+nota+recorrente), sem tipo/nome/moeda
+- FolderPlus em categoria: abre dialog simples "Novo sub-item" (cria sub-categoria)
+- FolderPlus em subgrupo: abre CategoryEditor (form completo)
+- Footer: [usuário] [atualizar] ... [desfazer] [refazer] ... [valor rápido]
+- Lint limpo

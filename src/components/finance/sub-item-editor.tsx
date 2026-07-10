@@ -16,17 +16,13 @@ import { FolderPlus } from 'lucide-react'
 
 interface Props {
   open: boolean
-  draggedKey: string | null
-  targetKey: string | null
-  draggedLabel: string
-  targetLabel: string
   parentLabel: string
   onOpenChange: (open: boolean) => void
-  onConfirm: (newSubgroupName: string) => Promise<void>
+  onCreate: (name: string) => Promise<void>
 }
 
-export function MergeSubgroupsDialog({
-  open, draggedKey, targetKey, draggedLabel, targetLabel, parentLabel, onOpenChange, onConfirm,
+export function SubItemEditor({
+  open, parentLabel, onOpenChange, onCreate,
 }: Props) {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -35,13 +31,11 @@ export function MergeSubgroupsDialog({
     if (open) setName('')
   }, [open])
 
-  if (!draggedKey || !targetKey) return null
-
-  async function handleConfirm() {
+  async function handleCreate() {
     if (!name.trim()) return
     setSaving(true)
     try {
-      await onConfirm(name.trim())
+      await onCreate(name.trim())
       onOpenChange(false)
     } finally {
       setSaving(false)
@@ -53,41 +47,40 @@ export function MergeSubgroupsDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <FolderPlus className="h-4 w-4 text-primary" />
-            Agrupar subgrupos
+            <FolderPlus className="h-4 w-4" />
+            Novo sub-item
           </DialogTitle>
+          <p className="text-xs text-muted-foreground">
+            dentro de <strong>{parentLabel}</strong>
+          </p>
           <DialogDescription className="sr-only">
-            Crie um novo subgrupo que conterá "{draggedLabel}" e "{targetLabel}".
+            Crie um novo sub-item dentro de {parentLabel}.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
-          <p className="text-sm text-muted-foreground">
-            Os subgrupos <strong className="text-foreground">{draggedLabel}</strong> e{' '}
-            <strong className="text-foreground">{targetLabel}</strong> serão agrupados dentro de um novo subgrupo em{' '}
-            <strong className="text-foreground">{parentLabel}</strong>.
-          </p>
-
           <div className="space-y-1.5">
-            <Label htmlFor="merge-name">Nome do novo grupo</Label>
+            <Label htmlFor="si-name">Nome do sub-item</Label>
             <Input
-              id="merge-name"
-              type="text"
+              id="si-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Cartões, Mercado, Extras..."
+              placeholder="Ex.: Comercio, Mercado, Extras…"
               autoFocus
-              onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) handleConfirm() }}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
           </div>
+          <p className="text-xs text-muted-foreground">
+            O sub-item herdará o tipo e a moeda do item pai.
+          </p>
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={!name.trim() || saving}>
-            {saving ? 'Agrupando…' : 'Agrupar'}
+          <Button onClick={handleCreate} disabled={!name.trim() || saving}>
+            {saving ? 'Criando…' : 'Criar sub-item'}
           </Button>
         </DialogFooter>
       </DialogContent>

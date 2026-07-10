@@ -56,6 +56,7 @@ import { MoveCategoryDialog } from '@/components/finance/move-category-dialog'
 import { DeleteSubgroupDialog } from '@/components/finance/delete-subgroup-dialog'
 import { QuickAddDialog } from '@/components/finance/quick-add-dialog'
 import { MergeSubgroupsDialog } from '@/components/finance/merge-subgroups-dialog'
+import { SubItemEditor } from '@/components/finance/sub-item-editor'
 import { BackupDialog } from '@/components/finance/backup-dialog'
 import { ImportStatementDialog } from '@/components/finance/import-dialog'
 import { BudgetCard } from '@/components/finance/budget-card'
@@ -105,6 +106,7 @@ export default function Home() {
     draggedKey: string; targetKey: string; draggedLabel: string; targetLabel: string
     parentKey: string; parentLabel: string
   } | null>(null)
+  const [newSubItemParent, setNewSubItemParent] = useState<{ id: string; name: string; group: string; type: string; currency: string } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
@@ -455,9 +457,30 @@ export default function Home() {
   async function handleQuickAdd(args: {
     name: string; value: number; currency: Currency; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
     group: string; note?: string; isRecurring: boolean; installmentsTotal?: number | null
-    newSubgroupName?: string
+    newSubgroupName?: string; existingCategoryId?: string
   }) {
     try {
+      // 0. If adding to an existing category, skip category creation
+      if (args.existingCategoryId) {
+        const txRes = await saveTransaction({
+          categoryId: args.existingCategoryId,
+          month, year,
+          value: args.value,
+          note: args.note ?? null,
+          user,
+          isRecurring: args.isRecurring,
+          installmentsTotal: args.installmentsTotal ?? null,
+        })
+        const txs = txRes.transactions ?? (txRes.transaction ? [txRes.transaction] : [])
+        if (txs.length > 0) {
+          dispatchChange('transaction', txRes.action as any, { transactions: txs }, `Adicionou valor`, {
+            user, action: 'create', entity: 'transaction', detail: `Adicionou valor`, createdAt: new Date().toISOString(),
+          })
+        }
+        toast.success('Valor adicionado')
+        return
+      }
+
       // 0. If creating a new subgroup, create it first
       let finalGroup = args.group
       if (args.newSubgroupName) {
@@ -583,6 +606,28 @@ export default function Home() {
       toast.success(`Subgrupos agrupados em "${newSubgroupName}"`)
     } catch (e: any) {
       toast.error(e.message || 'Erro ao agrupar subgrupos')
+    }
+  }
+
+  async function handleCreateSubItem(name: string) {
+    if (!newSubItemParent) return
+    try {
+      const r = await createCategory({
+        name,
+        group: newSubItemParent.group,
+        type: newSubItemParent.type as any,
+        currency: newSubItemParent.currency as Currency,
+        parentCategoryId: newSubItemParent.id,
+        workbookId,
+        user,
+      })
+      const detail = `Criou sub-item "${r.category.name}"`
+      dispatchChange('category', 'create', { category: r.category }, detail, {
+        user, action: 'create', entity: 'category', detail, createdAt: new Date().toISOString(),
+      })
+      toast.success(`Sub-item "${r.category.name}" criado`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao criar sub-item')
     }
   }
 
@@ -1273,9 +1318,23 @@ export default function Home() {
               onClearSearch={() => setSearch('')}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
               onAddCategory={(grp, parentCategoryId) => {
-                // Always open the CategoryEditor — the + button creates a category
-                setNewCatGroup(grp as CategoryGroup)
-                setNewCatParent(parentCategoryId ?? null)
+                if (parentCategoryId) {
+                  // Clicking FolderPlus on a CATEGORY → open SubItemEditor (simple name dialog)
+                  const parentCat = categories.find((c) => c.id === parentCategoryId)
+                  if (parentCat) {
+                    setNewSubItemParent({
+                      id: parentCat.id,
+                      name: parentCat.name,
+                      group: parentCat.group,
+                      type: parentCat.type,
+                      currency: parentCat.currency,
+                    })
+                  }
+                } else {
+                  // Clicking FolderPlus on a SUBGROUP → open CategoryEditor (full form)
+                  setNewCatGroup(grp as CategoryGroup)
+                  setNewCatParent(null)
+                }
               }}
               onDeleteCategory={handleDeleteCategory}
               onRename={handleRename}
@@ -1666,21 +1725,12 @@ export default function Home() {
 
       <footer className="sticky bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 text-xs">
+          {/* Left: user name + refresh */}
+          <div className="flex items-center gap-1.5 text-xs flex-1">
             <span className="text-muted-foreground hidden sm:inline">Você é</span>
             <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation">
               {user}
             </button>
-            {/* Undo/Redo — always visible */}
-            <UndoRedoButtons
-              canUndo={history.canUndo}
-              canRedo={history.canRedo}
-              nextUndo={history.nextUndo}
-              nextRedo={history.nextRedo}
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-            />
-            {/* Refresh button — always visible */}
             <Button
               variant="outline"
               size="icon"
@@ -1692,8 +1742,19 @@ export default function Home() {
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
-          <div className="flex items-center gap-1.5">
-            {/* Quick add — always visible (FAB-style) */}
+          {/* Center: Undo/Redo */}
+          <div className="flex items-center justify-center">
+            <UndoRedoButtons
+              canUndo={history.canUndo}
+              canRedo={history.canRedo}
+              nextUndo={history.nextUndo}
+              nextRedo={history.nextRedo}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+            />
+          </div>
+          {/* Right: Quick add */}
+          <div className="flex items-center gap-1.5 flex-1 justify-end">
             <Button
               size="sm"
               variant="default"
@@ -1740,6 +1801,13 @@ export default function Home() {
         parentLabel={newSubgroupParent?.label ?? ''}
         onOpenChange={(o) => !o && setNewSubgroupParent(null)}
         onCreate={handleCreateSubgroup}
+      />
+
+      <SubItemEditor
+        open={!!newSubItemParent}
+        parentLabel={newSubItemParent?.name ?? ''}
+        onOpenChange={(o) => !o && setNewSubItemParent(null)}
+        onCreate={handleCreateSubItem}
       />
 
       <SettingsDialog

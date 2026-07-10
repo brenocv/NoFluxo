@@ -338,6 +338,74 @@ function collectUserSubgroups(
   }
 }
 
+// Like collectGroupPaths, but also includes categories (sub-items) as selectable options.
+// Categories are identified by value "cat:<categoryId>". This allows the Quick Add dialog
+// to let the user add a value to any existing category at any depth.
+export function collectAllPaths(
+  userSubgroups: Subgroup[],
+  labels: Record<string, string>,
+  topGroups: TopGroup[],
+  categories: Category[]
+): { value: string; label: string; depth: number }[] {
+  const result: { value: string; label: string; depth: number }[] = []
+  const groups = topGroups
+  for (const tg of groups) {
+    const topLabel = labels[`group:${tg.key}`] ?? tg.name
+    result.push({ value: tg.key, label: topLabel, depth: 0 })
+    collectAllChildren(tg.key, topLabel, topLabel, userSubgroups, labels, categories, 0, result)
+  }
+  return result
+}
+
+function collectAllChildren(
+  parentKey: string,
+  parentPathLabel: string,
+  parentLabel: string,
+  userSubgroups: Subgroup[],
+  labels: Record<string, string>,
+  categories: Category[],
+  depth: number,
+  result: { value: string; label: string; depth: number }[]
+) {
+  // Subgroups under this parent
+  const childSgs = userSubgroups
+    .filter((s) => s.parentKey === parentKey)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  for (const child of childSgs) {
+    const childLabel = getGroupLabel(child.key, labels, userSubgroups)
+    const pathLabel = `${parentPathLabel} › ${childLabel}`
+    result.push({ value: child.key, label: pathLabel, depth: depth + 1 })
+    collectAllChildren(child.key, pathLabel, childLabel, userSubgroups, labels, categories, depth + 1, result)
+  }
+  // Categories directly in this group (no parent category)
+  const directCats = categories
+    .filter((c) => c.group === parentKey && !c.parentCategoryId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  for (const cat of directCats) {
+    const pathLabel = `${parentPathLabel} › ${cat.name}`
+    result.push({ value: `cat:${cat.id}`, label: pathLabel, depth: depth + 1 })
+    // Recurse into sub-categories
+    collectCategoryChildren(cat.id, pathLabel, categories, depth + 1, result)
+  }
+}
+
+function collectCategoryChildren(
+  parentCatId: string,
+  parentPathLabel: string,
+  categories: Category[],
+  depth: number,
+  result: { value: string; label: string; depth: number }[]
+) {
+  const children = categories
+    .filter((c) => c.parentCategoryId === parentCatId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  for (const child of children) {
+    const pathLabel = `${parentPathLabel} › ${child.name}`
+    result.push({ value: `cat:${child.id}`, label: pathLabel, depth: depth + 1 })
+    collectCategoryChildren(child.id, pathLabel, categories, depth + 1, result)
+  }
+}
+
 // ---- Category tree (nested categories) ----
 
 export interface CategoryNode {

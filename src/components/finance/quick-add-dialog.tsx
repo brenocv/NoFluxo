@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Category, Currency, collectGroupPaths, Subgroup, TopGroup, MONTHS_PT_LONG } from '@/lib/finance'
+import { Category, Currency, collectAllPaths, Subgroup, TopGroup, MONTHS_PT_LONG } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Zap, RefreshCw, TrendingDown, TrendingUp, PiggyBank, FolderPlus } from 'lucide-react'
@@ -40,6 +40,7 @@ interface Props {
     isRecurring: boolean
     installmentsTotal?: number | null
     newSubgroupName?: string
+    existingCategoryId?: string
   }) => Promise<void>
 }
 
@@ -79,9 +80,12 @@ export function QuickAddDialog({
     }
   }, [open, initialGroup])
 
-  const groupOptions = collectGroupPaths(subgroups, labels, topGroups)
+  const groupOptions = collectAllPaths(subgroups, labels, topGroups, categories)
   const parsed = parseFloat(raw.replace(',', '.'))
-  const valid = !isNaN(parsed) && parsed >= 0 && name.trim().length > 0 &&
+  // If an existing category is selected (value starts with "cat:"), name is not required
+  const isExistingCategory = group.startsWith('cat:')
+  const valid = !isNaN(parsed) && parsed >= 0 &&
+    (isExistingCategory || name.trim().length > 0) &&
     (!createNewSubgroup || newSubgroupName.trim().length > 0)
 
   // Default group based on type (only if no initialGroup and no manual selection)
@@ -115,6 +119,7 @@ export function QuickAddDialog({
         isRecurring,
         installmentsTotal: isRecurring ? inst : null,
         newSubgroupName: createNewSubgroup ? newSubgroupName.trim() : undefined,
+        existingCategoryId: isExistingCategory ? group.slice(4) : undefined,
       })
       onOpenChange(false)
     } finally {
@@ -139,48 +144,78 @@ export function QuickAddDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Type selector */}
+          {/* Group/item selector — shows ALL levels including categories */}
           <div className="space-y-1.5">
-            <Label className="text-xs">Tipo</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {TYPE_OPTIONS.map((opt) => {
-                const Icon = opt.icon
-                return (
-                  <button
+            <Label className="text-xs">Onde adicionar?</Label>
+            <Select value={group} onValueChange={setGroup}>
+              <SelectTrigger><SelectValue placeholder="Selecionar grupo ou item existente..." /></SelectTrigger>
+              <SelectContent className="max-h-60">
+                {groupOptions.map((opt) => (
+                  <SelectItem
                     key={opt.value}
-                    type="button"
-                    onClick={() => setType(opt.value)}
+                    value={opt.value}
                     className={cn(
-                      'flex flex-col items-center gap-1 p-2.5 rounded-lg border-2 transition-all touch-manipulation',
-                      type === opt.value
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border bg-muted/50 text-muted-foreground'
+                      opt.value.startsWith('cat:') ? 'text-[13px] text-foreground' : opt.depth === 0 ? 'font-bold text-sm' : 'text-xs text-muted-foreground'
                     )}
-                    style={type === opt.value ? { borderColor: opt.color, color: opt.color } : undefined}
                   >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-[11px] font-medium">{opt.label}</span>
-                  </button>
-                )
-              })}
+                    {opt.depth > 0 ? '  '.repeat(opt.depth) + '↳ ' : ''}{opt.label.split(' › ').pop()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {isExistingCategory && (
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                ✓ Adicionando valor a um item existente
+              </p>
+            )}
+          </div>
+
+          {/* Type selector — hidden when existing category is selected */}
+          {!isExistingCategory && !createNewSubgroup && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Tipo</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {TYPE_OPTIONS.map((opt) => {
+                  const Icon = opt.icon
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setType(opt.value)}
+                      className={cn(
+                        'flex flex-col items-center gap-1 p-2.5 rounded-lg border-2 transition-all touch-manipulation',
+                        type === opt.value
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-muted/50 text-muted-foreground'
+                      )}
+                      style={type === opt.value ? { borderColor: opt.color, color: opt.color } : undefined}
+                    >
+                      <Icon className="h-4 w-4" />
+                      <span className="text-[11px] font-medium">{opt.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Name */}
-          <div className="space-y-1.5">
-            <Label htmlFor="qa-name">Nome</Label>
-            <Input
-              id="qa-name"
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Ex.: Salário Breno, Almoço, Mercado..."
-              autoComplete="off"
-              onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
-            />
-          </div>
+          {/* Name — hidden when existing category is selected */}
+          {!isExistingCategory && !createNewSubgroup && (
+            <div className="space-y-1.5">
+              <Label htmlFor="qa-name">Nome do novo item</Label>
+              <Input
+                id="qa-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Ex.: Salário Breno, Almoço, Mercado..."
+                autoComplete="off"
+                onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
+              />
+            </div>
+          )}
 
-          {/* Value + Currency */}
+          {/* Value + Currency — currency hidden when existing category (uses its currency) */}
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <div className="space-y-1.5">
               <Label htmlFor="qa-value">Valor</Label>
@@ -213,60 +248,38 @@ export function QuickAddDialog({
             </div>
           </div>
 
-          {/* Group selector */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Grupo (opcional)</Label>
+          {/* New subgroup toggle — only when not selecting existing category */}
+          {!isExistingCategory && (
+            <div className="space-y-1.5">
               <button
                 type="button"
                 onClick={() => setCreateNewSubgroup(!createNewSubgroup)}
                 className={cn(
-                  'flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md transition-colors touch-manipulation',
+                  'flex items-center gap-1 text-[11px] px-2 py-1 rounded-md transition-colors touch-manipulation w-full justify-center',
                   createNewSubgroup
                     ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-muted'
+                    : 'text-muted-foreground hover:bg-muted border border-dashed border-border'
                 )}
               >
                 <FolderPlus className="h-3 w-3" />
-                {createNewSubgroup ? 'Cancelando novo subgrupo' : 'Novo subgrupo'}
+                {createNewSubgroup ? 'Cancelar novo subgrupo' : 'Criar em novo subgrupo'}
               </button>
+              {createNewSubgroup && (
+                <div className="space-y-2">
+                  <Input
+                    type="text"
+                    value={newSubgroupName}
+                    onChange={(e) => setNewSubgroupName(e.target.value)}
+                    placeholder="Nome do novo subgrupo (ex.: Mercado, Extras...)"
+                    onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Selecione o grupo pai no campo "Onde adicionar?" acima. O novo subgrupo será criado dentro dele.
+                  </p>
+                </div>
+              )}
             </div>
-            {!createNewSubgroup ? (
-              <Select value={group} onValueChange={setGroup}>
-                <SelectTrigger><SelectValue placeholder="Selecionar grupo..." /></SelectTrigger>
-                <SelectContent className="max-h-60">
-                  {groupOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className={opt.depth > 0 ? 'text-xs' : 'font-medium'}>
-                      {opt.depth > 0 ? '  '.repeat(opt.depth) + '↳ ' : ''}{opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="space-y-2">
-                <Input
-                  type="text"
-                  value={newSubgroupName}
-                  onChange={(e) => setNewSubgroupName(e.target.value)}
-                  placeholder="Nome do novo subgrupo (ex.: Mercado, Extras...)"
-                  onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
-                />
-                <Select value={group} onValueChange={setGroup}>
-                  <SelectTrigger><SelectValue placeholder="Dentro de qual grupo pai?" /></SelectTrigger>
-                  <SelectContent className="max-h-60">
-                    {groupOptions.filter((opt) => opt.depth === 0).map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-medium">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-muted-foreground">
-                  O novo subgrupo será criado dentro do grupo pai selecionado, e a categoria será adicionada nele.
-                </p>
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Note */}
           <div className="space-y-1.5">
