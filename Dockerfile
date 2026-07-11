@@ -1,17 +1,22 @@
 FROM oven/bun:1.1 AS base
 WORKDIR /app
 
-# Install dependencies
+# Install dependencies (without frozen-lockfile to avoid issues)
 COPY package.json bun.lock ./
-RUN bun install --frozen-lockfile
+RUN bun install
 
-# Copy source
+# Copy source code
 COPY . .
 
-# Build: generate Prisma client (needs a DATABASE_URL to parse schema) + Next.js build
+# Set dummy DATABASE_URL for Prisma during build (doesn't connect, just parses schema)
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Generate Prisma client
 RUN bunx prisma generate
-RUN bun run build
+
+# Build Next.js
+RUN bunx next build
 
 # Production
 EXPOSE 3000
