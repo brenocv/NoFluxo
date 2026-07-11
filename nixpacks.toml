@@ -1,0 +1,14 @@
+# Nixpacks config for Railway
+# Railway uses Nixpacks to build the app. This file customizes the build.
+
+[phases.install]
+# Install dependencies including Prisma
+cmds = ["bun install"]
+
+[phases.build]
+# Generate Prisma client + build Next.js
+cmds = ["bun run build"]
+
+[start]
+# Start the custom server (Next.js + Socket.io integrated)
+cmd = "node server.js"
