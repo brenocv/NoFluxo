@@ -1,12 +1,12 @@
-FROM oven/bun:1.1 AS base
+FROM node:22-slim
 WORKDIR /app
 
 # Copy prisma schema FIRST
 COPY prisma ./prisma
 
 # Install dependencies
-COPY package.json bun.lock ./
-RUN bun install
+COPY package.json ./
+RUN npm install
 
 # Copy all source code
 COPY . .
@@ -16,11 +16,14 @@ ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Generate Prisma client
-RUN bunx prisma generate --schema=./prisma/schema.prisma
+RUN npx prisma generate --schema=./prisma/schema.prisma
 
-# Build Next.js using Node.js (Bun has issues with Turbopack worker_threads)
+# Build Next.js
 RUN npx next build
+
+# Install tsx to run TypeScript server
+RUN npm install -g tsx
 
 # Production
 EXPOSE 3000
-CMD ["bun", "server.ts"]
+CMD ["npx", "tsx", "server.ts"]
