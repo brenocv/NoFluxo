@@ -1,7 +1,7 @@
 FROM oven/bun:1.1 AS base
 WORKDIR /app
 
-# Copy prisma schema FIRST (before install) to ensure it's always available
+# Copy prisma schema FIRST
 COPY prisma ./prisma
 
 # Install dependencies
@@ -15,11 +15,11 @@ COPY . .
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Generate Prisma client (explicitly point to schema)
+# Generate Prisma client
 RUN bunx prisma generate --schema=./prisma/schema.prisma
 
-# Build Next.js
-RUN bunx next build
+# Build Next.js using Node.js (Bun has issues with Turbopack worker_threads)
+RUN npx next build
 
 # Production
 EXPOSE 3000
