@@ -19,9 +19,12 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Generate Prisma client
 RUN npx prisma generate --schema=./prisma/schema.prisma
 
+# Compile server.ts to server.js (so we can run with node, much faster)
+RUN npx tsc server.ts --outDir . --module commonjs --moduleResolution node --target es2017 --skipLibCheck --esModuleInterop
+
 # Build Next.js
 RUN npx next build
 
 # Production
 EXPOSE 3000
-CMD ["npx", "tsx", "server.ts"]
+CMD ["node", "server.js"]
