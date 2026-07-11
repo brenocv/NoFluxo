@@ -11,7 +11,8 @@ RUN npm install
 # Copy all source code
 COPY . .
 
-# Set dummy DATABASE_URL for Prisma during build
+# Set environment to PRODUCTION (prevents dev mode and memory crashes)
+ENV NODE_ENV=production
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV NEXT_TELEMETRY_DISABLED=1
 
@@ -20,9 +21,6 @@ RUN npx prisma generate --schema=./prisma/schema.prisma
 
 # Build Next.js
 RUN npx next build
-
-# Install tsx to run TypeScript server
-RUN npm install -g tsx
 
 # Production
 EXPOSE 3000
