@@ -11,7 +11,7 @@ RUN npm install
 # Copy all source code
 COPY . .
 
-# Set environment to PRODUCTION (prevents dev mode and memory crashes)
+# Production environment
 ENV NODE_ENV=production
 ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -19,12 +19,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Generate Prisma client
 RUN npx prisma generate --schema=./prisma/schema.prisma
 
-# Compile server.ts to server.js (so we can run with node, much faster)
-RUN npx tsc server.ts --outDir . --module commonjs --moduleResolution node --target es2017 --skipLibCheck --esModuleInterop
-
 # Build Next.js
 RUN npx next build
 
-# Production
+# Start with next start on the PORT Railway provides
 EXPOSE 3000
-CMD ["node", "server.js"]
+CMD ["sh", "-c", "npx next start -p ${PORT:-3000}"]
