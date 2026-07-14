@@ -84,9 +84,10 @@ export async function copyMonth(args: {
 }
 
 export async function resetValues(args: {
-  scope: 'month' | 'year'
-  year: number
+  scope: 'month' | 'year' | 'factory'
+  year?: number
   month?: number
+  workbookId?: string
   user: string
 }): Promise<{ ok: boolean; deletedCount: number }> {
   const r = await fetch('/api/transactions/reset', {

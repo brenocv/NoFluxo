@@ -5,8 +5,8 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown, PiggyBank, Clock } from 'lucide-react'
-import { formatBRL, formatEUR } from '@/lib/finance'
-import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
+import { formatBRL } from '@/lib/finance'
+import { PREDEFINED_CURRENCIES, SecondaryCurrencyInfo } from '@/lib/currencies'
 
 interface ActiveCurrency {
   code: string
@@ -24,18 +24,33 @@ interface Props {
   includeReceivables: boolean
   onToggleReceivables: (v: boolean) => void
   euroRate: number
+  secondaryCurrency?: SecondaryCurrencyInfo
   customCurrencies?: ActiveCurrency[]
   onEntradasClick: () => void
   onSaidasClick: () => void
+}
+
+function formatSecondary(v: number, sec: SecondaryCurrencyInfo): string {
+  const sign = v < 0 ? '-' : ''
+  const abs = Math.abs(v)
+  const formatted = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return `${sign}${sec.symbol} ${formatted}`
 }
 
 export function SummaryCard({
   entradasBRL, saidasBRL, entradasEUR, saidasEUR,
   reservasBRL, receivablesBRL, receivablesEUR,
   includeReceivables, onToggleReceivables, euroRate,
+  secondaryCurrency,
   customCurrencies,
   onEntradasClick, onSaidasClick,
 }: Props) {
+  // Default to EUR if no secondary currency is provided (backwards compat)
+  const sec: SecondaryCurrencyInfo = secondaryCurrency ?? {
+    code: 'EUR', rate: euroRate, symbol: '€', name: 'Euro', flag: '🇪🇺',
+  }
+  const secRate = sec.rate || euroRate
+
   const totalEntradasBRL = entradasBRL + entradasEUR * euroRate
   const totalSaidasBRL = saidasBRL + saidasEUR * euroRate
   let saldoTotalBRL = totalEntradasBRL - totalSaidasBRL
@@ -43,7 +58,7 @@ export function SummaryCard({
   if (includeReceivables) {
     saldoTotalBRL += receivablesBRL + receivablesEUR * euroRate
   }
-  const saldoTotalEUR = saldoTotalBRL / euroRate
+  const saldoTotalSec = saldoTotalBRL / secRate
 
   return (
     <Card className="p-4 space-y-3 shadow-sm">
@@ -53,22 +68,34 @@ export function SummaryCard({
         </span>
         <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
           <span>
-            €1 = R$ {euroRate.toFixed(2).replace('.', ',')}
+            {sec.symbol}1 = R$ {secRate.toFixed(2).replace('.', ',')}
             {' '}<button onClick={() => {
-              const newRate = window.prompt('Nova cotação do Euro (em R$):', String(euroRate))
+              const newRate = window.prompt(`Nova cotação de ${sec.name} (em R$):`, String(secRate))
               if (newRate !== null) {
                 const parsed = parseFloat(newRate.replace(',', '.'))
                 if (!isNaN(parsed) && parsed > 0) {
-                  fetch('/api/config', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user' }),
-                  }).then(() => window.location.reload())
+                  // If secondary is EUR, save to euroToBrl; otherwise save to customCurrencies
+                  if (sec.code === 'EUR') {
+                    fetch('/api/config', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user' }),
+                    }).then(() => window.location.reload())
+                  } else {
+                    const updated = (customCurrencies ?? []).map((cur: any) =>
+                      cur.code === sec.code ? { ...cur, rate: parsed } : cur
+                    )
+                    fetch('/api/config', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
+                    }).then(() => window.location.reload())
+                  }
                 }
               }
             }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
           </span>
-          {(customCurrencies ?? []).map((c) => {
+          {(customCurrencies ?? []).filter(c => c.code !== sec.code).map((c) => {
             const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
             return (
               <span key={c.code}>
@@ -78,7 +105,6 @@ export function SummaryCard({
                   if (newRate !== null) {
                     const parsed = parseFloat(newRate.replace(',', '.'))
                     if (!isNaN(parsed) && parsed > 0) {
-                      // Update in customCurrencies config
                       const updated = (customCurrencies ?? []).map((cur: any) =>
                         cur.code === c.code ? { ...cur, rate: parsed } : cur
                       )
@@ -108,8 +134,8 @@ export function SummaryCard({
         <div className={cn('text-3xl font-bold tabular-nums', saldoTotalBRL >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
           {formatBRL(saldoTotalBRL)}
         </div>
-        <div className={cn('text-sm font-medium tabular-nums', saldoTotalEUR >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80')}>
-          ≈ {formatEUR(saldoTotalEUR)}
+        <div className={cn('text-sm font-medium tabular-nums', saldoTotalSec >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80')}>
+          ≈ {formatSecondary(saldoTotalSec, sec)}
         </div>
       </div>
 
@@ -129,7 +155,7 @@ export function SummaryCard({
               {formatBRL(totalEntradasBRL)}
             </div>
             <div className="text-[10px] text-muted-foreground tabular-nums">
-              ≈ {formatEUR(totalEntradasBRL / euroRate)}
+              ≈ {formatSecondary(totalEntradasBRL / secRate, sec)}
             </div>
           </div>
         </button>
@@ -147,7 +173,7 @@ export function SummaryCard({
               {formatBRL(totalSaidasBRL)}
             </div>
             <div className="text-[10px] text-muted-foreground tabular-nums">
-              ≈ {formatEUR(totalSaidasBRL / euroRate)}
+              ≈ {formatSecondary(totalSaidasBRL / secRate, sec)}
             </div>
           </div>
         </button>
@@ -162,7 +188,7 @@ export function SummaryCard({
           <span className="text-xs font-semibold text-foreground tabular-nums">
             {formatBRL(reservasBRL)}
             <span className="text-[10px] text-muted-foreground ml-1 font-normal">
-              ({formatEUR(reservasBRL / euroRate)})
+              ({formatSecondary(reservasBRL / secRate, sec)})
             </span>
           </span>
         </div>

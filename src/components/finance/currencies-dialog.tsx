@@ -12,8 +12,9 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Trash2, Coins } from 'lucide-react'
-import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
+import { cn } from '@/lib/utils'
+import { Plus, Trash2, Coins, Star } from 'lucide-react'
+import { PREDEFINED_CURRENCIES, getCurrencyDef } from '@/lib/currencies'
 
 interface ActiveCurrency {
   code: string
@@ -27,6 +28,8 @@ interface Props {
   onSaveEuroRate: (v: number) => Promise<void>
   currencies?: ActiveCurrency[]
   onSaveCurrencies?: (currencies: ActiveCurrency[]) => Promise<void>
+  secondaryCurrency?: string
+  onSaveSecondaryCurrency?: (code: string) => Promise<void>
 }
 
 export function CurrenciesDialog({
@@ -36,6 +39,8 @@ export function CurrenciesDialog({
   onSaveEuroRate,
   currencies = [],
   onSaveCurrencies,
+  secondaryCurrency = 'EUR',
+  onSaveSecondaryCurrency,
 }: Props) {
   const [rate, setRate] = useState(String(euroRate))
   const [saving, setSaving] = useState(false)
@@ -54,6 +59,14 @@ export function CurrenciesDialog({
   const availableCurrencies = PREDEFINED_CURRENCIES.filter(c =>
     !activeCurrencies.find(a => a.code === c.code) && c.code !== 'BRL' && c.code !== 'EUR'
   )
+
+  // All currencies eligible to be the secondary one (shown alongside BRL).
+  // EUR is always eligible (uses config.euroToBrl). Other currencies are
+  // only eligible if they're already in the active customCurrencies list.
+  const secondaryOptions = [
+    { code: 'EUR', ...getCurrencyDef('EUR')! },
+    ...activeCurrencies.map((c) => ({ code: c.code, ...getCurrencyDef(c.code)! })).filter(o => o.symbol),
+  ]
 
   async function handleAddCurrency() {
     if (!newCurrencyCode || !newCurrencyRate) return
@@ -134,6 +147,48 @@ export function CurrenciesDialog({
               O Real (R$) é a moeda principal. Todas as outras cotações são em relação a ele.
             </p>
           </div>
+
+          {/* Secondary currency selector — the one shown alongside BRL */}
+          {onSaveSecondaryCurrency && (
+            <div className="space-y-2 pt-4 border-t border-border">
+              <Label className="flex items-center gap-1.5">
+                <Star className="h-3.5 w-3.5 text-amber-500" />
+                Moeda secundária
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Esta é a moeda que aparece ao lado do Real nos valores (ex.: R$ 100 ({secondaryCurrency === 'EUR' ? '€' : getCurrencyDef(secondaryCurrency)?.symbol} 16,67)).
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {secondaryOptions.map((opt) => (
+                  <button
+                    key={opt.code}
+                    type="button"
+                    onClick={async () => {
+                      setSaving(true)
+                      try { await onSaveSecondaryCurrency(opt.code) } finally { setSaving(false) }
+                    }}
+                    disabled={saving}
+                    className={cn(
+                      'flex items-center gap-2 h-10 px-3 rounded-md border-2 text-sm font-medium transition-all touch-manipulation',
+                      secondaryCurrency === opt.code
+                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'
+                        : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted'
+                    )}
+                  >
+                    <span className="text-base">{opt.flag}</span>
+                    <span>{opt.symbol}</span>
+                    <span className="text-xs font-normal">{opt.name}</span>
+                    {secondaryCurrency === opt.code && <Star className="h-3 w-3 ml-auto fill-amber-500 text-amber-500" />}
+                  </button>
+                ))}
+              </div>
+              {secondaryOptions.length === 1 && (
+                <p className="text-[11px] text-muted-foreground">
+                  Adicione outras moedas abaixo para poder escolhê-las como secundária.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Other currencies */}
           {onSaveCurrencies && (
