@@ -14,7 +14,7 @@ import {
 } from '@/lib/finance'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
-  AlertTriangle, RefreshCw, Check, FolderPlus, Move,
+  AlertTriangle, RefreshCw, Check, FolderPlus,
   TrendingUp, TrendingDown, PiggyBank, GripVertical,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType } from './category-dnd'
@@ -257,7 +257,7 @@ export function GroupNode(props: Props) {
         )}
         {/* Label — wraps naturally on small screens */}
         <div
-          className={cn('flex-1 min-w-0 text-pretty leading-tight', isTopLevel ? 'font-bold text-sm' : 'font-semibold text-[13px]')}
+          className={cn('flex-1 min-w-0 break-words leading-tight', isTopLevel ? 'font-bold text-sm' : 'font-semibold text-[13px]')}
           style={{ color: isTopLevel ? color : undefined }}
         >
           {node.label}
@@ -280,19 +280,15 @@ export function GroupNode(props: Props) {
           onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
           small={!isTopLevel}
         />
-        {/* + button: top-level creates subgroup, subgroups create sub-item (category) inside */}
+        {/* + button: creates a new subgroup inside (FolderPlus for both top-level and subgroups) */}
         <button
           onClick={(e) => {
             e.stopPropagation()
-            if (isTopLevel) {
-              props.onAddSubgroup(node.key)
-            } else {
-              props.onAddCategory(node.key, null)
-            }
+            props.onAddSubgroup(node.key)
           }}
           className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors touch-manipulation"
-          aria-label={isTopLevel ? 'Novo subgrupo' : 'Novo sub-item'}
-          title={isTopLevel ? 'Criar subgrupo aqui' : 'Adicionar sub-item aqui'}
+          aria-label="Novo subgrupo"
+          title="Criar subgrupo aqui"
           style={{ color }}
         >
           <FolderPlus className={isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
@@ -515,7 +511,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         if (targetRow && targetRow.dataset.catId !== category.id) {
           const targetRect = targetRow.getBoundingClientRect()
           const isAbove = ev.clientY < targetRect.top + targetRect.height / 2
-          dnd.setTarget(targetRow.dataset.catId, isAbove ? 'before' : 'after')
+          dnd.setTarget(targetRow.dataset.catId ?? null, isAbove ? 'before' : 'after')
         } else {
           dnd.setTarget(null, null)
         }
@@ -591,7 +587,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             <span className="text-[13px] font-medium text-foreground flex items-start gap-1 flex-wrap min-w-0 w-full">
               {/* Hide name for receivables — show only the "a receber" badge */}
               {category.group !== 'rendimentos.valores_a_receber' && (
-                <div className="text-pretty leading-tight flex-1 min-w-0">{category.name}</div>
+                <div className="break-words leading-tight flex-1 min-w-0">{category.name}</div>
               )}
               {category.group === 'rendimentos.valores_a_receber' && (
                 <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
@@ -621,9 +617,6 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             title="Adicionar sub-item"
           >
             <FolderPlus className="h-3 w-3" style={{ color }} />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); allProps.onMoveCategory(category) }} className="p-1 sm:p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation" aria-label="Mover" title="Mover para outro local">
-            <Move className="h-3 w-3" />
           </button>
           {isRecurring && (
             <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1 sm:p-1.5 rounded-md hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -13,108 +13,122 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { Download, Plus, Trash2, Upload, LogOut } from 'lucide-react'
-import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
-
-interface ActiveCurrency {
-  code: string
-  rate: number
-}
+import { Download, LogOut } from 'lucide-react'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
+  currentUser: string
+  onSetUser: (name: string) => void
   euroRate: number
   onSaveEuroRate: (v: number) => Promise<void>
+  euroName: string
+  onSaveEuroName: (name: string) => Promise<void>
   onExportExcel?: () => void
-  currencies?: ActiveCurrency[]
-  onSaveCurrencies?: (currencies: ActiveCurrency[]) => Promise<void>
-  onDeleteAccount?: () => void
   onLogout?: () => void
-  onBackup?: () => void
-  onRestore?: () => void
-  onResetValues?: () => void
-  accountName?: string
 }
+
+const USERS = ['Breno', 'Kiki', 'Visita']
 
 export function SettingsDialog({
   open,
   onOpenChange,
+  currentUser,
+  onSetUser,
   euroRate,
   onSaveEuroRate,
+  euroName,
+  onSaveEuroName,
   onExportExcel,
-  currencies = [],
-  onSaveCurrencies,
-  onDeleteAccount,
   onLogout,
-  onBackup,
-  onRestore,
-  onResetValues,
-  accountName,
 }: Props) {
   const [rate, setRate] = useState(String(euroRate))
-  const [saving, setSaving] = useState(false)
-  const [activeCurrencies, setActiveCurrencies] = useState<ActiveCurrency[]>(currencies)
-  const [newCurrencyCode, setNewCurrencyCode] = useState('')
-  const [newCurrencyRate, setNewCurrencyRate] = useState('')
+  const [name, setName] = useState(euroName)
+  const [savingRate, setSavingRate] = useState(false)
+  const [savingName, setSavingName] = useState(false)
 
+  // Sync local state when dialog opens or props change
   useEffect(() => {
-    setActiveCurrencies(currencies)
-  }, [currencies])
-
-  // Available currencies = predefined minus already active
-  const availableCurrencies = PREDEFINED_CURRENCIES.filter(c => 
-    !activeCurrencies.find(a => a.code === c.code) && c.code !== 'BRL' // BRL is always main, don't add
-  )
-
-  async function handleAddCurrency() {
-    if (!newCurrencyCode || !newCurrencyRate) return
-    const rate = parseFloat(newCurrencyRate.replace(',', '.'))
-    if (isNaN(rate) || rate <= 0) return
-    const updated = [...activeCurrencies, { code: newCurrencyCode, rate }]
-    setActiveCurrencies(updated)
-    setNewCurrencyCode('')
-    setNewCurrencyRate('')
-    if (onSaveCurrencies) {
-      setSaving(true)
-      try { await onSaveCurrencies(updated) } finally { setSaving(false) }
+    if (open) {
+      setRate(String(euroRate))
+      setName(euroName)
     }
-  }
-
-  async function handleRemoveCurrency(code: string) {
-    const updated = activeCurrencies.filter(c => c.code !== code)
-    setActiveCurrencies(updated)
-    if (onSaveCurrencies) {
-      setSaving(true)
-      try { await onSaveCurrencies(updated) } finally { setSaving(false) }
-    }
-  }
-
-  async function handleUpdateCurrencyRate(code: string, newRate: string) {
-    const rate = parseFloat(newRate.replace(',', '.'))
-    if (isNaN(rate) || rate <= 0) return
-    const updated = activeCurrencies.map(c => c.code === code ? { ...c, rate } : c)
-    setActiveCurrencies(updated)
-    if (onSaveCurrencies) {
-      setSaving(true)
-      try { await onSaveCurrencies(updated) } finally { setSaving(false) }
-    }
-  }
+  }, [open, euroRate, euroName])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Configurações</DialogTitle>
           <DialogDescription className="sr-only">
-            Defina cotações de moedas e gerencie a planilha.
+            Defina quem está usando este dispositivo, o nome da moeda alternativa e a cotação usada nos cálculos.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* Exchange rate (Euro) */}
+          {/* User identity */}
           <div className="space-y-2">
-            <Label htmlFor="rate">Cotação do Euro (em R$)</Label>
+            <Label>Quem está usando?</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {USERS.map((u) => (
+                <button
+                  key={u}
+                  onClick={() => onSetUser(u)}
+                  className={cn(
+                    'h-10 rounded-lg text-sm font-medium transition-all touch-manipulation',
+                    currentUser === u
+                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  )}
+                >
+                  {u}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Cada dispositivo escolhe quem está usando — assim o histórico mostra quem editou o quê.
+            </p>
+          </div>
+
+          {/* Euro name (editable) */}
+          <div className="space-y-2">
+            <Label htmlFor="euro-name">Nome da moeda alternativa</Label>
+            <div className="flex gap-2">
+              <Input
+                id="euro-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Euro"
+                className="flex-1"
+                autoComplete="off"
+              />
+              <Button
+                onClick={async () => {
+                  const v = name.trim() || 'Euro'
+                  setSavingName(true)
+                  try {
+                    await onSaveEuroName(v)
+                  } finally {
+                    setSavingName(false)
+                  }
+                }}
+                disabled={savingName || (name.trim() || 'Euro') === euroName}
+              >
+                {savingName ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Você pode renomear a moeda alternativa para &quot;Euro PT&quot;, &quot;Dólar&quot;, etc.
+              O símbolo (€) continua o mesmo.
+            </p>
+          </div>
+
+          {/* Exchange rate */}
+          <div className="space-y-2">
+            <Label htmlFor="rate">
+              Cotação do {euroName} (em R$)
+            </Label>
             <div className="flex gap-2">
               <Input
                 id="rate"
@@ -129,82 +143,22 @@ export function SettingsDialog({
                 onClick={async () => {
                   const v = parseFloat(rate.replace(',', '.'))
                   if (isNaN(v) || v <= 0) return
-                  setSaving(true)
-                  try { await onSaveEuroRate(v) } finally { setSaving(false) }
+                  setSavingRate(true)
+                  try {
+                    await onSaveEuroRate(v)
+                  } finally {
+                    setSavingRate(false)
+                  }
                 }}
-                disabled={saving}
+                disabled={savingRate}
               >
-                {saving ? 'Salvando…' : 'Salvar'}
+                {savingRate ? 'Salvando…' : 'Salvar'}
               </Button>
             </div>
+            <p className="text-xs text-muted-foreground">
+              Usado para mostrar o saldo total consolidado em Reais.
+            </p>
           </div>
-
-          {/* Custom currencies (from predefined list) */}
-          {onSaveCurrencies && (
-            <div className="space-y-3">
-              <Label>Outras moedas</Label>
-              <p className="text-xs text-muted-foreground">
-                Escolha moedas da lista. A cotação é em relação ao Real (R$).
-              </p>
-              
-              {activeCurrencies.length > 0 && (
-                <div className="space-y-2">
-                  {activeCurrencies.map((c) => {
-                    const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
-                    return (
-                      <div key={c.code} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
-                        <span className="text-lg">{def?.flag}</span>
-                        <span className="text-sm font-medium flex-1">{def?.symbol} {def?.name}</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          inputMode="decimal"
-                          defaultValue={String(c.rate)}
-                          onBlur={(e) => handleUpdateCurrencyRate(c.code, e.target.value)}
-                          className="w-24 h-8 text-xs"
-                          title="Cotação em R$"
-                        />
-                        <span className="text-xs text-muted-foreground">R$</span>
-                        <button
-                          onClick={() => handleRemoveCurrency(c.code)}
-                          className="p-1 rounded hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Add from predefined list */}
-              {availableCurrencies.length > 0 && (
-                <div className="flex gap-2">
-                  <select
-                    value={newCurrencyCode}
-                    onChange={(e) => setNewCurrencyCode(e.target.value)}
-                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
-                  >
-                    <option value="">Escolher moeda...</option>
-                    {availableCurrencies.map((c) => (
-                      <option key={c.code} value={c.code}>{c.flag} {c.symbol} {c.name}</option>
-                    ))}
-                  </select>
-                  <Input
-                    value={newCurrencyRate}
-                    onChange={(e) => setNewCurrencyRate(e.target.value)}
-                    placeholder="Valor em R$"
-                    inputMode="decimal"
-                    className="w-28"
-                    title="Cotação em Real (ex: 5.50)"
-                  />
-                  <Button onClick={handleAddCurrency} disabled={!newCurrencyCode || !newCurrencyRate} size="icon">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Excel export */}
           {onExportExcel && (
@@ -218,59 +172,30 @@ export function SettingsDialog({
                 <Download className="h-4 w-4" />
                 Exportar Excel do ano atual
               </Button>
-            </div>
-          )}
-
-          {/* Backup / Restore / Reset */}
-          <div className="space-y-2 pt-4 border-t border-border">
-            <Label>Dados da planilha</Label>
-            {onBackup && (
-              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { onBackup(); onOpenChange(false) }}>
-                <Download className="h-4 w-4" /> Exportar backup (JSON)
-              </Button>
-            )}
-            {onRestore && (
-              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { onRestore(); onOpenChange(false) }}>
-                <Upload className="h-4 w-4" /> Restaurar backup
-              </Button>
-            )}
-            {onResetValues && (
-              <Button variant="outline" className="w-full justify-start gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30" onClick={() => { onResetValues(); onOpenChange(false) }}>
-                <Trash2 className="h-4 w-4" /> Zerar valores da planilha
-              </Button>
-            )}
-          </div>
-
-          {/* Logout */}
-          {onLogout && (
-            <div className="space-y-2 pt-4 border-t border-border">
-              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { onLogout(); onOpenChange(false) }}>
-                <LogOut className="h-4 w-4" /> Sair da conta
-              </Button>
-            </div>
-          )}
-
-          {/* Delete account */}
-          {onDeleteAccount && (
-            <div className="space-y-2 pt-4 border-t border-border">
-              <Label>Conta: {accountName}</Label>
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                onClick={() => {
-                  if (confirm(`Apagar a conta "${accountName}" e todos os seus dados? Esta ação não pode ser desfeita.`)) {
-                    onDeleteAccount()
-                  }
-                }}
-              >
-                <Trash2 className="h-4 w-4" />
-                Apagar esta conta
-              </Button>
+              <p className="text-xs text-muted-foreground">
+                Gera um arquivo .xlsx com todas as categorias e valores do ano.
+              </p>
             </div>
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-row sm:justify-between items-center gap-2">
+          {onLogout ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (confirm('Sair da conta? Você voltará para a tela de login.')) {
+                  onLogout()
+                  onOpenChange(false)
+                }
+              }}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="h-3.5 w-3.5 mr-1" />
+              Sair da conta
+            </Button>
+          ) : <div />}
           <Button onClick={() => onOpenChange(false)}>Fechar</Button>
         </DialogFooter>
       </DialogContent>

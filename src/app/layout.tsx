@@ -15,16 +15,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NoFluxo · Controle Financeiro",
+  title: "Porto 2026 · Controle Financeiro",
   description:
-    "NoFluxo — seu controle financeiro em fluxo. Despesas, rendimentos e reservas.",
-  keywords: ["NoFluxo", "finanças", "controle", "despesas", "rendimentos"],
+    "Controle financeiro compartilhado em tempo real entre Breno e Kiki — despesas, rendimentos e reservas do ano.",
+  keywords: ["finanças", "Porto", "controle", "despesas", "rendimentos", "Breno", "Kiki"],
   authors: [{ name: "Breno & Kiki" }],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NoFluxo",
+    title: "Porto 2026",
   },
   icons: {
     icon: [
@@ -43,7 +43,7 @@ export const viewport: Viewport = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "NoFluxo",
+    title: "Porto 2026",
   },
 };
 
@@ -56,11 +56,10 @@ export default function RootLayout({
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <link rel="icon" type="image/svg+xml" href="/logo-nofluxo.svg" />
         <link rel="apple-touch-icon" href="/icon-192.png" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="NoFluxo" />
+        <meta name="apple-mobile-web-app-title" content="Porto 2026" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground`}

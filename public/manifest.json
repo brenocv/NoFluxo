@@ -1,11 +1,11 @@
 {
-  "name": "NoFluxo — Controle Financeiro",
-  "short_name": "NoFluxo",
-  "description": "NoFluxo — seu controle financeiro em fluxo",
+  "name": "Porto 2026 — Controle Financeiro",
+  "short_name": "Porto 2026",
+  "description": "Controle financeiro compartilhado em tempo real entre Breno e Kiki",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0f172a",
-  "theme_color": "#16a34a",
+  "theme_color": "#0f172a",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -19,12 +19,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
-    },
-    {
-      "src": "/logo-nofluxo.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
     }
   ],
   "shortcuts": [

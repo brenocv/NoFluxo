@@ -43,23 +43,10 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
     error: null,
   })
   const [live, setLive] = useState<LiveMeta>({
-    connected: true,
+    connected: false,
     presences: [],
     lastChange: null,
   })
-
-  // Track browser online/offline status
-  useEffect(() => {
-    setLive((l) => ({ ...l, connected: navigator.onLine }))
-    const onOnline = () => setLive((l) => ({ ...l, connected: true }))
-    const onOffline = () => setLive((l) => ({ ...l, connected: false }))
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
-    return () => {
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-    }
-  }, [])
 
   // Initial load — re-fetches whenever the year changes
   useEffect(() => {
@@ -265,7 +252,6 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
       const detail = (e as CustomEvent).detail as ChangeMessage
       // Handle special 'reload' type — re-fetch all data
       if (detail.type === ('reload' as any)) {
-        if (!workbookId) return
         setState((s) => ({ ...s, loading: true }))
         ;(async () => {
           try {
@@ -283,8 +269,6 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
                 loading: false,
                 error: null,
               })
-            } else {
-              setState((s) => ({ ...s, loading: false }))
             }
           } catch {}
         })()
@@ -313,7 +297,7 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
       socket.off('change', onChange)
       window.removeEventListener('finance:patch', onLocalPatch as EventListener)
     }
-  }, [currentUser, workbookId, year])
+  }, [currentUser])
 
   const broadcast = useCallback((msg: Omit<ChangeMessage, 'by' | 'at'>) => {
     const socket = getSocket()

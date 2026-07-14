@@ -39,68 +39,6 @@ import { SummaryCard } from '@/components/finance/summary-card'
 import { GroupNode } from '@/components/finance/gn6'
 import { TransactionEditor } from '@/components/finance/transaction-editor'
 import { CategoryEditor } from '@/components/finance/cat-editor'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { User, LogOut } from 'lucide-react'
-import { Input as UiInput } from '@/components/ui/input'
-
-// Switch User component (inline)
-function SwitchUserContent({ accountName, currentUser, onSelectUser, onLogout }: {
-  accountName: string
-  currentUser: string
-  onSelectUser: (name: string) => void
-  onLogout: () => void
-}) {
-  const [newUserName, setNewUserName] = useState('')
-  const [users, setUsers] = useState<string[]>(() => {
-    try {
-      const stored = localStorage.getItem(`nofluxo_users_${accountName}`)
-      return stored ? JSON.parse(stored) : []
-    } catch { return [] }
-  })
-
-  function handleCreate() {
-    if (!newUserName.trim()) return
-    const updated = [...users, newUserName.trim()]
-    setUsers(updated)
-    localStorage.setItem(`nofluxo_users_${accountName}`, JSON.stringify(updated))
-    onSelectUser(newUserName.trim())
-    setNewUserName('')
-  }
-
-  return (
-    <div className="space-y-3 py-2">
-      {users.map((u) => (
-        <button
-          key={u}
-          onClick={() => onSelectUser(u)}
-          className={cn(
-            'w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all touch-manipulation',
-            u === currentUser ? 'border-primary bg-primary/5' : 'border-border bg-background hover:bg-muted/50'
-          )}
-        >
-          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-            <User className="h-4 w-4 text-primary" />
-          </div>
-          <span className="font-medium text-foreground">{u}</span>
-          {u === currentUser && <span className="text-xs text-primary ml-auto">atual</span>}
-        </button>
-      ))}
-
-      <div className="flex gap-2 pt-2">
-        <UiInput
-          value={newUserName}
-          onChange={(e) => setNewUserName(e.target.value)}
-          placeholder="Novo usuário..."
-          onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-          className="flex-1"
-        />
-        <Button onClick={handleCreate} disabled={!newUserName.trim()} size="icon">
-          <Plus className="h-4 w-4" />
-        </Button>
-      </div>
-    </div>
-  )
-}
 import { SubgroupEditor } from '@/components/finance/subgroup-editor'
 import { ActivityPanel } from '@/components/finance/activity-panel'
 import { SettingsDialog } from '@/components/finance/settings-dialog'
@@ -126,7 +64,6 @@ import { WorkbookSwitcher } from '@/components/finance/workbook-switcher'
 import { NewCardDialog } from '@/components/finance/new-card-dialog'
 import { PrevBalanceCard } from '@/components/finance/prev-balance-card'
 import { useVencimentoNotifications } from '@/hooks/use-vencimento-notifications'
-import { LoginScreen } from '@/components/finance/login-screen'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -171,9 +108,6 @@ export default function Home() {
   } | null>(null)
   const [newSubItemParent, setNewSubItemParent] = useState<{ id: string; name: string; group: string; type: string; currency: string } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [accountName, setAccountName] = useState('')
-  const [switchUserOpen, setSwitchUserOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
   const history = useActionHistory()
@@ -186,6 +120,7 @@ export default function Home() {
   const [prevMonthLabel, setPrevMonthLabel] = useState<string>('')
 
   const euroRate = parseFloat(config.euroToBrl ?? '6') || 6
+  const euroName = config.euroName || 'Euro'
 
   // Fetch workbook name when workbookId changes — also sets a default workbook if none is selected
   useEffect(() => {
@@ -487,7 +422,6 @@ export default function Home() {
   async function handleCreateCategory(args: {
     name: string; group: CategoryGroup; type: CategoryType; currency: Currency
     note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null; color?: string | null
-    value?: number | null
   }) {
     try {
       const r = await createCategory({ ...args, parentCategoryId: newCatParent, workbookId, user })
@@ -497,25 +431,6 @@ export default function Home() {
       dispatchChange('category', 'create', { category: r.category }, detail, {
         user, action: 'create', entity: 'category', detail, createdAt: new Date().toISOString(),
       })
-
-      // If a value was provided, create a transaction for the current month
-      if (args.value !== null && args.value !== undefined && args.value > 0) {
-        const txRes = await saveTransaction({
-          categoryId: r.category.id,
-          month,
-          year,
-          value: args.value,
-          note: args.note ?? null,
-          user,
-        })
-        const txs = txRes.transactions ?? (txRes.transaction ? [txRes.transaction] : [])
-        if (txs.length > 0) {
-          dispatchChange('transaction', txRes.action as any, { transactions: txs }, `Adicionou valor em "${r.category.name}"`, {
-            user, action: 'create', entity: 'transaction', detail: `Adicionou valor em "${r.category.name}"`, createdAt: new Date().toISOString(),
-          })
-        }
-      }
-
       const createdCat = r.category
       const idRef = { current: createdCat.id }
       history.push({
@@ -532,17 +447,6 @@ export default function Home() {
           dispatchChange('category', 'create', { category: rr.category }, `Refazendo: ${detail}`, {
             user, action: 'create', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
           })
-          if (args.value !== null && args.value !== undefined && args.value > 0) {
-            const txRes = await saveTransaction({
-              categoryId: rr.category.id, month, year, value: args.value, note: args.note ?? null, user,
-            })
-            const txs = txRes.transactions ?? (txRes.transaction ? [txRes.transaction] : [])
-            if (txs.length > 0) {
-              dispatchChange('transaction', txRes.action as any, { transactions: txs }, `Refazendo: valor em "${rr.category.name}"`, {
-                user, action: 'create', entity: 'transaction', detail: `Refazendo: valor`, createdAt: new Date().toISOString(),
-              })
-            }
-          }
         },
       })
       toast.success(newCatParent ? `Sub-item "${r.category.name}" criado` : `Categoria "${r.category.name}" criada`)
@@ -776,13 +680,45 @@ export default function Home() {
   async function handleSaveEuroRate(v: number) {
     try {
       await updateConfig('euroToBrl', String(v), user)
-      const detail = `Atualizou câmbio Euro → R$ ${v.toFixed(2)}`
+      const detail = `Atualizou câmbio ${euroName} → R$ ${v.toFixed(2)}`
       dispatchChange('config', 'update', { key: 'euroToBrl', value: String(v) }, detail, {
         user, action: 'update', entity: 'config', detail, createdAt: new Date().toISOString(),
       })
       toast.success('Cotação atualizada')
     } catch (e: any) {
       toast.error(e.message || 'Erro ao atualizar cotação')
+    }
+  }
+
+  async function handleSaveEuroName(name: string) {
+    try {
+      await updateConfig('euroName', name, user)
+      const detail = `Renomeou moeda alternativa para "${name}"`
+      dispatchChange('config', 'update', { key: 'euroName', value: name }, detail, {
+        user, action: 'update', entity: 'config', detail, createdAt: new Date().toISOString(),
+      })
+      toast.success('Nome atualizado')
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao atualizar nome')
+    }
+  }
+
+  function handleLogout() {
+    try {
+      // Clear all auth/state keys so the app returns to the login screen
+      window.localStorage.removeItem('porto_finance_user')
+      window.localStorage.removeItem('porto_workbook_id')
+      // Also clear per-account workbook keys if any
+      const keys = Object.keys(window.localStorage)
+      for (const k of keys) {
+        if (k.startsWith('nofluxo_') || k.startsWith('porto_')) {
+          window.localStorage.removeItem(k)
+        }
+      }
+      // Hard reload so the app re-bootstraps from a clean state
+      window.location.href = '/'
+    } catch {
+      window.location.href = '/'
     }
   }
 
@@ -1249,16 +1185,6 @@ export default function Home() {
 
   // ---- Render ----
 
-  // Show login screen first
-  if (!isLoggedIn || !hydrated) {
-    return <LoginScreen onLogin={(accName, userName) => {
-      localStorage.setItem('porto_finance_user', userName)
-      setUser(userName)
-      setAccountName(accName)
-      setIsLoggedIn(true)
-    }} />
-  }
-
   if (!hydrated || loading || !workbookId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -1286,39 +1212,24 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
         <div className="max-w-3xl mx-auto px-3 py-2 space-y-2">
-          {/* Top row: Account (left) | Logo+NoFluxo (center) | Workbook (right) */}
-          <div className="flex items-center justify-between gap-2">
-            {/* Left: Account name → click to go back to login */}
-            <button
-              onClick={() => {
-                if (confirm('Sair da conta e voltar para o login?')) {
-                  setIsLoggedIn(false)
-                }
-              }}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground truncate max-w-[30%] text-left touch-manipulation"
-              title="Voltar para login"
-            >
-              ← {accountName || user}
-            </button>
-
-            {/* Center: Logo + NoFluxo */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-6 w-6" />
-              <span className="text-base font-bold text-primary">NoFluxo</span>
+          {/* Title row — full width, written in a flowing way */}
+          <button
+            onClick={() => setWorkbookOpen(true)}
+            className="w-full flex items-center gap-2 text-left touch-manipulation hover:opacity-80 transition-opacity"
+          >
+            <div className="h-7 w-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm flex-shrink-0">
+              €
             </div>
-
-            {/* Right: Workbook name → click to switch */}
-            <button
-              onClick={() => setWorkbookOpen(true)}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground truncate max-w-[30%] text-right touch-manipulation"
-              title="Trocar planilha"
-            >
-              {workbookName || 'Porto 2026'}
-            </button>
-          </div>
-
-          {/* Icons row — centered */}
-          <div className="flex items-center justify-center gap-1 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-sm font-semibold leading-tight truncate">
+                <span className="text-muted-foreground font-normal">Planilha </span>
+                <span className="text-foreground">"{workbookName || 'Porto 2026'}"</span>
+                <span className="text-muted-foreground font-normal"> • {year}</span>
+              </h1>
+            </div>
+          </button>
+          {/* Icons row — wraps naturally on small screens */}
+          <div className="flex items-center gap-1 flex-wrap">
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCopyOpen(true)} aria-label="Copiar mês" title="Copiar valores para outro mês">
               <Copy className="h-4 w-4" />
             </Button>
@@ -1335,17 +1246,27 @@ export default function Home() {
               <Download className="h-4 w-4" />
             </Button>
             {notifications.supported && (
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => notifications.enabled ? notifications.disable() : notifications.requestPermission()} aria-label="Notificações" title={notifications.enabled ? 'Desativar notificações' : 'Ativar notificações de vencimento'}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => notifications.enabled ? notifications.disable() : notifications.requestPermission()}
+                aria-label="Notificações"
+                title={notifications.enabled ? 'Desativar notificações' : 'Ativar notificações de vencimento'}
+              >
                 {notifications.enabled ? <Bell className="h-4 w-4 text-emerald-600" /> : <BellOff className="h-4 w-4" />}
               </Button>
             )}
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setSettingsOpen(true)} aria-label="Configurações">
+              <Settings className="h-4 w-4" />
+            </Button>
             <ThemeToggle />
-            {/* Online/Offline status */}
+            {/* Online/Offline status — at the end of icons row */}
             <Badge variant="outline" className={cn(
-              'gap-1 px-1.5 h-8 text-[10px] flex-shrink-0',
+              'gap-1 px-1.5 h-8 text-[10px] flex-shrink-0 ml-auto',
               live.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
             )}>
-              {live.connected ? <><Wifi className="h-3 w-3" /><span>Online</span></>
+              {live.connected ? <><Wifi className="h-3 w-3" /><span className="hidden sm:inline">Sincronizando</span><span className="sm:hidden">Online</span></>
                 : <><WifiOff className="h-3 w-3" /><span>Offline</span></>}
             </Badge>
           </div>
@@ -1366,9 +1287,7 @@ export default function Home() {
           includeReceivables={includeReceivables}
           onToggleReceivables={handleToggleReceivables}
           euroRate={euroRate}
-          customCurrencies={(() => {
-            try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
-          })()}
+          euroName={euroName}
           onEntradasClick={() => scrollToGroup('rendimentos')}
           onSaidasClick={() => scrollToGroup('despesas')}
         />
@@ -1842,25 +1761,17 @@ export default function Home() {
 
       <footer className="sticky bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
-          {/* Left: user name + settings + refresh */}
+          {/* Left: user name + refresh */}
           <div className="flex items-center gap-1.5 text-xs flex-1">
             <button
-              onClick={() => setSwitchUserOpen(true)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation"
-              title="Trocar de usuário"
+              onClick={() => setSettingsOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation"
+              title="Trocar de usuário ou abrir configurações"
             >
+              <span className="text-muted-foreground hidden sm:inline">Você é</span>
+              <span className="sm:hidden text-muted-foreground">👤</span>
               {user}
             </button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setSettingsOpen(true)}
-              aria-label="Configurações"
-              title="Configurações (moeda, conta, planilha)"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -1901,29 +1812,6 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* Switch User Dialog */}
-      <Dialog open={switchUserOpen} onOpenChange={setSwitchUserOpen}>
-        <DialogContent className="max-w-sm" onOpenAutoFocus={(e) => e.preventDefault()}>
-          <DialogHeader>
-            <DialogTitle>Trocar usuário</DialogTitle>
-            <DialogDescription className="sr-only">Selecione ou crie um usuário</DialogDescription>
-          </DialogHeader>
-          <SwitchUserContent
-            accountName={accountName}
-            currentUser={user}
-            onSelectUser={(name) => {
-              localStorage.setItem('porto_finance_user', name)
-              setUser(name)
-              setSwitchUserOpen(false)
-            }}
-            onLogout={() => {
-              setSwitchUserOpen(false)
-              setIsLoggedIn(false)
-            }}
-          />
-        </DialogContent>
-      </Dialog>
-
       <TransactionEditor
         open={!!editTarget}
         category={editTarget?.category ?? null}
@@ -1931,9 +1819,7 @@ export default function Home() {
         month={month}
         year={year}
         euroRate={euroRate}
-        customCurrencies={(() => {
-          try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
-        })()}
+        euroName={euroName}
         onOpenChange={(o) => !o && setEditTarget(null)}
         onSave={handleSaveTransaction}
         onClear={handleClearTransaction}
@@ -1947,9 +1833,7 @@ export default function Home() {
         labels={labels}
         subgroups={subgroups}
         topGroups={topGroups}
-        customCurrencies={(() => {
-          try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
-        })()}
+        euroName={euroName}
         onOpenChange={(o) => !o && setNewCatGroup(null)}
         onCreate={handleCreateCategory}
       />
@@ -1972,43 +1856,14 @@ export default function Home() {
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+        currentUser={user}
+        onSetUser={setUser}
         euroRate={euroRate}
         onSaveEuroRate={handleSaveEuroRate}
+        euroName={euroName}
+        onSaveEuroName={handleSaveEuroName}
         onExportExcel={handleExportExcel}
-        accountName={accountName}
-        currencies={(() => {
-          try {
-            const stored = config.customCurrencies
-            return stored ? JSON.parse(stored) : []
-          } catch { return [] }
-        })()}
-        onSaveCurrencies={async (currencies) => {
-          await updateConfig('customCurrencies', JSON.stringify(currencies), user)
-          window.dispatchEvent(new CustomEvent('finance:patch', {
-            detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(currencies) }, by: { name: user, color: USER_COLOR }, at: Date.now() }
-          }))
-        }}
-        onDeleteAccount={() => {
-          try {
-            const stored = localStorage.getItem('nofluxo_accounts')
-            const accounts = stored ? JSON.parse(stored) : []
-            const updated = accounts.filter((a: any) => a.name !== accountName)
-            localStorage.setItem('nofluxo_accounts', JSON.stringify(updated))
-            localStorage.removeItem(`nofluxo_users_${accountName}`)
-            localStorage.removeItem('nofluxo_workbook')
-            localStorage.removeItem('porto_workbook_id')
-            localStorage.removeItem('porto_finance_user')
-          } catch {}
-          setIsLoggedIn(false)
-          setSettingsOpen(false)
-          window.location.reload()
-        }}
-        onLogout={() => {
-          setIsLoggedIn(false)
-        }}
-        onBackup={() => setBackupOpen(true)}
-        onRestore={() => setBackupOpen(true)}
-        onResetValues={() => setResetOpen(true)}
+        onLogout={handleLogout}
       />
 
       <CopyMonthDialog
@@ -2057,9 +1912,7 @@ export default function Home() {
         topGroups={topGroups}
         labels={labels}
         initialGroup={quickAddInitialGroup}
-        customCurrencies={(() => {
-          try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
-        })()}
+        euroName={euroName}
         onOpenChange={setQuickAddOpen}
         onCreate={handleQuickAdd}
       />
