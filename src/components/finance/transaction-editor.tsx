@@ -56,7 +56,7 @@ interface Props {
 }
 
 export function TransactionEditor({
-  open, category, transaction, month, year, euroRate,
+  open, category, transaction, month, year, euroRate, customCurrencies,
   onOpenChange, onSave, onClear, onStopRecurring, onUpdateCategory,
 }: Props) {
   const [raw, setRaw] = useState('')
