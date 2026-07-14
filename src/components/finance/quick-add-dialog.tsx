@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -13,10 +13,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Category, collectAllPaths, Subgroup, TopGroup, MONTHS_PT_LONG } from '@/lib/finance'
+import {
+  Category, collectAllPaths, Subgroup, TopGroup, MONTHS_PT_LONG, getTopGroup,
+} from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Zap, RefreshCw, TrendingDown, TrendingUp, PiggyBank, FolderPlus } from 'lucide-react'
+import { Zap, RefreshCw, FolderPlus, TrendingDown, TrendingUp, PiggyBank } from 'lucide-react'
 import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
 
 type QuickType = 'EXPENSE' | 'INCOME' | 'RESERVE'
@@ -46,11 +48,38 @@ interface Props {
   }) => Promise<void>
 }
 
-const TYPE_OPTIONS: { value: QuickType; label: string; icon: typeof TrendingDown; color: string }[] = [
-  { value: 'EXPENSE', label: 'Despesa', icon: TrendingDown, color: '#dc2626' },
-  { value: 'INCOME', label: 'Rendimento', icon: TrendingUp, color: '#16a34a' },
-  { value: 'RESERVE', label: 'Reserva', icon: PiggyBank, color: '#d97706' },
-]
+// Map a topGroup key → its type. Used to derive the Tipo from the "Onde adicionar?" selection.
+function deriveTypeFromGroup(group: string, topGroups: TopGroup[]): QuickType {
+  const topKey = getTopGroup(group)
+  const tg = topGroups.find((t) => t.key === topKey)
+  if (tg) {
+    if (tg.type === 'INCOME') return 'INCOME'
+    if (tg.type === 'RESERVE') return 'RESERVE'
+    return 'EXPENSE'
+  }
+  // Fallback to known default keys
+  if (topKey === 'rendimentos') return 'INCOME'
+  if (topKey === 'reservas') return 'RESERVE'
+  return 'EXPENSE'
+}
+
+const TYPE_ICON: Record<QuickType, typeof TrendingDown> = {
+  EXPENSE: TrendingDown,
+  INCOME: TrendingUp,
+  RESERVE: PiggyBank,
+}
+
+const TYPE_LABEL: Record<QuickType, string> = {
+  EXPENSE: 'Despesa',
+  INCOME: 'Rendimento',
+  RESERVE: 'Reserva',
+}
+
+const TYPE_COLOR: Record<QuickType, string> = {
+  EXPENSE: '#dc2626',
+  INCOME: '#16a34a',
+  RESERVE: '#d97706',
+}
 
 export function QuickAddDialog({
   open, month, year, categories, subgroups, topGroups, labels, initialGroup, customCurrencies, onOpenChange, onCreate,
@@ -58,7 +87,6 @@ export function QuickAddDialog({
   const [name, setName] = useState('')
   const [raw, setRaw] = useState('')
   const [currency, setCurrency] = useState<string>('BRL')
-  const [type, setType] = useState<QuickType>('EXPENSE')
   const [group, setGroup] = useState<string>('')
   const [note, setNote] = useState('')
   const [isRecurring, setIsRecurring] = useState(false)
@@ -67,44 +95,61 @@ export function QuickAddDialog({
   const [createNewSubgroup, setCreateNewSubgroup] = useState(false)
   const [newSubgroupName, setNewSubgroupName] = useState('')
 
+  const groupOptions = useMemo(
+    () => collectAllPaths(subgroups, labels, topGroups, categories),
+    [subgroups, labels, topGroups, categories]
+  )
+
+  // When the dialog opens, pick a sensible default group:
+  // - If initialGroup is given (e.g., user clicked "+" on a card), use it.
+  // - Otherwise, pick the first subgroup of the first EXPENSE card.
   useEffect(() => {
     if (open) {
       setName('')
       setRaw('')
       setCurrency('BRL')
-      setType('EXPENSE')
-      setGroup(initialGroup || '')
       setNote('')
       setIsRecurring(false)
       setInstallmentsTotal('')
       setCreateNewSubgroup(false)
       setNewSubgroupName('')
-    }
-  }, [open, initialGroup])
 
-  const groupOptions = collectAllPaths(subgroups, labels, topGroups, categories)
-  const parsed = parseFloat(raw.replace(',', '.'))
-  // If an existing category is selected (value starts with "cat:"), name is not required
+      let startGroup = initialGroup || ''
+      if (!startGroup) {
+        // Default: first subgroup inside the first EXPENSE topGroup
+        const firstExpense = topGroups.find((t) => t.type === 'EXPENSE')
+        if (firstExpense) {
+          const firstSub = subgroups
+            .filter((s) => s.parentKey === firstExpense.key)
+            .sort((a, b) => a.sortOrder - b.sortOrder)[0]
+          startGroup = firstSub?.key ?? firstExpense.key
+        } else if (groupOptions.length > 0) {
+          // Fallback: first available option that's not a category
+          const firstNonCat = groupOptions.find((o) => !o.value.startsWith('cat:'))
+          startGroup = firstNonCat?.value ?? ''
+        }
+      }
+      setGroup(startGroup)
+    }
+  }, [open, initialGroup, topGroups, subgroups, groupOptions])
+
+  // Derive the type from the selected group's parent card
   const isExistingCategory = group.startsWith('cat:')
+  const type: QuickType = useMemo(() => {
+    if (isExistingCategory) {
+      // Use the existing category's type
+      const catId = group.slice(4)
+      const cat = categories.find((c) => c.id === catId)
+      if (cat) return cat.type as QuickType
+    }
+    return deriveTypeFromGroup(group, topGroups)
+  }, [group, isExistingCategory, categories, topGroups])
+
+  const parsed = parseFloat(raw.replace(',', '.'))
   const valid = !isNaN(parsed) && parsed >= 0 &&
+    group.length > 0 &&
     (isExistingCategory || name.trim().length > 0) &&
     (!createNewSubgroup || newSubgroupName.trim().length > 0)
-
-  // Default group based on type (only if no initialGroup and no manual selection)
-  useEffect(() => {
-    if (open && !group && !initialGroup) {
-      if (type === 'EXPENSE') {
-        const opt = groupOptions.find((g) => g.value === 'despesas.cartoes') || groupOptions.find((g) => g.depth === 1 && g.value.startsWith('despesas'))
-        if (opt) setGroup(opt.value)
-      } else if (type === 'INCOME') {
-        const opt = groupOptions.find((g) => g.value === 'rendimentos.brl') || groupOptions.find((g) => g.depth === 1 && g.value.startsWith('rendimentos'))
-        if (opt) setGroup(opt.value)
-      } else if (type === 'RESERVE') {
-        const opt = groupOptions.find((g) => g.value === 'reservas')
-        if (opt) setGroup(opt.value)
-      }
-    }
-  }, [open, type])
 
   async function handleSave() {
     if (!valid) return
@@ -116,7 +161,8 @@ export function QuickAddDialog({
         value: parsed,
         currency,
         type,
-        group: group || (type === 'EXPENSE' ? 'despesas.cartoes' : type === 'INCOME' ? 'rendimentos.brl' : 'reservas'),
+        // Use the selected group (or its parent if creating a new subgroup)
+        group: createNewSubgroup ? group : group,
         note: note.trim() || undefined,
         isRecurring,
         installmentsTotal: isRecurring ? inst : null,
@@ -130,10 +176,15 @@ export function QuickAddDialog({
   }
 
   const monthLabel = `${MONTHS_PT_LONG[month - 1]}/${year}`
+  const TypeIcon = TYPE_ICON[type]
+  const typeColor = TYPE_COLOR[type]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-md max-h-[90vh] overflow-y-auto"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Zap className="h-4 w-4 text-primary" />
@@ -141,7 +192,7 @@ export function QuickAddDialog({
           </DialogTitle>
           <p className="text-xs text-muted-foreground">{monthLabel}</p>
           <DialogDescription className="sr-only">
-            Crie uma categoria e um valor rapidamente. Escolha o tipo (despesa, rendimento ou reserva), a moeda e o grupo.
+            Adicione um valor a um item existente ou crie um novo. O tipo é determinado automaticamente pelo card onde você adiciona.
           </DialogDescription>
         </DialogHeader>
 
@@ -186,36 +237,21 @@ export function QuickAddDialog({
             )}
           </div>
 
-          {/* Type selector — hidden when existing category is selected */}
-          {!isExistingCategory && !createNewSubgroup && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Tipo</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {TYPE_OPTIONS.map((opt) => {
-                  const Icon = opt.icon
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setType(opt.value)}
-                      className={cn(
-                        'flex flex-col items-center gap-1 p-2.5 rounded-lg border-2 transition-all touch-manipulation',
-                        type === opt.value
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-muted/50 text-muted-foreground'
-                      )}
-                      style={type === opt.value ? { borderColor: opt.color, color: opt.color } : undefined}
-                    >
-                      <Icon className="h-4 w-4" />
-                      <span className="text-[11px] font-medium">{opt.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
+          {/* Type indicator (read-only — derived from the selected card) */}
+          {!createNewSubgroup && (
+            <div
+              className="flex items-center gap-2 p-2.5 rounded-lg border-2 text-sm font-medium"
+              style={{ borderColor: typeColor, color: typeColor, backgroundColor: typeColor + '0d' }}
+            >
+              <TypeIcon className="h-4 w-4" />
+              <span>Tipo: {TYPE_LABEL[type]}</span>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {isExistingCategory ? '(da categoria existente)' : '(do card selecionado)'}
+              </span>
             </div>
           )}
 
-          {/* Name — hidden when existing category is selected */}
+          {/* Name — hidden when existing category or creating new subgroup */}
           {!isExistingCategory && !createNewSubgroup && (
             <div className="space-y-1.5">
               <Label htmlFor="qa-name">Nome do novo item</Label>
@@ -301,7 +337,7 @@ export function QuickAddDialog({
                     onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    Selecione o grupo pai no campo "Onde adicionar?" acima. O novo subgrupo será criado dentro dele.
+                    O novo subgrupo será criado dentro do card selecionado em &quot;Onde adicionar?&quot; acima.
                   </p>
                 </div>
               )}
