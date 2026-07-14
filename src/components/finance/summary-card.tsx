@@ -157,7 +157,7 @@ export function SummaryCard({
         <button
           onClick={onEntradasClick}
           className="text-left rounded-lg bg-muted/50 p-2.5 hover:bg-muted transition-colors touch-manipulation active:scale-[0.98]"
-          aria-label="Ver rendimentos"
+          aria-label="Ver receitas"
         >
           <div className="flex items-center gap-1.5 text-muted-foreground">
             <TrendingUp className="h-3.5 w-3.5" />

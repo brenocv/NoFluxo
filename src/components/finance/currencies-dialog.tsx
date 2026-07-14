@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, Coins, Star } from 'lucide-react'
-import { PREDEFINED_CURRENCIES, getCurrencyDef } from '@/lib/currencies'
+import { PREDEFINED_CURRENCIES, DEFAULT_OFFERED_CURRENCIES, getCurrencyDef } from '@/lib/currencies'
 
 interface ActiveCurrency {
   code: string
@@ -56,8 +56,11 @@ export function CurrenciesDialog({
     if (open) setRate(String(euroRate))
   }, [open, euroRate])
 
-  const availableCurrencies = PREDEFINED_CURRENCIES.filter(c =>
-    !activeCurrencies.find(a => a.code === c.code) && c.code !== 'BRL' && c.code !== 'EUR'
+  // Only USD is offered by default (per user request: just Real + Euro + Dólar).
+  // The full PREDEFINED_CURRENCIES list is still used for symbol/name lookup
+  // when displaying active currencies.
+  const availableCurrencies = DEFAULT_OFFERED_CURRENCIES.filter(c =>
+    !activeCurrencies.find(a => a.code === c.code)
   )
 
   // All currencies eligible to be the secondary one (shown alongside BRL).

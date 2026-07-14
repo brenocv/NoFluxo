@@ -17,6 +17,14 @@ export const PREDEFINED_CURRENCIES: CurrencyDef[] = [
   { code: 'CZK', name: 'Coroa Tcheca', symbol: 'Kč', flag: '🇨🇿' },
 ]
 
+// Currencies offered by default in the "Add currency" dropdown of CurrenciesDialog.
+// The full PREDEFINED_CURRENCIES list is kept for symbol/name lookup, but only
+// these are shown as selectable options. The user explicitly asked for only
+// Real (primary), Euro (secondary), and Dólar to be available by default.
+export const DEFAULT_OFFERED_CURRENCIES: CurrencyDef[] = [
+  { code: 'USD', name: 'Dólar', symbol: '$', flag: '🇺🇸' },
+]
+
 export function getCurrencySymbol(code: string): string {
   const c = PREDEFINED_CURRENCIES.find(c => c.code === code)
   return c?.symbol ?? code

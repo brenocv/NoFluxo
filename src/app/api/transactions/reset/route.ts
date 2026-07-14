@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     // or if a user accidentally deleted one).
     const DEFAULT_TOP_GROUPS = [
       { key: 'despesas',    name: 'Despesas',    color: '#dc2626', type: 'EXPENSE', sortOrder: 0 },
-      { key: 'rendimentos', name: 'Rendimentos', color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
+      { key: 'rendimentos', name: 'Receitas',    color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
       { key: 'reservas',    name: 'Reservas',    color: '#d97706', type: 'RESERVE', sortOrder: 2 },
     ]
     for (const tg of DEFAULT_TOP_GROUPS) {
