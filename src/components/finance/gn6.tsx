@@ -14,7 +14,7 @@ import {
 } from '@/lib/finance'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
-  AlertTriangle, RefreshCw, Check, FolderPlus,
+  AlertTriangle, RefreshCw, Check, FolderPlus, Move,
   TrendingUp, TrendingDown, PiggyBank, GripVertical,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType } from './category-dnd'
@@ -25,6 +25,7 @@ interface Props {
   transactionsByCat: Record<string, Transaction | undefined>
   allCategories: Category[]
   euroRate: number
+  secondarySymbol?: string
   highlightedCategoryIds: Set<string>
   onClearSearch: () => void
   onEdit: (category: Category, current: Transaction | undefined) => void
@@ -74,7 +75,7 @@ const ATTR_BY_TYPE: Record<DnDType, string> = {
 }
 
 export function GroupNode(props: Props) {
-  const { node, transactionsByCat, euroRate, allCategories } = props
+  const { node, transactionsByCat, euroRate, allCategories, secondarySymbol } = props
   const [userOpen, setUserOpen] = useState(true)
   const hasSearch = props.highlightedCategoryIds.size > 0
   const hasHighlightedInTree = (n: GroupTreeNode): boolean => {
@@ -257,7 +258,7 @@ export function GroupNode(props: Props) {
         )}
         {/* Label — wraps naturally on small screens */}
         <div
-          className={cn('flex-1 min-w-0 break-words leading-tight', isTopLevel ? 'font-bold text-sm' : 'font-semibold text-[13px]')}
+          className={cn('flex-1 min-w-0 text-pretty leading-tight', isTopLevel ? 'font-bold text-sm' : 'font-semibold text-[13px]')}
           style={{ color: isTopLevel ? color : undefined }}
         >
           {node.label}
@@ -280,15 +281,19 @@ export function GroupNode(props: Props) {
           onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
           small={!isTopLevel}
         />
-        {/* + button: creates a new subgroup inside (FolderPlus for both top-level and subgroups) */}
+        {/* + button: top-level creates subgroup, subgroups create sub-item (category) inside */}
         <button
           onClick={(e) => {
             e.stopPropagation()
-            props.onAddSubgroup(node.key)
+            if (isTopLevel) {
+              props.onAddSubgroup(node.key)
+            } else {
+              props.onAddCategory(node.key, null)
+            }
           }}
           className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors touch-manipulation"
-          aria-label="Novo subgrupo"
-          title="Criar subgrupo aqui"
+          aria-label={isTopLevel ? 'Novo subgrupo' : 'Novo sub-item'}
+          title={isTopLevel ? 'Criar subgrupo aqui' : 'Adicionar sub-item aqui'}
           style={{ color }}
         >
           <FolderPlus className={isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
@@ -315,7 +320,7 @@ export function GroupNode(props: Props) {
         <span className="text-xs sm:text-sm font-semibold tabular-nums ml-0.5 sm:ml-1 text-right" style={{ color }}>
           {totalSign}{formatMoney(Math.abs(total), 'BRL')}
           <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
-            ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+            ({formatMoney(Math.abs(total) / euroRate, 'EUR', secondarySymbol)})
           </span>
         </span>
       </div>
@@ -511,7 +516,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         if (targetRow && targetRow.dataset.catId !== category.id) {
           const targetRect = targetRow.getBoundingClientRect()
           const isAbove = ev.clientY < targetRect.top + targetRect.height / 2
-          dnd.setTarget(targetRow.dataset.catId ?? null, isAbove ? 'before' : 'after')
+          dnd.setTarget(targetRow.dataset.catId, isAbove ? 'before' : 'after')
         } else {
           dnd.setTarget(null, null)
         }
@@ -587,7 +592,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             <span className="text-[13px] font-medium text-foreground flex items-start gap-1 flex-wrap min-w-0 w-full">
               {/* Hide name for receivables — show only the "a receber" badge */}
               {category.group !== 'rendimentos.valores_a_receber' && (
-                <div className="break-words leading-tight flex-1 min-w-0">{category.name}</div>
+                <div className="text-pretty leading-tight flex-1 min-w-0">{category.name}</div>
               )}
               {category.group === 'rendimentos.valores_a_receber' && (
                 <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
@@ -618,6 +623,9 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
           >
             <FolderPlus className="h-3 w-3" style={{ color }} />
           </button>
+          <button onClick={(e) => { e.stopPropagation(); allProps.onMoveCategory(category) }} className="p-1 sm:p-1.5 rounded-md hover:bg-muted transition-all touch-manipulation" aria-label="Mover" title="Mover para outro local">
+            <Move className="h-3 w-3" />
+          </button>
           {isRecurring && (
             <button onClick={(e) => { e.stopPropagation(); if (tx && tx.seriesId) allProps.onStopRecurring(tx.seriesId, tx.month) }} className="p-1 sm:p-1.5 rounded-md hover:bg-cyan-50 dark:hover:bg-cyan-950/40 hover:text-cyan-600 dark:hover:text-cyan-400 transition-all touch-manipulation" aria-label="Parar recorrência" title="Parar recorrência">
               <RefreshCw className="h-3 w-3" />
@@ -629,11 +637,18 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             ) : (
               <div className="flex flex-col items-end leading-tight">
                 <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap" style={{ color }}>
-                  {sign}{formatMoney(Math.abs(displayValue), category.currency)}
+                  {sign}{formatMoney(Math.abs(displayValue), category.currency, secondarySymbol)}
                 </span>
-                <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
-                  {category.currency === 'BRL' ? formatMoney(Math.abs(displayValue) / euroRate, 'EUR') : formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
-                </span>
+                {category.currency === 'BRL' && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
+                    {formatMoney(Math.abs(displayValue) / euroRate, 'EUR', secondarySymbol)}
+                  </span>
+                )}
+                {category.currency === 'EUR' && (
+                  <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
+                    {formatMoney(Math.abs(displayValue) * euroRate, 'BRL', secondarySymbol)}
+                  </span>
+                )}
               </div>
             )}
           </button>

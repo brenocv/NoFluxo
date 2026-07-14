@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -12,167 +12,170 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { cn } from '@/lib/utils'
-import { Download } from 'lucide-react'
+import { Download, Trash2, Upload, LogOut } from 'lucide-react'
 
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
-  currentUser: string
-  onSetUser: (name: string) => void
   euroRate: number
+  secondaryCurrencyName?: string
+  secondaryCurrencySymbol?: string
   onSaveEuroRate: (v: number) => Promise<void>
-  euroName: string
-  onSaveEuroName: (name: string) => Promise<void>
+  onSaveSecondaryCurrency?: (name: string, symbol: string) => Promise<void>
   onExportExcel?: () => void
+  onDeleteAccount?: () => void
+  onLogout?: () => void
+  onBackup?: () => void
+  onRestore?: () => void
+  onResetValues?: () => void
+  accountName?: string
 }
-
-const USERS = ['Breno', 'Kiki', 'Visita']
 
 export function SettingsDialog({
   open,
   onOpenChange,
-  currentUser,
-  onSetUser,
   euroRate,
+  secondaryCurrencyName = 'Euro',
+  secondaryCurrencySymbol = '€',
   onSaveEuroRate,
-  euroName,
-  onSaveEuroName,
+  onSaveSecondaryCurrency,
   onExportExcel,
+  onDeleteAccount,
+  onLogout,
+  onBackup,
+  onRestore,
+  onResetValues,
+  accountName,
 }: Props) {
   const [rate, setRate] = useState(String(euroRate))
-  const [name, setName] = useState(euroName)
-  const [savingRate, setSavingRate] = useState(false)
-  const [savingName, setSavingName] = useState(false)
+  const [currencyName, setCurrencyName] = useState(secondaryCurrencyName)
+  const [currencySymbol, setCurrencySymbol] = useState(secondaryCurrencySymbol)
+  const [saving, setSaving] = useState(false)
 
-  // Sync local state when dialog opens or props change
   useEffect(() => {
-    if (open) {
-      setRate(String(euroRate))
-      setName(euroName)
-    }
-  }, [open, euroRate, euroName])
+    setRate(String(euroRate))
+    setCurrencyName(secondaryCurrencyName)
+    setCurrencySymbol(secondaryCurrencySymbol)
+  }, [euroRate, secondaryCurrencyName, secondaryCurrencySymbol])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Configurações</DialogTitle>
           <DialogDescription className="sr-only">
-            Defina quem está usando este dispositivo, o nome da moeda alternativa e a cotação usada nos cálculos.
+            Defina a moeda secundária e gerencie a planilha.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-5 py-2">
-          {/* User identity */}
-          <div className="space-y-2">
-            <Label>Quem está usando?</Label>
-            <div className="grid grid-cols-3 gap-2">
-              {USERS.map((u) => (
-                <button
-                  key={u}
-                  onClick={() => onSetUser(u)}
-                  className={cn(
-                    'h-10 rounded-lg text-sm font-medium transition-all touch-manipulation',
-                    currentUser === u
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  )}
+          {/* Secondary currency */}
+          <div className="space-y-3">
+            <Label>Moeda secundária</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Nome</label>
+                <Input
+                  value={currencyName}
+                  onChange={(e) => setCurrencyName(e.target.value)}
+                  placeholder="Euro, Dólar..."
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Símbolo</label>
+                <Input
+                  value={currencySymbol}
+                  onChange={(e) => setCurrencySymbol(e.target.value)}
+                  placeholder="€, $, £..."
+                  className="w-20"
+                />
+              </div>
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-muted-foreground">Cotação (em R$)</label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={rate}
+                  onChange={(e) => setRate(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  onClick={async () => {
+                    const v = parseFloat(rate.replace(',', '.'))
+                    if (isNaN(v) || v <= 0) return
+                    setSaving(true)
+                    try {
+                      await onSaveEuroRate(v)
+                      if (onSaveSecondaryCurrency) {
+                        await onSaveSecondaryCurrency(currencyName.trim() || 'Euro', currencySymbol.trim() || '€')
+                      }
+                    } finally { setSaving(false) }
+                  }}
+                  disabled={saving}
                 >
-                  {u}
-                </button>
-              ))}
+                  {saving ? 'Salvando…' : 'Salvar'}
+                </Button>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Cada dispositivo escolhe quem está usando — assim o histórico mostra quem editou o quê.
-            </p>
-          </div>
-
-          {/* Euro name (editable) */}
-          <div className="space-y-2">
-            <Label htmlFor="euro-name">Nome da moeda alternativa</Label>
-            <div className="flex gap-2">
-              <Input
-                id="euro-name"
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Euro"
-                className="flex-1"
-                autoComplete="off"
-              />
-              <Button
-                onClick={async () => {
-                  const v = name.trim() || 'Euro'
-                  setSavingName(true)
-                  try {
-                    await onSaveEuroName(v)
-                  } finally {
-                    setSavingName(false)
-                  }
-                }}
-                disabled={savingName || (name.trim() || 'Euro') === euroName}
-              >
-                {savingName ? 'Salvando…' : 'Salvar'}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Você pode renomear a moeda alternativa para &quot;Euro PT&quot;, &quot;Dólar&quot;, etc.
-              O símbolo (€) continua o mesmo.
-            </p>
-          </div>
-
-          {/* Exchange rate */}
-          <div className="space-y-2">
-            <Label htmlFor="rate">
-              Cotação do {euroName} (em R$)
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="rate"
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                onClick={async () => {
-                  const v = parseFloat(rate.replace(',', '.'))
-                  if (isNaN(v) || v <= 0) return
-                  setSavingRate(true)
-                  try {
-                    await onSaveEuroRate(v)
-                  } finally {
-                    setSavingRate(false)
-                  }
-                }}
-                disabled={savingRate}
-              >
-                {savingRate ? 'Salvando…' : 'Salvar'}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Usado para mostrar o saldo total consolidado em Reais.
-            </p>
           </div>
 
           {/* Excel export */}
           {onExportExcel && (
-            <div className="space-y-2">
-              <Label>Exportar planilha</Label>
+            <div className="space-y-2 pt-4 border-t border-border">
+              <Label>Exportar</Label>
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { onExportExcel(); onOpenChange(false) }}>
+                <Download className="h-4 w-4" /> Exportar Excel
+              </Button>
+            </div>
+          )}
+
+          {/* Backup / Restore / Reset */}
+          <div className="space-y-2 pt-4 border-t border-border">
+            <Label>Dados da planilha</Label>
+            {onBackup && (
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { onBackup(); onOpenChange(false) }}>
+                <Download className="h-4 w-4" /> Backup (JSON)
+              </Button>
+            )}
+            {onRestore && (
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { onRestore(); onOpenChange(false) }}>
+                <Upload className="h-4 w-4" /> Restaurar backup
+              </Button>
+            )}
+            {onResetValues && (
+              <Button variant="outline" className="w-full justify-start gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30" onClick={() => { onResetValues(); onOpenChange(false) }}>
+                <Trash2 className="h-4 w-4" /> Zerar valores
+              </Button>
+            )}
+          </div>
+
+          {/* Logout */}
+          {onLogout && (
+            <div className="space-y-2 pt-4 border-t border-border">
+              <Button variant="outline" className="w-full justify-start gap-2" onClick={() => { onLogout(); onOpenChange(false) }}>
+                <LogOut className="h-4 w-4" /> Sair da conta
+              </Button>
+            </div>
+          )}
+
+          {/* Delete account */}
+          {onDeleteAccount && (
+            <div className="space-y-2 pt-4 border-t border-border">
+              <Label>Conta: {accountName}</Label>
               <Button
                 variant="outline"
-                className="w-full justify-start gap-2"
-                onClick={() => { onExportExcel(); onOpenChange(false) }}
+                className="w-full justify-start gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                onClick={() => {
+                  if (confirm(`Apagar a conta "${accountName}" e todos os dados?`)) {
+                    onDeleteAccount()
+                  }
+                }}
               >
-                <Download className="h-4 w-4" />
-                Exportar Excel do ano atual
+                <Trash2 className="h-4 w-4" /> Apagar esta conta
               </Button>
-              <p className="text-xs text-muted-foreground">
-                Gera um arquivo .xlsx com todas as categorias e valores do ano.
-              </p>
             </div>
           )}
         </div>

@@ -109,7 +109,8 @@ export async function DELETE(req: NextRequest) {
   const user = String(body.user || 'Anônimo').slice(0, 30)
 
   const count = await db.workbook.count()
-  if (count <= 1) {
+  // Allow deleting last workbook if user is 'reset' (full reset)
+  if (count <= 1 && user !== 'reset') {
     return NextResponse.json({ error: 'Não é possível remover a única planilha' }, { status: 400 })
   }
 

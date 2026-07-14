@@ -6,6 +6,12 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown, PiggyBank, Clock } from 'lucide-react'
 import { formatBRL, formatEUR } from '@/lib/finance'
+import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
+
+interface ActiveCurrency {
+  code: string
+  rate: number
+}
 
 interface Props {
   entradasBRL: number
@@ -18,7 +24,8 @@ interface Props {
   includeReceivables: boolean
   onToggleReceivables: (v: boolean) => void
   euroRate: number
-  euroName?: string
+  secondarySymbol?: string
+  secondaryName?: string
   onEntradasClick: () => void
   onSaidasClick: () => void
 }
@@ -27,7 +34,7 @@ export function SummaryCard({
   entradasBRL, saidasBRL, entradasEUR, saidasEUR,
   reservasBRL, receivablesBRL, receivablesEUR,
   includeReceivables, onToggleReceivables, euroRate,
-  euroName = 'Euro',
+  secondarySymbol, secondaryName,
   onEntradasClick, onSaidasClick,
 }: Props) {
   const totalEntradasBRL = entradasBRL + entradasEUR * euroRate
@@ -41,13 +48,28 @@ export function SummaryCard({
 
   return (
     <Card className="p-4 space-y-3 shadow-sm">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-1">
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Resumo do mês
         </span>
-        <span className="text-xs text-muted-foreground">
-          €1 = R$ {euroRate.toFixed(2).replace('.', ',')}
-        </span>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+          <span>
+            {secondarySymbol ?? '€'}1 = R$ {euroRate.toFixed(2).replace('.', ',')}
+            {' '}<button onClick={() => {
+              const newRate = window.prompt(`Nova cotação do ${secondaryName ?? 'Euro'} (em R$):`, String(euroRate))
+              if (newRate !== null) {
+                const parsed = parseFloat(newRate.replace(',', '.'))
+                if (!isNaN(parsed) && parsed > 0) {
+                  fetch('/api/config', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user' }),
+                  }).then(() => window.location.reload())
+                }
+              }
+            }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
+          </span>
+        </div>
       </div>
 
       <div className="space-y-1">
@@ -63,7 +85,7 @@ export function SummaryCard({
           {formatBRL(saldoTotalBRL)}
         </div>
         <div className={cn('text-sm font-medium tabular-nums', saldoTotalEUR >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80')}>
-          ≈ {formatEUR(saldoTotalEUR)} <span className="text-[10px] text-muted-foreground">({euroName})</span>
+          ≈ {formatEUR(saldoTotalEUR)}
         </div>
       </div>
 

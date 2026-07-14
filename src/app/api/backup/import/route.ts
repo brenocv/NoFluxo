@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
 // POST /api/backup/import
-//   body: { backup: {...}, mode: 'replace' | 'merge', workbookId? }
+//   body: { backup: {...}, mode: 'replace' | 'merge' }
 //
-//   mode='replace': DELETES all existing data (scoped to workbookId when provided)
-//                   and restores from backup.
+//   mode='replace': DELETES all existing data and restores from backup.
 //   mode='merge':   keeps existing data, adds only what's missing (by ID).
 //
 // Returns counts of what was imported.
@@ -18,7 +17,6 @@ export async function POST(req: NextRequest) {
   const backup = body.backup
   const mode: 'replace' | 'merge' = body.mode === 'merge' ? 'merge' : 'replace'
   const user = String(body.user || 'Anônimo').slice(0, 30)
-  const workbookId: string | undefined = body.workbookId || backup.workbookId || undefined
 
   // Validate backup structure
   const requiredKeys = ['categories', 'transactions', 'config']
@@ -31,21 +29,12 @@ export async function POST(req: NextRequest) {
 
   try {
     if (mode === 'replace') {
-      // Delete everything in the right order (respecting foreign keys).
-      // When a workbookId is provided, scope the deletion to that workbook
-      // so we don't wipe out other workbooks.
+      // Delete everything in the right order (respecting foreign keys)
       await db.activityLog.deleteMany()
-      if (workbookId) {
-        await db.transaction.deleteMany({ where: { category: { workbookId } } })
-        await db.note.deleteMany({ where: { workbookId } })
-        await db.category.deleteMany({ where: { workbookId } })
-        await db.subgroup.deleteMany({ where: { workbookId } })
-      } else {
-        await db.transaction.deleteMany()
-        await db.note.deleteMany()
-        await db.category.deleteMany()
-        await db.subgroup.deleteMany()
-      }
+      await db.transaction.deleteMany()
+      await db.note.deleteMany()
+      await db.category.deleteMany()
+      await db.subgroup.deleteMany()
       await db.config.deleteMany()
     }
 
@@ -60,25 +49,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Map old subgroup ids to either themselves or a fallback workbook
-    const fallbackWbId = workbookId || ''
-
     // Import subgroups
     if (Array.isArray(backup.subgroups)) {
       for (const sg of backup.subgroups) {
-        const sgWbId = sg.workbookId || fallbackWbId
-        if (!sgWbId) continue // cannot create without workbookId
         await db.subgroup.upsert({
-          where: { id: sg.id },
+          where: { key: sg.key },
           update: mode === 'replace' ? {
-            workbookId: sgWbId,
             parentKey: sg.parentKey,
             name: sg.name,
             sortOrder: sg.sortOrder,
           } : {},
           create: {
             id: sg.id,
-            workbookId: sgWbId,
             key: sg.key,
             parentKey: sg.parentKey,
             name: sg.name,
@@ -91,12 +73,9 @@ export async function POST(req: NextRequest) {
     // Import categories
     if (Array.isArray(backup.categories)) {
       for (const c of backup.categories) {
-        const cWbId = c.workbookId || fallbackWbId
-        if (!cWbId) continue
         await db.category.upsert({
           where: { id: c.id },
           update: mode === 'replace' ? {
-            workbookId: cWbId,
             name: c.name,
             group: c.group,
             type: c.type,
@@ -110,7 +89,6 @@ export async function POST(req: NextRequest) {
           } : {},
           create: {
             id: c.id,
-            workbookId: cWbId,
             name: c.name,
             group: c.group,
             type: c.type,
@@ -160,31 +138,22 @@ export async function POST(req: NextRequest) {
     // Import notes
     if (Array.isArray(backup.notes)) {
       for (const n of backup.notes) {
-        const nWbId = n.workbookId || fallbackWbId
-        if (!nWbId) continue
-        // Note unique constraint is workbookId_year_month, but Prisma's
-        // compound unique name depends on schema order; use the explicit name.
-        try {
-          await db.note.upsert({
-            where: { workbookId_year_month: { workbookId: nWbId, year: n.year, month: n.month } },
-            update: mode === 'replace' ? {
-              text: n.text,
-              user: n.user,
-              isRecurring: n.isRecurring,
-            } : {},
-            create: {
-              id: n.id,
-              workbookId: nWbId,
-              year: n.year,
-              month: n.month,
-              text: n.text,
-              user: n.user,
-              isRecurring: n.isRecurring ?? false,
-            },
-          })
-        } catch {
-          // Skip if upsert fails (e.g. ID conflict in merge mode)
-        }
+        await db.note.upsert({
+          where: { year_month: { year: n.year, month: n.month } },
+          update: mode === 'replace' ? {
+            text: n.text,
+            user: n.user,
+            isRecurring: n.isRecurring,
+          } : {},
+          create: {
+            id: n.id,
+            year: n.year,
+            month: n.month,
+            text: n.text,
+            user: n.user,
+            isRecurring: n.isRecurring ?? false,
+          },
+        })
       }
     }
 

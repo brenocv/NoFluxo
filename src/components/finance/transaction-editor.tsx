@@ -16,12 +16,18 @@ import { Switch } from '@/components/ui/switch'
 import { Category, formatMoney, MONTHS_PT_LONG, Transaction } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
 
 const PRESET_COLORS = [
   '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
   '#16a34a', '#0891b2', '#0284c7', '#4f46e5', '#7c3aed',
   '#c026d3', '#db2777', '#e11d48', '#f97316', '#facc15',
 ]
+
+interface CustomCurrency {
+  code: string
+  rate: number
+}
 
 interface Props {
   open: boolean
@@ -30,7 +36,8 @@ interface Props {
   month: number
   year: number
   euroRate: number
-  euroName?: string
+  secondarySymbol?: string
+  secondaryName?: string
   onOpenChange: (open: boolean) => void
   onSave: (args: {
     value: number | null
@@ -50,7 +57,7 @@ interface Props {
 }
 
 export function TransactionEditor({
-  open, category, transaction, month, year, euroRate, euroName = 'Euro',
+  open, category, transaction, month, year, euroRate,
   onOpenChange, onSave, onClear, onStopRecurring, onUpdateCategory,
 }: Props) {
   const [raw, setRaw] = useState('')
@@ -63,7 +70,7 @@ export function TransactionEditor({
   const [catName, setCatName] = useState('')
   const [catNote, setCatNote] = useState('')
   const [goalValue, setGoalValue] = useState('')
-  const [catCurrency, setCatCurrency] = useState<'BRL' | 'EUR'>('BRL')
+  const [catCurrency, setCatCurrency] = useState<string>('BRL')
   const [catColor, setCatColor] = useState<string>('')
 
   useEffect(() => {
@@ -197,12 +204,13 @@ export function TransactionEditor({
             {valid && (
               <p className="text-xs text-muted-foreground tabular-nums">
                 {isIncome ? '+' : isReserve || isReceivable ? '' : '−'}
-                {formatMoney(parsed, category.currency)}
-                <span className="ml-1.5">
-                  ≈ {category.currency === 'BRL'
-                    ? formatMoney(parsed / euroRate, 'EUR')
-                    : formatMoney(parsed * euroRate, 'BRL')}
-                </span>
+                {formatMoney(parsed, category.currency, secondarySymbol)}
+                {category.currency === 'BRL' && (
+                  <span className="ml-1.5">≈ {formatMoney(parsed / euroRate, 'EUR', secondarySymbol)}</span>
+                )}
+                {category.currency === 'EUR' && (
+                  <span className="ml-1.5">≈ {formatMoney(parsed * euroRate, 'BRL', secondarySymbol)}</span>
+                )}
               </p>
             )}
           </div>
@@ -358,7 +366,7 @@ export function TransactionEditor({
                     type="button"
                     onClick={() => setCatCurrency('EUR')}
                     className={cn('h-9 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'EUR' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'border-border bg-muted/50 text-muted-foreground')}
-                  >€ {euroName}</button>
+                  >{secondarySymbol ?? '€'} {secondaryName ?? 'Euro'}</button>
                 </div>
               </div>
 
