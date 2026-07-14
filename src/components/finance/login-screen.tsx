@@ -113,8 +113,7 @@ export function LoginScreen({ onLogin }: Props) {
         body: JSON.stringify({ key: 'euroToBrl', value: '6', user: 'Sistema' }),
       })
 
-      localStorage.setItem('porto_workbook_id', wbId)
-      localStorage.setItem(`nofluxo_wb_${selectedAccount}`, wbId)
+      localStorage.setItem('nofluxo_workbook', wbId)
       return wbId
     } catch (e) {
       console.error('Erro ao criar planilha:', e)
@@ -164,23 +163,9 @@ export function LoginScreen({ onLogin }: Props) {
 
   function handleSelectUser(name: string) {
     setSelectedUser(name)
-    // Check if this account already has a workbook saved
-    const existingWb = localStorage.getItem(`nofluxo_wb_${selectedAccount}`)
+    const existingWb = localStorage.getItem('nofluxo_workbook')
     if (existingWb) {
-      // Verify the workbook still exists in the database
-      fetch('/api/workbooks')
-        .then(r => r.json())
-        .then(data => {
-          const wb = data.workbooks?.find((w: any) => w.id === existingWb)
-          if (wb) {
-            localStorage.setItem('porto_workbook_id', existingWb)
-            onLogin(selectedAccount, name, existingWb)
-          } else {
-            // Workbook was deleted, need to create a new one
-            setMode('create-workbook')
-          }
-        })
-        .catch(() => setMode('create-workbook'))
+      onLogin(selectedAccount, name, existingWb)
     } else {
       setMode('create-workbook')
     }

@@ -1251,13 +1251,10 @@ export default function Home() {
 
   // Show login screen first
   if (!isLoggedIn || !hydrated) {
-    return <LoginScreen onLogin={(accName, userName, wbId) => {
+    return <LoginScreen onLogin={(accName, userName) => {
       localStorage.setItem('porto_finance_user', userName)
       setUser(userName)
       setAccountName(accName)
-      if (wbId) {
-        setWorkbook(wbId)
-      }
       setIsLoggedIn(true)
     }} />
   }
@@ -1998,7 +1995,7 @@ export default function Home() {
             const updated = accounts.filter((a: any) => a.name !== accountName)
             localStorage.setItem('nofluxo_accounts', JSON.stringify(updated))
             localStorage.removeItem(`nofluxo_users_${accountName}`)
-            localStorage.removeItem(`nofluxo_wb_${accountName}`)
+            localStorage.removeItem('nofluxo_workbook')
             localStorage.removeItem('porto_workbook_id')
             localStorage.removeItem('porto_finance_user')
           } catch {}

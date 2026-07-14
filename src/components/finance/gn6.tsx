@@ -638,16 +638,9 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
                 <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap" style={{ color }}>
                   {sign}{formatMoney(Math.abs(displayValue), category.currency)}
                 </span>
-                {category.currency === 'BRL' && (
-                  <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
-                    {formatMoney(Math.abs(displayValue) / euroRate, 'EUR')}
-                  </span>
-                )}
-                {category.currency === 'EUR' && (
-                  <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
-                    {formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
-                  </span>
-                )}
+                <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
+                  {category.currency === 'BRL' ? formatMoney(Math.abs(displayValue) / euroRate, 'EUR') : formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
+                </span>
               </div>
             )}
           </button>

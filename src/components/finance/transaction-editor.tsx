@@ -204,12 +204,11 @@ export function TransactionEditor({
               <p className="text-xs text-muted-foreground tabular-nums">
                 {isIncome ? '+' : isReserve || isReceivable ? '' : '−'}
                 {formatMoney(parsed, category.currency)}
-                {category.currency === 'BRL' && (
-                  <span className="ml-1.5">≈ {formatMoney(parsed / euroRate, 'EUR')}</span>
-                )}
-                {category.currency === 'EUR' && (
-                  <span className="ml-1.5">≈ {formatMoney(parsed * euroRate, 'BRL')}</span>
-                )}
+                <span className="ml-1.5">
+                  ≈ {category.currency === 'BRL'
+                    ? formatMoney(parsed / euroRate, 'EUR')
+                    : formatMoney(parsed * euroRate, 'BRL')}
+                </span>
               </p>
             )}
           </div>
