@@ -1310,10 +1310,11 @@ export default function Home() {
             {/* Right: Workbook name → click to switch */}
             <button
               onClick={() => setWorkbookOpen(true)}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground truncate max-w-[30%] text-right touch-manipulation"
+              className="text-xs font-medium text-muted-foreground hover:text-foreground truncate max-w-[40%] text-right touch-manipulation"
               title="Trocar planilha"
             >
-              {workbookName || 'Porto 2026'}
+              <span className="text-muted-foreground/70">Planilha </span>
+              <span className="text-foreground font-semibold">"{workbookName || 'Porto 2026'}"</span>
             </button>
           </div>
 
@@ -1849,7 +1850,9 @@ export default function Home() {
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation"
               title="Trocar de usuário"
             >
-              {user}
+              <span className="text-muted-foreground hidden sm:inline">Você é</span>
+              <span className="sm:hidden text-muted-foreground">👤</span>
+              <span>{user}</span>
             </button>
             <Button
               variant="outline"
