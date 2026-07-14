@@ -186,8 +186,6 @@ export default function Home() {
   const [prevMonthLabel, setPrevMonthLabel] = useState<string>('')
 
   const euroRate = parseFloat(config.euroToBrl ?? '6') || 6
-  const secondarySymbol = config.secondaryCurrencySymbol ?? '€'
-  const secondaryName = config.secondaryCurrencyName ?? 'Euro'
 
   // Fetch workbook name when workbookId changes — also sets a default workbook if none is selected
   useEffect(() => {
@@ -1371,8 +1369,9 @@ export default function Home() {
           includeReceivables={includeReceivables}
           onToggleReceivables={handleToggleReceivables}
           euroRate={euroRate}
-          secondarySymbol={secondarySymbol}
-          secondaryName={secondaryName}
+          customCurrencies={(() => {
+            try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
+          })()}
           onEntradasClick={() => scrollToGroup('rendimentos')}
           onSaidasClick={() => scrollToGroup('despesas')}
         />
@@ -1435,7 +1434,6 @@ export default function Home() {
               transactionsByCat={txByCat}
               allCategories={categories}
               euroRate={euroRate}
-              secondarySymbol={secondarySymbol}
               highlightedCategoryIds={highlightedCategoryIds}
               onClearSearch={() => setSearch('')}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
@@ -1936,8 +1934,9 @@ export default function Home() {
         month={month}
         year={year}
         euroRate={euroRate}
-        secondarySymbol={secondarySymbol}
-        secondaryName={secondaryName}
+        customCurrencies={(() => {
+          try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
+        })()}
         onOpenChange={(o) => !o && setEditTarget(null)}
         onSave={handleSaveTransaction}
         onClear={handleClearTransaction}
@@ -1951,8 +1950,9 @@ export default function Home() {
         labels={labels}
         subgroups={subgroups}
         topGroups={topGroups}
-        secondarySymbol={secondarySymbol}
-        secondaryName={secondaryName}
+        customCurrencies={(() => {
+          try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
+        })()}
         onOpenChange={(o) => !o && setNewCatGroup(null)}
         onCreate={handleCreateCategory}
       />
@@ -1976,21 +1976,21 @@ export default function Home() {
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
         euroRate={euroRate}
-        secondaryCurrencyName={config.secondaryCurrencyName ?? 'Euro'}
-        secondaryCurrencySymbol={config.secondaryCurrencySymbol ?? '€'}
         onSaveEuroRate={handleSaveEuroRate}
-        onSaveSecondaryCurrency={async (name, symbol) => {
-          await updateConfig('secondaryCurrencyName', name, user)
-          await updateConfig('secondaryCurrencySymbol', symbol, user)
-          window.dispatchEvent(new CustomEvent('finance:patch', {
-            detail: { type: 'config', action: 'update', payload: { key: 'secondaryCurrencyName', value: name }, by: { name: user, color: USER_COLOR }, at: Date.now() }
-          }))
-          window.dispatchEvent(new CustomEvent('finance:patch', {
-            detail: { type: 'config', action: 'update', payload: { key: 'secondaryCurrencySymbol', value: symbol }, by: { name: user, color: USER_COLOR }, at: Date.now() }
-          }))
-        }}
         onExportExcel={handleExportExcel}
         accountName={accountName}
+        currencies={(() => {
+          try {
+            const stored = config.customCurrencies
+            return stored ? JSON.parse(stored) : []
+          } catch { return [] }
+        })()}
+        onSaveCurrencies={async (currencies) => {
+          await updateConfig('customCurrencies', JSON.stringify(currencies), user)
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(currencies) }, by: { name: user, color: USER_COLOR }, at: Date.now() }
+          }))
+        }}
         onDeleteAccount={() => {
           try {
             const stored = localStorage.getItem('nofluxo_accounts')
@@ -2060,7 +2060,9 @@ export default function Home() {
         topGroups={topGroups}
         labels={labels}
         initialGroup={quickAddInitialGroup}
-        secondarySymbol={secondarySymbol}
+        customCurrencies={(() => {
+          try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
+        })()}
         onOpenChange={setQuickAddOpen}
         onCreate={handleQuickAdd}
       />

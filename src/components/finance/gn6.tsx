@@ -25,7 +25,6 @@ interface Props {
   transactionsByCat: Record<string, Transaction | undefined>
   allCategories: Category[]
   euroRate: number
-  secondarySymbol?: string
   highlightedCategoryIds: Set<string>
   onClearSearch: () => void
   onEdit: (category: Category, current: Transaction | undefined) => void
@@ -75,7 +74,7 @@ const ATTR_BY_TYPE: Record<DnDType, string> = {
 }
 
 export function GroupNode(props: Props) {
-  const { node, transactionsByCat, euroRate, allCategories, secondarySymbol } = props
+  const { node, transactionsByCat, euroRate, allCategories } = props
   const [userOpen, setUserOpen] = useState(true)
   const hasSearch = props.highlightedCategoryIds.size > 0
   const hasHighlightedInTree = (n: GroupTreeNode): boolean => {
@@ -320,7 +319,7 @@ export function GroupNode(props: Props) {
         <span className="text-xs sm:text-sm font-semibold tabular-nums ml-0.5 sm:ml-1 text-right" style={{ color }}>
           {totalSign}{formatMoney(Math.abs(total), 'BRL')}
           <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
-            ({formatMoney(Math.abs(total) / euroRate, 'EUR', secondarySymbol)})
+            ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
           </span>
         </span>
       </div>
@@ -637,16 +636,16 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             ) : (
               <div className="flex flex-col items-end leading-tight">
                 <span className="text-[13px] font-semibold tabular-nums whitespace-nowrap" style={{ color }}>
-                  {sign}{formatMoney(Math.abs(displayValue), category.currency, secondarySymbol)}
+                  {sign}{formatMoney(Math.abs(displayValue), category.currency)}
                 </span>
                 {category.currency === 'BRL' && (
                   <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
-                    {formatMoney(Math.abs(displayValue) / euroRate, 'EUR', secondarySymbol)}
+                    {formatMoney(Math.abs(displayValue) / euroRate, 'EUR')}
                   </span>
                 )}
                 {category.currency === 'EUR' && (
                   <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
-                    {formatMoney(Math.abs(displayValue) * euroRate, 'BRL', secondarySymbol)}
+                    {formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
                   </span>
                 )}
               </div>

@@ -465,12 +465,17 @@ export const MONTHS_PT_LONG = [
 
 // ---- Formatting ----
 
-export function formatMoney(v: number, currency: string, secondarySymbol: string = '€'): string {
+export function formatMoney(v: number, currency: string): string {
   const sign = v < 0 ? '-' : ''
   const abs = Math.abs(v)
   const formatted = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  if (currency === 'BRL') return `${sign}R$ ${formatted}`
-  return `${sign}${secondarySymbol} ${formatted}`
+  // Predefined symbols
+  const symbols: Record<string, string> = {
+    BRL: 'R$', USD: '$', CAD: 'C$', EUR: '€', GBP: '£',
+    DKK: 'kr', HUF: 'Ft', CZK: 'Kč',
+  }
+  const symbol = symbols[currency] ?? currency
+  return `${sign}${symbol} ${formatted}`
 }
 
 export function formatBRL(v: number) {

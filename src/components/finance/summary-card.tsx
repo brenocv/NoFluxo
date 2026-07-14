@@ -24,8 +24,7 @@ interface Props {
   includeReceivables: boolean
   onToggleReceivables: (v: boolean) => void
   euroRate: number
-  secondarySymbol?: string
-  secondaryName?: string
+  customCurrencies?: ActiveCurrency[]
   onEntradasClick: () => void
   onSaidasClick: () => void
 }
@@ -34,7 +33,7 @@ export function SummaryCard({
   entradasBRL, saidasBRL, entradasEUR, saidasEUR,
   reservasBRL, receivablesBRL, receivablesEUR,
   includeReceivables, onToggleReceivables, euroRate,
-  secondarySymbol, secondaryName,
+  customCurrencies,
   onEntradasClick, onSaidasClick,
 }: Props) {
   const totalEntradasBRL = entradasBRL + entradasEUR * euroRate
@@ -54,9 +53,9 @@ export function SummaryCard({
         </span>
         <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
           <span>
-            {secondarySymbol ?? '€'}1 = R$ {euroRate.toFixed(2).replace('.', ',')}
+            €1 = R$ {euroRate.toFixed(2).replace('.', ',')}
             {' '}<button onClick={() => {
-              const newRate = window.prompt(`Nova cotação do ${secondaryName ?? 'Euro'} (em R$):`, String(euroRate))
+              const newRate = window.prompt('Nova cotação do Euro (em R$):', String(euroRate))
               if (newRate !== null) {
                 const parsed = parseFloat(newRate.replace(',', '.'))
                 if (!isNaN(parsed) && parsed > 0) {
@@ -69,6 +68,31 @@ export function SummaryCard({
               }
             }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
           </span>
+          {(customCurrencies ?? []).map((c) => {
+            const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
+            return (
+              <span key={c.code}>
+                {def?.symbol ?? c.code}1 = R$ {c.rate.toFixed(2).replace('.', ',')}
+                {' '}<button onClick={() => {
+                  const newRate = window.prompt(`Nova cotação de ${def?.name ?? c.code} (em R$):`, String(c.rate))
+                  if (newRate !== null) {
+                    const parsed = parseFloat(newRate.replace(',', '.'))
+                    if (!isNaN(parsed) && parsed > 0) {
+                      // Update in customCurrencies config
+                      const updated = (customCurrencies ?? []).map((cur: any) =>
+                        cur.code === c.code ? { ...cur, rate: parsed } : cur
+                      )
+                      fetch('/api/config', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
+                      }).then(() => window.location.reload())
+                    }
+                  }
+                }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
+              </span>
+            )
+          })}
         </div>
       </div>
 

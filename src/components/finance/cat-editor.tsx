@@ -45,8 +45,7 @@ interface Props {
   labels: Record<string, string>
   subgroups: Subgroup[]
   topGroups: TopGroup[]
-  secondarySymbol?: string
-  secondaryName?: string
+  customCurrencies?: { code: string; rate: number }[]
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
@@ -60,7 +59,7 @@ interface Props {
   }) => Promise<void>
 }
 
-export function CategoryEditor({ open, group, labels, subgroups, topGroups, secondarySymbol, secondaryName, onOpenChange, onCreate }: Props) {
+export function CategoryEditor({ open, group, labels, subgroups, topGroups, customCurrencies, onOpenChange, onCreate }: Props) {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [groupVal, setGroupVal] = useState<string>('')
@@ -218,7 +217,13 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, seco
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BRL">Real (R$)</SelectItem>
-                  <SelectItem value="EUR">{secondarySymbol ?? '€'} {secondaryName ?? 'Euro'}</SelectItem>
+                  <SelectItem value="EUR">Euro (€)</SelectItem>
+                  {(customCurrencies ?? []).map((c) => {
+                    const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
+                    return (
+                      <SelectItem key={c.code} value={c.code}>{def?.flag} {def?.symbol} {def?.name}</SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>

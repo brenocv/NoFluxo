@@ -30,7 +30,7 @@ interface Props {
   topGroups: TopGroup[]
   labels: Record<string, string>
   initialGroup?: string
-  secondarySymbol?: string
+  customCurrencies?: { code: string; rate: number }[]
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
@@ -53,7 +53,7 @@ const TYPE_OPTIONS: { value: QuickType; label: string; icon: typeof TrendingDown
 ]
 
 export function QuickAddDialog({
-  open, month, year, categories, subgroups, topGroups, labels, initialGroup, secondarySymbol, onOpenChange, onCreate,
+  open, month, year, categories, subgroups, topGroups, labels, initialGroup, customCurrencies, onOpenChange, onCreate,
 }: Props) {
   const [name, setName] = useState('')
   const [raw, setRaw] = useState('')
@@ -249,7 +249,7 @@ export function QuickAddDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Moeda</Label>
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setCurrency('BRL')}
@@ -259,7 +259,18 @@ export function QuickAddDialog({
                   type="button"
                   onClick={() => setCurrency('EUR')}
                   className={cn('h-12 px-3 rounded-md text-sm font-bold border-2 transition-all', currency === 'EUR' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'border-border bg-muted/50 text-muted-foreground')}
-                >{secondarySymbol ?? '€'}</button>
+                >€</button>
+                {(customCurrencies ?? []).map((c) => {
+                  const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => setCurrency(c.code)}
+                      className={cn('h-12 px-3 rounded-md text-xs font-bold border-2 transition-all', currency === c.code ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300' : 'border-border bg-muted/50 text-muted-foreground')}
+                    >{def?.symbol ?? c.code}</button>
+                  )
+                })}
               </div>
             </div>
           </div>
