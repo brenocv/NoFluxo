@@ -80,7 +80,12 @@ export function SummaryCard({
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user' }),
-                    }).then(() => window.location.reload())
+                    }).then(() => {
+                      // Update state in-place via the finance:patch event (NO page reload)
+                      window.dispatchEvent(new CustomEvent('finance:patch', {
+                        detail: { type: 'config', action: 'update', payload: { key: 'euroToBrl', value: String(parsed) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
+                      }))
+                    })
                   } else {
                     const updated = (customCurrencies ?? []).map((cur: any) =>
                       cur.code === sec.code ? { ...cur, rate: parsed } : cur
@@ -89,7 +94,11 @@ export function SummaryCard({
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
-                    }).then(() => window.location.reload())
+                    }).then(() => {
+                      window.dispatchEvent(new CustomEvent('finance:patch', {
+                        detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(updated) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
+                      }))
+                    })
                   }
                 }
               }
@@ -112,7 +121,11 @@ export function SummaryCard({
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
-                      }).then(() => window.location.reload())
+                      }).then(() => {
+                        window.dispatchEvent(new CustomEvent('finance:patch', {
+                          detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(updated) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
+                        }))
+                      })
                     }
                   }
                 }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>

@@ -1343,10 +1343,22 @@ export default function Home() {
 
   // Show login screen first
   if (!isLoggedIn || !hydrated) {
-    return <LoginScreen onLogin={(accName, userName) => {
+    return <LoginScreen onLogin={(accName, userName, wbId) => {
       localStorage.setItem('porto_finance_user', userName)
       setUser(userName)
       setAccountName(accName)
+      // If a workbookId was provided (newly created), use it; otherwise clear
+      // any stale workbookId from a previous account so the app doesn't load
+      // another account's data.
+      if (wbId) {
+        setWorkbook(wbId)
+      } else {
+        // Clear stale workbook selection so the app creates/loads the right one
+        try {
+          localStorage.removeItem('porto_workbook_id')
+          localStorage.removeItem('nofluxo_workbook')
+        } catch {}
+      }
       setIsLoggedIn(true)
     }} />
   }

@@ -85,6 +85,9 @@ export function LoginScreen({ onLogin }: Props) {
 
   async function createEmptyWorkbook(name: string) {
     try {
+      // POST /api/workbooks ALREADY creates the 3 default TopGroups
+      // (Despesas/Rendimentos/Reservas) + 5 default subgroups on the server side.
+      // We just need to create the workbook and get its ID.
       const r = await fetch('/api/workbooks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -94,26 +97,10 @@ export function LoginScreen({ onLogin }: Props) {
       const data = await r.json()
       const wbId = data.workbook.id
 
-      const groups = [
-        { key: 'despesas', name: 'Despesas', color: '#dc2626', type: 'EXPENSE', isDefault: true },
-        { key: 'rendimentos', name: 'Receitas', color: '#16a34a', type: 'INCOME', isDefault: true },
-        { key: 'reservas', name: 'Reservas', color: '#d97706', type: 'RESERVE', isDefault: true },
-      ]
-      for (const g of groups) {
-        await fetch('/api/topgroups', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...g, workbookId: wbId }),
-        })
-      }
-
-      await fetch('/api/config', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key: 'euroToBrl', value: '6', user: 'Sistema' }),
-      })
-
-      localStorage.setItem('nofluxo_workbook', wbId)
+      // Save the workbook ID scoped to THIS account so that switching accounts
+      // doesn't accidentally load another account's workbook.
+      localStorage.setItem(`nofluxo_wb_${selectedAccount}`, wbId)
+      localStorage.setItem('porto_workbook_id', wbId)
       return wbId
     } catch (e) {
       console.error('Erro ao criar planilha:', e)
@@ -163,10 +150,13 @@ export function LoginScreen({ onLogin }: Props) {
 
   function handleSelectUser(name: string) {
     setSelectedUser(name)
-    const existingWb = localStorage.getItem('nofluxo_workbook')
-    if (existingWb) {
-      onLogin(selectedAccount, name, existingWb)
+    // Look up the workbook ID scoped to THIS account (not the global one,
+    // which might belong to a different account).
+    const accountWb = localStorage.getItem(`nofluxo_wb_${selectedAccount}`)
+    if (accountWb) {
+      onLogin(selectedAccount, name, accountWb)
     } else {
+      // No workbook for this account yet — create one
       setMode('create-workbook')
     }
   }
