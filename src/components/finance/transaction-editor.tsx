@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Category, formatMoney, MONTHS_PT_LONG, Transaction } from '@/lib/finance'
 import { cn } from '@/lib/utils'
-import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { Trash2, RefreshCw, AlertTriangle, Clock } from 'lucide-react'
 import { PREDEFINED_CURRENCIES, SecondaryCurrencyInfo } from '@/lib/currencies'
 
 const PRESET_COLORS = [
@@ -53,6 +53,7 @@ interface Props {
     monthlyGoal?: number | null
     currency?: 'BRL' | 'EUR'
     color?: string | null
+    excludeFromTotal?: boolean
   }) => Promise<void>
 }
 
@@ -64,6 +65,7 @@ export function TransactionEditor({
   const [note, setNote] = useState('')
   const [isRecurring, setIsRecurring] = useState(false)
   const [installmentsTotal, setInstallmentsTotal] = useState('')
+  const [isReceivable, setIsReceivable] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // Category rename + goal
@@ -81,6 +83,10 @@ export function TransactionEditor({
       setInstallmentsTotal(
         transaction?.installmentsTotal != null ? String(transaction.installmentsTotal) : ''
       )
+      // "Valor a receber" = excludeFromTotal flag on the category.
+      // If the category is already in the "valores_a_receber" subgroup,
+      // it's automatically a receivable (and the toggle is shown as on).
+      setIsReceivable(category.excludeFromTotal || category.group === 'rendimentos.valores_a_receber')
       setCatName(category.name)
       setCatNote(category.note ?? '')
       setGoalValue(category.monthlyGoal != null ? String(category.monthlyGoal) : '')
@@ -94,7 +100,10 @@ export function TransactionEditor({
   const monthLabel = MONTHS_PT_LONG[month - 1]
   const isIncome = category.type === 'INCOME'
   const isReserve = category.type === 'RESERVE'
-  const isReceivable = category.group === 'rendimentos.valores_a_receber'
+  // Note: the editable "isReceivable" state (declared above) controls the
+  // "Valor a receber" toggle. This derived const tells us if the category
+  // is in the receivable subgroup (used only for color styling on the value input).
+  const isInReceivableGroup = category.group === 'rendimentos.valores_a_receber'
 
   const parsed = parseFloat(raw.replace(',', '.'))
   const valid = !isNaN(parsed) && parsed >= 0
@@ -118,6 +127,13 @@ export function TransactionEditor({
       if (newGoal !== category!.monthlyGoal) catFields.monthlyGoal = newGoal
       if (catCurrency !== category!.currency) catFields.currency = catCurrency
       if (catColor !== (category!.color ?? '')) catFields.color = catColor || null
+      // "Valor a receber" toggle: sync the excludeFromTotal flag.
+      // The category is considered receivable if it's in the valores_a_receber
+      // subgroup OR has the excludeFromTotal flag set.
+      const wasReceivable = category!.excludeFromTotal || category!.group === 'rendimentos.valores_a_receber'
+      if (isReceivable !== wasReceivable) {
+        catFields.excludeFromTotal = isReceivable
+      }
       if (Object.keys(catFields).length > 0) {
         await onUpdateCategory(catFields)
       }
@@ -196,14 +212,14 @@ export function TransactionEditor({
               className={cn(
                 'text-2xl font-semibold tabular-nums h-14',
                 isIncome && valid && 'text-emerald-600',
-                !isIncome && !isReserve && !isReceivable && valid && 'text-rose-600',
-                (isReserve || isReceivable) && valid && 'text-amber-600'
+                !isIncome && !isReserve && !isInReceivableGroup && valid && 'text-rose-600',
+                (isReserve || isInReceivableGroup) && valid && 'text-amber-600'
               )}
               onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
             />
             {valid && (
               <p className="text-xs text-muted-foreground tabular-nums">
-                {isIncome ? '+' : isReserve || isReceivable ? '' : '−'}
+                {isIncome ? '+' : isReserve || isInReceivableGroup ? '' : '−'}
                 {formatMoney(parsed, category.currency)}
                 {(() => {
                   // Show the secondary currency equivalent next to the value.
@@ -311,6 +327,28 @@ export function TransactionEditor({
                   </Button>
                 )}
               </>
+            )}
+          </div>
+
+          {/* "Valor a receber" toggle — marks this item as a receivable
+              (forecast, not yet received). Excluded from the main saldo total
+              unless the user toggles "Incluir valores a receber" in the summary. */}
+          <div className="space-y-2 rounded-lg bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30 p-3">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="tx-receivable" className="text-sm font-medium flex items-center gap-1.5 cursor-pointer">
+                <Clock className="h-3.5 w-3.5 text-amber-600" />
+                Valor a receber
+              </Label>
+              <Switch
+                id="tx-receivable"
+                checked={isReceivable}
+                onCheckedChange={setIsReceivable}
+              />
+            </div>
+            {isReceivable && (
+              <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                Este item será tratado como um valor previsto, mas ainda não recebido. Ele não entra no saldo total do mês a menos que você ative &quot;Incluir valores a receber&quot; no resumo.
+              </p>
             )}
           </div>
 

@@ -467,7 +467,7 @@ export default function Home() {
 
   async function handleUpdateCategory(fields: {
     name?: string; note?: string | null; monthlyGoal?: number | null
-    currency?: 'BRL' | 'EUR'; color?: string | null
+    currency?: 'BRL' | 'EUR'; color?: string | null; excludeFromTotal?: boolean
   }) {
     if (!editTarget) return
     const prevCat = { ...editTarget.category }
@@ -483,6 +483,7 @@ export default function Home() {
           const rr = await updateCategory(prevCat.id, {
             name: prevCat.name, note: prevCat.note, monthlyGoal: prevCat.monthlyGoal,
             currency: prevCat.currency, color: prevCat.color,
+            excludeFromTotal: prevCat.excludeFromTotal,
           }, user)
           dispatchChange('category', 'update', { category: rr.category }, `Desfez: ${detail}`, {
             user, action: 'update', entity: 'category', detail: `Desfez: ${detail}`, createdAt: new Date().toISOString(),
@@ -1390,20 +1391,9 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
         <div className="max-w-3xl mx-auto px-3 py-2 space-y-2">
-          {/* Top row: User (left) | Logo+NoFluxo (center) | Workbook (right) */}
+          {/* Top row: Logo+NoFluxo (left) | Workbook name (right) */}
           <div className="flex items-center justify-between gap-2">
-            {/* Left: "Você é [nome]" → click to switch user */}
-            <button
-              onClick={() => setSwitchUserOpen(true)}
-              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium text-xs touch-manipulation truncate max-w-[35%]"
-              title="Trocar de usuário"
-            >
-              <span className="text-muted-foreground hidden sm:inline">Você é</span>
-              <span className="sm:hidden text-muted-foreground">👤</span>
-              <span className="truncate">{user}</span>
-            </button>
-
-            {/* Center: Logo + NoFluxo */}
+            {/* Left: Logo + NoFluxo */}
             <div className="flex items-center gap-1.5 flex-shrink-0">
               <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-6 w-6" />
               <span className="text-base font-bold text-primary">NoFluxo</span>

@@ -197,7 +197,7 @@ export function WorkbookSwitcher({
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
             <p className="text-xs text-muted-foreground">
-              A nova planilha será criada zerada, com os cards Despesas, Rendimentos e Reservas prontos para uso.
+              A nova planilha será criada zerada, com os cards Despesas, Receitas e Reservas prontos para uso.
             </p>
             <Button
               onClick={handleCreate}
