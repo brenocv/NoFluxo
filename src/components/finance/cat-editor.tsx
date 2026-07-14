@@ -31,6 +31,7 @@ import {
   TopGroup,
 } from '@/lib/finance'
 import { cn } from '@/lib/utils'
+import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
 
 const PRESET_COLORS = [
   '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
@@ -44,26 +45,27 @@ interface Props {
   labels: Record<string, string>
   subgroups: Subgroup[]
   topGroups: TopGroup[]
-  euroName?: string
+  customCurrencies?: { code: string; rate: number }[]
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
     group: CategoryGroup
     type: CategoryType
-    currency: Currency
+    currency: string
     note?: string
     excludeFromTotal?: boolean
     monthlyGoal?: number | null
-    color?: string | null
+    value?: number | null
   }) => Promise<void>
 }
 
-export function CategoryEditor({ open, group, labels, subgroups, topGroups, euroName = 'Euro', onOpenChange, onCreate }: Props) {
+export function CategoryEditor({ open, group, labels, subgroups, topGroups, customCurrencies, onOpenChange, onCreate }: Props) {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [groupVal, setGroupVal] = useState<string>('')
   const [type, setType] = useState<CategoryType>('EXPENSE')
-  const [currency, setCurrency] = useState<Currency>('BRL')
+  const [currency, setCurrency] = useState<string>('BRL')
+  const [value, setValue] = useState('')
   const [goal, setGoal] = useState('')
   const [color, setColor] = useState<string>('')
   const [saving, setSaving] = useState(false)
@@ -78,6 +80,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, euro
     if (open) {
       setName('')
       setNote('')
+      setValue('')
       setGoal('')
       setColor('')
     }
@@ -107,6 +110,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, euro
     setSaving(true)
     try {
       const parsedGoal = goal.trim() === '' ? null : parseFloat(goal.replace(',', '.'))
+      const parsedValue = value.trim() === '' ? null : parseFloat(value.replace(',', '.'))
       await onCreate({
         name: name.trim(),
         group: groupVal as CategoryGroup,
@@ -115,6 +119,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, euro
         note: note.trim() || undefined,
         excludeFromTotal: groupVal === 'rendimentos.valores_a_receber',
         monthlyGoal: parsedGoal,
+        value: parsedValue,
         color: color || null,
       })
       onOpenChange(false)
@@ -167,15 +172,29 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, euro
             <Select value={groupVal} onValueChange={setGroupVal}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent className="max-h-60">
-                {groupOptions.map((opt) => (
-                  <SelectItem
-                    key={opt.value}
-                    value={opt.value}
-                    className={opt.depth > 0 ? 'text-xs' : 'font-medium'}
-                  >
-                    {opt.depth > 0 ? '  '.repeat(opt.depth) + '↳ ' : ''}{opt.label}
-                  </SelectItem>
-                ))}
+                {groupOptions.map((opt) => {
+                  const parts = opt.label.split(' › ')
+                  const lastPart = parts[parts.length - 1]
+                  const isTopLevel = opt.depth === 0
+                  const isSubgroup = opt.depth === 1
+                  return (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className={cn(
+                        isTopLevel ? 'font-bold text-sm border-b border-border/50' : '',
+                        isSubgroup ? 'text-[13px] font-medium' : '',
+                        opt.depth > 1 ? 'text-xs' : ''
+                      )}
+                    >
+                      {isTopLevel && '🔷 '}
+                      {isSubgroup && '  📁 '}
+                      {opt.depth > 1 && '    • '}
+                      {lastPart}
+                      {opt.depth > 0 && <span className="text-muted-foreground/60 ml-1 text-[10px]">({parts.slice(0, -1).join(' › ')})</span>}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
           </div>
@@ -194,14 +213,36 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, euro
             </div>
             <div className="space-y-1.5">
               <Label>Moeda</Label>
-              <Select value={currency} onValueChange={(v) => setCurrency(v as Currency)}>
+              <Select value={currency} onValueChange={(v) => setCurrency(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BRL">Real (R$)</SelectItem>
-                  <SelectItem value="EUR">{euroName} (€)</SelectItem>
+                  <SelectItem value="EUR">Euro (€)</SelectItem>
+                  {(customCurrencies ?? []).map((c) => {
+                    const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
+                    return (
+                      <SelectItem key={c.code} value={c.code}>{def?.flag} {def?.symbol} {def?.name}</SelectItem>
+                    )
+                  })}
                 </SelectContent>
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cat-value">
+              Valor ({currency === 'BRL' ? 'R$' : '€'})
+              <span className="ml-1 text-xs text-muted-foreground">(opcional)</span>
+            </Label>
+            <Input
+              id="cat-value"
+              type="text"
+              inputMode="decimal"
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              placeholder="Ex.: 1500,00"
+              className="text-lg font-semibold tabular-nums h-12"
+            />
           </div>
 
           <div className="space-y-1.5">

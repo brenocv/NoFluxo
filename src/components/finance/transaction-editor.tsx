@@ -16,12 +16,18 @@ import { Switch } from '@/components/ui/switch'
 import { Category, formatMoney, MONTHS_PT_LONG, Transaction } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react'
+import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
 
 const PRESET_COLORS = [
   '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
   '#16a34a', '#0891b2', '#0284c7', '#4f46e5', '#7c3aed',
   '#c026d3', '#db2777', '#e11d48', '#f97316', '#facc15',
 ]
+
+interface CustomCurrency {
+  code: string
+  rate: number
+}
 
 interface Props {
   open: boolean
@@ -30,7 +36,7 @@ interface Props {
   month: number
   year: number
   euroRate: number
-  euroName?: string
+  customCurrencies?: CustomCurrency[]
   onOpenChange: (open: boolean) => void
   onSave: (args: {
     value: number | null
@@ -50,7 +56,7 @@ interface Props {
 }
 
 export function TransactionEditor({
-  open, category, transaction, month, year, euroRate, euroName = 'Euro',
+  open, category, transaction, month, year, euroRate,
   onOpenChange, onSave, onClear, onStopRecurring, onUpdateCategory,
 }: Props) {
   const [raw, setRaw] = useState('')
@@ -63,7 +69,7 @@ export function TransactionEditor({
   const [catName, setCatName] = useState('')
   const [catNote, setCatNote] = useState('')
   const [goalValue, setGoalValue] = useState('')
-  const [catCurrency, setCatCurrency] = useState<'BRL' | 'EUR'>('BRL')
+  const [catCurrency, setCatCurrency] = useState<string>('BRL')
   const [catColor, setCatColor] = useState<string>('')
 
   useEffect(() => {
@@ -348,17 +354,28 @@ export function TransactionEditor({
               {/* Currency selector */}
               <div className="space-y-1.5">
                 <Label className="text-xs">Moeda da categoria</Label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setCatCurrency('BRL')}
-                    className={cn('h-9 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'BRL' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300' : 'border-border bg-muted/50 text-muted-foreground')}
+                    className={cn('h-9 px-3 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'BRL' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300' : 'border-border bg-muted/50 text-muted-foreground')}
                   >R$ Real</button>
                   <button
                     type="button"
                     onClick={() => setCatCurrency('EUR')}
-                    className={cn('h-9 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'EUR' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'border-border bg-muted/50 text-muted-foreground')}
-                  >€ {euroName}</button>
+                    className={cn('h-9 px-3 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'EUR' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'border-border bg-muted/50 text-muted-foreground')}
+                  >€ Euro</button>
+                  {(customCurrencies ?? []).map((c) => {
+                    const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
+                    return (
+                      <button
+                        key={c.code}
+                        type="button"
+                        onClick={() => setCatCurrency(c.code)}
+                        className={cn('h-9 px-3 rounded-md text-sm font-medium border-2 transition-all', catCurrency === c.code ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300' : 'border-border bg-muted/50 text-muted-foreground')}
+                      >{def?.symbol ?? c.code} {def?.name ?? c.code}</button>
+                    )
+                  })}
                 </div>
               </div>
 

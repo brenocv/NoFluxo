@@ -13,10 +13,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Category, Currency, collectAllPaths, Subgroup, TopGroup, MONTHS_PT_LONG } from '@/lib/finance'
+import { Category, collectAllPaths, Subgroup, TopGroup, MONTHS_PT_LONG } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Zap, RefreshCw, TrendingDown, TrendingUp, PiggyBank, FolderPlus } from 'lucide-react'
+import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
 
 type QuickType = 'EXPENSE' | 'INCOME' | 'RESERVE'
 
@@ -29,12 +30,12 @@ interface Props {
   topGroups: TopGroup[]
   labels: Record<string, string>
   initialGroup?: string
-  euroName?: string
+  customCurrencies?: { code: string; rate: number }[]
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
     value: number
-    currency: Currency
+    currency: string
     type: QuickType
     group: string
     note?: string
@@ -52,11 +53,11 @@ const TYPE_OPTIONS: { value: QuickType; label: string; icon: typeof TrendingDown
 ]
 
 export function QuickAddDialog({
-  open, month, year, categories, subgroups, topGroups, labels, initialGroup, euroName = 'Euro', onOpenChange, onCreate,
+  open, month, year, categories, subgroups, topGroups, labels, initialGroup, customCurrencies, onOpenChange, onCreate,
 }: Props) {
   const [name, setName] = useState('')
   const [raw, setRaw] = useState('')
-  const [currency, setCurrency] = useState<Currency>('BRL')
+  const [currency, setCurrency] = useState<string>('BRL')
   const [type, setType] = useState<QuickType>('EXPENSE')
   const [group, setGroup] = useState<string>('')
   const [note, setNote] = useState('')
@@ -145,23 +146,37 @@ export function QuickAddDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* Group/item selector — shows ALL levels including categories */}
+          {/* Group/item selector — shows ALL levels with visual distinction */}
           <div className="space-y-1.5">
             <Label className="text-xs">Onde adicionar?</Label>
             <Select value={group} onValueChange={setGroup}>
               <SelectTrigger><SelectValue placeholder="Selecionar grupo ou item existente..." /></SelectTrigger>
               <SelectContent className="max-h-60">
-                {groupOptions.map((opt) => (
-                  <SelectItem
-                    key={opt.value}
-                    value={opt.value}
-                    className={cn(
-                      opt.value.startsWith('cat:') ? 'text-[13px] text-foreground' : opt.depth === 0 ? 'font-bold text-sm' : 'text-xs text-muted-foreground'
-                    )}
-                  >
-                    {opt.depth > 0 ? '  '.repeat(opt.depth) + '↳ ' : ''}{opt.label.split(' › ').pop()}
-                  </SelectItem>
-                ))}
+                {groupOptions.map((opt) => {
+                  const parts = opt.label.split(' › ')
+                  const lastPart = parts[parts.length - 1]
+                  const isTopLevel = opt.depth === 0
+                  const isSubgroup = opt.depth === 1
+                  const isCategory = opt.value.startsWith('cat:')
+                  return (
+                    <SelectItem
+                      key={opt.value}
+                      value={opt.value}
+                      className={cn(
+                        isTopLevel ? 'font-bold text-sm border-b border-border/50' : '',
+                        isSubgroup ? 'text-[13px] font-medium' : '',
+                        isCategory ? 'text-[13px] text-foreground' : '',
+                        opt.depth > 1 ? 'text-xs' : ''
+                      )}
+                    >
+                      {isTopLevel && '🔷 '}
+                      {isSubgroup && '  📁 '}
+                      {isCategory && '  '.repeat(Math.min(opt.depth, 3)) + '• '}
+                      {lastPart}
+                      {opt.depth > 0 && <span className="text-muted-foreground/60 ml-1 text-[10px]">({parts.slice(0, -1).join(' › ')})</span>}
+                    </SelectItem>
+                  )
+                })}
               </SelectContent>
             </Select>
             {isExistingCategory && (
@@ -234,7 +249,7 @@ export function QuickAddDialog({
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Moeda</Label>
-              <div className="flex gap-1">
+              <div className="flex gap-1 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setCurrency('BRL')}
@@ -245,6 +260,17 @@ export function QuickAddDialog({
                   onClick={() => setCurrency('EUR')}
                   className={cn('h-12 px-3 rounded-md text-sm font-bold border-2 transition-all', currency === 'EUR' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'border-border bg-muted/50 text-muted-foreground')}
                 >€</button>
+                {(customCurrencies ?? []).map((c) => {
+                  const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
+                  return (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => setCurrency(c.code)}
+                      className={cn('h-12 px-3 rounded-md text-xs font-bold border-2 transition-all', currency === c.code ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300' : 'border-border bg-muted/50 text-muted-foreground')}
+                    >{def?.symbol ?? c.code}</button>
+                  )
+                })}
               </div>
             </div>
           </div>
