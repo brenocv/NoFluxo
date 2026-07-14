@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
-import { Download } from 'lucide-react'
+import { Download, LogOut } from 'lucide-react'
 
 interface Props {
   open: boolean
@@ -25,6 +25,7 @@ interface Props {
   euroName: string
   onSaveEuroName: (name: string) => Promise<void>
   onExportExcel?: () => void
+  onLogout?: () => void
 }
 
 const USERS = ['Breno', 'Kiki', 'Visita']
@@ -39,6 +40,7 @@ export function SettingsDialog({
   euroName,
   onSaveEuroName,
   onExportExcel,
+  onLogout,
 }: Props) {
   const [rate, setRate] = useState(String(euroRate))
   const [name, setName] = useState(euroName)
@@ -177,7 +179,23 @@ export function SettingsDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="flex-row sm:justify-between items-center gap-2">
+          {onLogout ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (confirm('Sair da conta? Você voltará para a tela de login.')) {
+                  onLogout()
+                  onOpenChange(false)
+                }
+              }}
+              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+            >
+              <LogOut className="h-3.5 w-3.5 mr-1" />
+              Sair da conta
+            </Button>
+          ) : <div />}
           <Button onClick={() => onOpenChange(false)}>Fechar</Button>
         </DialogFooter>
       </DialogContent>

@@ -22,13 +22,63 @@ export async function POST(req: NextRequest) {
     data: { name, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
   })
 
-  // If copyFrom is provided, clone categories and subgroups (structure only, no transactions)
+  // Always create the 3 default TopGroups (cards) so the user sees
+  // Despesas / Rendimentos / Reservas as soon as they open the new workbook.
+  // Without these, the page renders an empty tree and any attempt to add a
+  // value crashes because there's no group to attach it to.
+  const DEFAULT_TOP_GROUPS = [
+    { key: 'despesas',    name: 'Despesas',    color: '#dc2626', type: 'EXPENSE', sortOrder: 0 },
+    { key: 'rendimentos', name: 'Rendimentos', color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
+    { key: 'reservas',    name: 'Reservas',    color: '#d97706', type: 'RESERVE', sortOrder: 2 },
+  ]
+  for (const tg of DEFAULT_TOP_GROUPS) {
+    await db.topGroup.create({
+      data: {
+        workbookId: wb.id,
+        key: tg.key,
+        name: tg.name,
+        color: tg.color,
+        type: tg.type,
+        sortOrder: tg.sortOrder,
+        isDefault: true,
+      },
+    })
+  }
+
+  // Always create the default subgroups as well — they are referenced by the
+  // finance.ts GROUP_STRUCTURE and used by the cat-editor for default
+  // currency/type selection.
+  const DEFAULT_SUBGROUPS = [
+    { key: 'despesas.cartoes',                parentKey: 'despesas',    name: 'Cartões BR',        sortOrder: 0 },
+    { key: 'despesas.contas_casa',            parentKey: 'despesas',    name: 'Contas casa',       sortOrder: 1 },
+    { key: 'rendimentos.brl',                 parentKey: 'rendimentos', name: 'Em Real (R$)',      sortOrder: 0 },
+    { key: 'rendimentos.eur',                 parentKey: 'rendimentos', name: 'Em Euro (€)',       sortOrder: 1 },
+    { key: 'rendimentos.valores_a_receber',   parentKey: 'rendimentos', name: 'Valores a receber', sortOrder: 2 },
+  ]
+  for (const sg of DEFAULT_SUBGROUPS) {
+    await db.subgroup.create({
+      data: {
+        workbookId: wb.id,
+        key: sg.key,
+        parentKey: sg.parentKey,
+        name: sg.name,
+        sortOrder: sg.sortOrder,
+      },
+    })
+  }
+
+  // If copyFrom is provided, ALSO clone categories and any extra subgroups
+  // from the source workbook (on top of the defaults we just created).
   if (body.copyFrom) {
     const sourceCats = await db.category.findMany({ where: { workbookId: String(body.copyFrom) } })
     const sourceSubs = await db.subgroup.findMany({ where: { workbookId: String(body.copyFrom) } })
 
-    // Clone subgroups
+    // Clone subgroups that don't already exist (skip defaults)
     for (const sg of sourceSubs) {
+      const exists = await db.subgroup.findUnique({
+        where: { workbookId_key: { workbookId: wb.id, key: sg.key } },
+      })
+      if (exists) continue
       await db.subgroup.create({
         data: {
           workbookId: wb.id,

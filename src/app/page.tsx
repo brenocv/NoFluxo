@@ -703,6 +703,25 @@ export default function Home() {
     }
   }
 
+  function handleLogout() {
+    try {
+      // Clear all auth/state keys so the app returns to the login screen
+      window.localStorage.removeItem('porto_finance_user')
+      window.localStorage.removeItem('porto_workbook_id')
+      // Also clear per-account workbook keys if any
+      const keys = Object.keys(window.localStorage)
+      for (const k of keys) {
+        if (k.startsWith('nofluxo_') || k.startsWith('porto_')) {
+          window.localStorage.removeItem(k)
+        }
+      }
+      // Hard reload so the app re-bootstraps from a clean state
+      window.location.href = '/'
+    } catch {
+      window.location.href = '/'
+    }
+  }
+
   async function handleRename(key: string, value: string) {
     try {
       await updateLabel(key, value, user, workbookId)
@@ -1203,7 +1222,9 @@ export default function Home() {
             </div>
             <div className="flex-1 min-w-0">
               <h1 className="text-sm font-semibold leading-tight truncate">
-                {workbookName || 'Porto 2026'} <span className="text-muted-foreground font-normal">• Controle financeiro • {year}</span>
+                <span className="text-muted-foreground font-normal">Planilha </span>
+                <span className="text-foreground">"{workbookName || 'Porto 2026'}"</span>
+                <span className="text-muted-foreground font-normal"> • {year}</span>
               </h1>
             </div>
           </button>
@@ -1742,8 +1763,13 @@ export default function Home() {
         <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
           {/* Left: user name + refresh */}
           <div className="flex items-center gap-1.5 text-xs flex-1">
-            <span className="text-muted-foreground hidden sm:inline">Você é</span>
-            <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation">
+            <button
+              onClick={() => setSettingsOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation"
+              title="Trocar de usuário ou abrir configurações"
+            >
+              <span className="text-muted-foreground hidden sm:inline">Você é</span>
+              <span className="sm:hidden text-muted-foreground">👤</span>
               {user}
             </button>
             <Button
@@ -1837,6 +1863,7 @@ export default function Home() {
         euroName={euroName}
         onSaveEuroName={handleSaveEuroName}
         onExportExcel={handleExportExcel}
+        onLogout={handleLogout}
       />
 
       <CopyMonthDialog
