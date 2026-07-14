@@ -45,9 +45,9 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // Always create the default subgroups as well — they are referenced by the
+  // Always create the default subgroups (these are referenced by the
   // finance.ts GROUP_STRUCTURE and used by the cat-editor for default
-  // currency/type selection.
+  // currency/type selection).
   const DEFAULT_SUBGROUPS = [
     { key: 'despesas.cartoes',                parentKey: 'despesas',    name: 'Cartões BR',        sortOrder: 0 },
     { key: 'despesas.contas_casa',            parentKey: 'despesas',    name: 'Contas casa',       sortOrder: 1 },
@@ -67,60 +67,11 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // If copyFrom is provided, ALSO clone categories and any extra subgroups
-  // from the source workbook (on top of the defaults we just created).
-  if (body.copyFrom) {
-    const sourceCats = await db.category.findMany({ where: { workbookId: String(body.copyFrom) } })
-    const sourceSubs = await db.subgroup.findMany({ where: { workbookId: String(body.copyFrom) } })
-
-    // Clone subgroups that don't already exist (skip defaults we just created)
-    for (const sg of sourceSubs) {
-      const exists = await db.subgroup.findUnique({
-        where: { workbookId_key: { workbookId: wb.id, key: sg.key } },
-      })
-      if (exists) continue
-      await db.subgroup.create({
-        data: {
-          workbookId: wb.id,
-          key: sg.key,
-          parentKey: sg.parentKey,
-          name: sg.name,
-          sortOrder: sg.sortOrder,
-        },
-      })
-    }
-
-    // Clone categories (need to remap parentCategoryId)
-    const idMap: Record<string, string> = {}
-    // First pass: create without parent
-    for (const c of sourceCats) {
-      const newCat = await db.category.create({
-        data: {
-          workbookId: wb.id,
-          name: c.name,
-          group: c.group,
-          type: c.type,
-          currency: c.currency,
-          note: c.note,
-          sortOrder: c.sortOrder,
-          autoConvert: c.autoConvert,
-          excludeFromTotal: c.excludeFromTotal,
-          monthlyGoal: c.monthlyGoal,
-          parentCategoryId: null, // set in second pass
-        },
-      })
-      idMap[c.id] = newCat.id
-    }
-    // Second pass: set parents
-    for (const c of sourceCats) {
-      if (c.parentCategoryId && idMap[c.parentCategoryId]) {
-        await db.category.update({
-          where: { id: idMap[c.id] },
-          data: { parentCategoryId: idMap[c.parentCategoryId] },
-        })
-      }
-    }
-  }
+  // NOTE: New workbooks are always created ZEROED — only the 3 default cards
+  // and 5 default subgroups are created. No categories, no transactions.
+  // The previous `copyFrom` behavior (cloning categories from another
+  // workbook) has been removed by user request: every new planilha starts
+  // empty so the user can populate it from scratch.
 
   await db.activityLog.create({
     data: { user, action: 'create', entity: 'config', detail: `Criou planilha "${name}"` },

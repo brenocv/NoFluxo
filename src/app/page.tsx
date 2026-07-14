@@ -127,13 +127,16 @@ import { NewCardDialog } from '@/components/finance/new-card-dialog'
 import { PrevBalanceCard } from '@/components/finance/prev-balance-card'
 import { useVencimentoNotifications } from '@/hooks/use-vencimento-notifications'
 import { LoginScreen } from '@/components/finance/login-screen'
+import { CurrenciesDialog } from '@/components/finance/currencies-dialog'
+import { CardAddChoiceDialog } from '@/components/finance/card-add-choice-dialog'
+import { AddItemToCardDialog } from '@/components/finance/add-item-to-card-dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Copy, Eraser,
-  Database, Bell, BellOff, Upload, RefreshCw, Zap, Download,
+  Database, Bell, BellOff, Upload, RefreshCw, Zap, Download, Coins,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -176,6 +179,12 @@ export default function Home() {
   const [switchUserOpen, setSwitchUserOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
+  const [currenciesOpen, setCurrenciesOpen] = useState(false)
+  // When user clicks the "+" button on a top-level CARD (Despesas/Rendimentos/Reservas),
+  // we open a choice dialog: "adicionar item com valor" or "criar subgrupo".
+  const [cardAddChoiceTarget, setCardAddChoiceTarget] = useState<{ key: string; name: string; type: 'EXPENSE' | 'INCOME' | 'RESERVE' } | null>(null)
+  // When user chooses "adicionar item com valor", we open AddItemToCardDialog scoped to that card.
+  const [addItemToCardTarget, setAddItemToCardTarget] = useState<{ key: string; name: string; type: 'EXPENSE' | 'INCOME' | 'RESERVE' } | null>(null)
   const history = useActionHistory()
   const notifications = useVencimentoNotifications(categories)
   const [includeReceivables, setIncludeReceivables] = useState<boolean>(() => {
@@ -657,6 +666,67 @@ export default function Home() {
           }
         },
       })
+
+      toast.success(`"${args.name}" adicionado`)
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao adicionar')
+    }
+  }
+
+  // Add item with value directly to a CARD (no card chooser — comes from the
+  // "+" button on the card itself). Similar to handleQuickAdd but always
+  // scoped to the clicked card.
+  async function handleAddItemToCard(
+    cardKey: string,
+    cardType: 'EXPENSE' | 'INCOME' | 'RESERVE',
+    args: {
+      name: string; value: number; currency: string; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
+      group: string; note?: string; isRecurring: boolean; installmentsTotal?: number | null
+      newSubgroupName?: string
+    }
+  ) {
+    try {
+      // 1. If creating a new subgroup inside the card, create it first
+      let finalGroup = args.group
+      if (args.newSubgroupName) {
+        const sgRes = await createSubgroup(cardKey, args.newSubgroupName, user, workbookId)
+        dispatchChange('subgroup', 'create', { subgroup: sgRes.subgroup }, `Criou subgrupo "${args.newSubgroupName}"`, {
+          user, action: 'create', entity: 'subgroup', detail: `Criou subgrupo "${args.newSubgroupName}"`, createdAt: new Date().toISOString(),
+        })
+        finalGroup = sgRes.subgroup.key
+      }
+
+      // 2. Create the category inside the card (or its new subgroup)
+      const catRes = await createCategory({
+        name: args.name,
+        group: finalGroup,
+        type: args.type as any,
+        currency: args.currency as Currency,
+        note: args.note,
+        workbookId,
+        user,
+      })
+      dispatchChange('category', 'create', { category: catRes.category }, `Criou categoria "${args.name}"`, {
+        user, action: 'create', entity: 'category', detail: `Criou categoria "${args.name}"`, createdAt: new Date().toISOString(),
+      })
+
+      // 3. Create the transaction
+      const txRes = await saveTransaction({
+        categoryId: catRes.category.id,
+        month,
+        year,
+        value: args.value,
+        note: args.note ?? null,
+        user,
+        isRecurring: args.isRecurring,
+        installmentsTotal: args.installmentsTotal ?? null,
+      })
+      const txs = txRes.transactions ?? (txRes.transaction ? [txRes.transaction] : [])
+      if (txs.length > 0) {
+        dispatchChange('transaction', txRes.action as any, { transactions: txs }, `Adicionou ${args.name}`, {
+          user, action: 'create', entity: 'transaction', detail: `Adicionou ${args.name}`, createdAt: new Date().toISOString(),
+        })
+      }
 
       toast.success(`"${args.name}" adicionado`)
     } catch (e: any) {
@@ -1286,19 +1356,17 @@ export default function Home() {
     <div className="min-h-screen flex flex-col bg-muted/30">
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
         <div className="max-w-3xl mx-auto px-3 py-2 space-y-2">
-          {/* Top row: Account (left) | Logo+NoFluxo (center) | Workbook (right) */}
+          {/* Top row: User (left) | Logo+NoFluxo (center) | Workbook (right) */}
           <div className="flex items-center justify-between gap-2">
-            {/* Left: Account name → click to go back to login */}
+            {/* Left: "Você é [nome]" → click to switch user */}
             <button
-              onClick={() => {
-                if (confirm('Sair da conta e voltar para o login?')) {
-                  setIsLoggedIn(false)
-                }
-              }}
-              className="text-xs font-medium text-muted-foreground hover:text-foreground truncate max-w-[30%] text-left touch-manipulation"
-              title="Voltar para login"
+              onClick={() => setSwitchUserOpen(true)}
+              className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium text-xs touch-manipulation truncate max-w-[35%]"
+              title="Trocar de usuário"
             >
-              ← {accountName || user}
+              <span className="text-muted-foreground hidden sm:inline">Você é</span>
+              <span className="sm:hidden text-muted-foreground">👤</span>
+              <span className="truncate">{user}</span>
             </button>
 
             {/* Center: Logo + NoFluxo */}
@@ -1331,6 +1399,9 @@ export default function Home() {
             </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setBackupOpen(true)} aria-label="Backup" title="Backup e restauração">
               <Database className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setCurrenciesOpen(true)} aria-label="Moedas" title="Criar e editar moedas">
+              <Coins className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleExportExcel} aria-label="Exportar Excel" title="Exportar Excel do ano atual">
               <Download className="h-4 w-4" />
@@ -1437,7 +1508,7 @@ export default function Home() {
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
               onAddCategory={(grp, parentCategoryId) => {
                 if (parentCategoryId) {
-                  // Clicking FolderPlus on a CATEGORY → open SubItemEditor (simple name dialog)
+                  // Clicking "+" on a CATEGORY → open SubItemEditor (simple name dialog)
                   const parentCat = categories.find((c) => c.id === parentCategoryId)
                   if (parentCat) {
                     setNewSubItemParent({
@@ -1449,10 +1520,15 @@ export default function Home() {
                     })
                   }
                 } else {
-                  // Clicking FolderPlus on a SUBGROUP → open CategoryEditor (full form)
+                  // Clicking "+" on a SUBGROUP → open CategoryEditor (full form, scoped to subgroup)
                   setNewCatGroup(grp as CategoryGroup)
                   setNewCatParent(null)
                 }
+              }}
+              onAddToCard={(cardKey, cardName, cardType) => {
+                // Clicking "+" on a TOP-LEVEL CARD (Despesas/Rendimentos/Reservas)
+                // opens a choice dialog: "adicionar item com valor" or "criar subgrupo"
+                setCardAddChoiceTarget({ key: cardKey, name: cardName, type: cardType })
               }}
               onDeleteCategory={handleDeleteCategory}
               onRename={handleRename}
@@ -2012,6 +2088,75 @@ export default function Home() {
         onBackup={() => setBackupOpen(true)}
         onRestore={() => setBackupOpen(true)}
         onResetValues={() => setResetOpen(true)}
+      />
+
+      <CurrenciesDialog
+        open={currenciesOpen}
+        onOpenChange={setCurrenciesOpen}
+        euroRate={euroRate}
+        onSaveEuroRate={handleSaveEuroRate}
+        currencies={(() => {
+          try {
+            const stored = config.customCurrencies
+            return stored ? JSON.parse(stored) : []
+          } catch { return [] }
+        })()}
+        onSaveCurrencies={async (currencies) => {
+          await updateConfig('customCurrencies', JSON.stringify(currencies), user)
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(currencies) }, by: { name: user, color: USER_COLOR }, at: Date.now() }
+          }))
+        }}
+      />
+
+      {/* Choice dialog: when user clicks "+" on a top-level card, choose
+          between "adicionar item com valor" or "criar subgrupo". */}
+      <CardAddChoiceDialog
+        open={!!cardAddChoiceTarget}
+        cardName={cardAddChoiceTarget?.name ?? ''}
+        onOpenChange={(o) => !o && setCardAddChoiceTarget(null)}
+        onAddItemWithValue={() => {
+          // Move from choice dialog to the actual add-item dialog
+          if (cardAddChoiceTarget) {
+            setAddItemToCardTarget(cardAddChoiceTarget)
+          }
+        }}
+        onCreateSubgroup={() => {
+          // Reuse existing SubgroupEditor by setting newSubgroupParent
+          if (cardAddChoiceTarget) {
+            setNewSubgroupParent({
+              key: cardAddChoiceTarget.key,
+              label: cardAddChoiceTarget.name,
+            })
+          }
+        }}
+      />
+
+      {/* Add item with value directly to the card */}
+      <AddItemToCardDialog
+        open={!!addItemToCardTarget}
+        month={month}
+        year={year}
+        cardKey={addItemToCardTarget?.key ?? ''}
+        cardName={addItemToCardTarget?.name ?? ''}
+        cardType={addItemToCardTarget?.type ?? 'EXPENSE'}
+        subgroups={subgroups}
+        labels={labels}
+        customCurrencies={(() => {
+          try {
+            const stored = config.customCurrencies
+            return stored ? JSON.parse(stored) : []
+          } catch { return [] }
+        })()}
+        onOpenChange={(o) => !o && setAddItemToCardTarget(null)}
+        onCreate={async (args) => {
+          if (!addItemToCardTarget) return
+          await handleAddItemToCard(
+            addItemToCardTarget.key,
+            addItemToCardTarget.type,
+            args
+          )
+        }}
       />
 
       <CopyMonthDialog
