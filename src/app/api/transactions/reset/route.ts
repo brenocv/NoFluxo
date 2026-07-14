@@ -59,6 +59,44 @@ export async function POST(req: NextRequest) {
       where: { workbookId, key: { notIn: defaultTopKeys } },
     })
 
+    // 5. ENSURE the 3 default TopGroups exist (create if missing — this can
+    // happen if the workbook was created before the "defaults on create" fix,
+    // or if a user accidentally deleted one).
+    const DEFAULT_TOP_GROUPS = [
+      { key: 'despesas',    name: 'Despesas',    color: '#dc2626', type: 'EXPENSE', sortOrder: 0 },
+      { key: 'rendimentos', name: 'Rendimentos', color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
+      { key: 'reservas',    name: 'Reservas',    color: '#d97706', type: 'RESERVE', sortOrder: 2 },
+    ]
+    for (const tg of DEFAULT_TOP_GROUPS) {
+      const exists = await db.topGroup.findUnique({
+        where: { workbookId_key: { workbookId, key: tg.key } },
+      })
+      if (!exists) {
+        await db.topGroup.create({
+          data: { ...tg, workbookId, isDefault: true },
+        })
+      }
+    }
+
+    // 6. ENSURE the 5 default subgroups exist (create if missing)
+    const DEFAULT_SUBGROUPS = [
+      { key: 'despesas.cartoes',                parentKey: 'despesas',    name: 'Cartões BR',        sortOrder: 0 },
+      { key: 'despesas.contas_casa',            parentKey: 'despesas',    name: 'Contas casa',       sortOrder: 1 },
+      { key: 'rendimentos.brl',                 parentKey: 'rendimentos', name: 'Em Real (R$)',      sortOrder: 0 },
+      { key: 'rendimentos.eur',                 parentKey: 'rendimentos', name: 'Em Euro (€)',       sortOrder: 1 },
+      { key: 'rendimentos.valores_a_receber',   parentKey: 'rendimentos', name: 'Valores a receber', sortOrder: 2 },
+    ]
+    for (const sg of DEFAULT_SUBGROUPS) {
+      const exists = await db.subgroup.findUnique({
+        where: { workbookId_key: { workbookId, key: sg.key } },
+      })
+      if (!exists) {
+        await db.subgroup.create({
+          data: { ...sg, workbookId },
+        })
+      }
+    }
+
     const detail = `Resetou a planilha para o estado inicial (${txResult.count} transações, ${catResult.count} itens, ${subResult.count} subgrupos, ${topResult.count} cards removidos)`
     await db.activityLog.create({
       data: { user, action: 'delete', entity: 'transaction', detail },
