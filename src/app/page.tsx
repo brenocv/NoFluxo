@@ -130,6 +130,7 @@ import { LoginScreen } from '@/components/finance/login-screen'
 import { CurrenciesDialog } from '@/components/finance/currencies-dialog'
 import { CardAddChoiceDialog } from '@/components/finance/card-add-choice-dialog'
 import { AddItemToCardDialog } from '@/components/finance/add-item-to-card-dialog'
+import { getSecondaryCurrency } from '@/lib/currencies'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
@@ -195,6 +196,12 @@ export default function Home() {
   const [prevMonthLabel, setPrevMonthLabel] = useState<string>('')
 
   const euroRate = parseFloat(config.euroToBrl ?? '6') || 6
+  // The "secondary" currency is the one shown alongside BRL in values.
+  // Default is EUR. User can pick another via CurrenciesDialog.
+  const customCurrenciesList = (() => {
+    try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
+  })()
+  const secondaryCurrencyInfo = getSecondaryCurrency(config, customCurrenciesList)
 
   // Fetch workbook name when workbookId changes — also sets a default workbook if none is selected
   useEffect(() => {
@@ -1150,7 +1157,22 @@ export default function Home() {
     }
   }
 
-  async function handleReset(scope: 'month' | 'year') {
+  async function handleReset(scope: 'month' | 'year' | 'factory') {
+    if (scope === 'factory') {
+      // Factory reset: wipe everything back to default state. Cannot be undone.
+      try {
+        const r = await resetValues({ scope: 'factory', workbookId, user }) as any
+        // Reload all data from server
+        window.dispatchEvent(new CustomEvent('finance:patch', {
+          detail: { type: 'reload' as any, action: 'update' as any, payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+        }))
+        toast.success(`Planilha resetada: ${r.deletedCount} valor(es), ${r.deletedCategories} itens, ${r.deletedSubgroups} subgrupos, ${r.deletedTopGroups} cards removidos`)
+      } catch (e: any) {
+        toast.error(e.message || 'Erro ao resetar planilha')
+      }
+      return
+    }
+
     const txsToDelete = transactions.filter((t) => {
       if (t.year !== year) return false
       if (scope === 'month' && t.month !== month) return false
@@ -1438,6 +1460,7 @@ export default function Home() {
           includeReceivables={includeReceivables}
           onToggleReceivables={handleToggleReceivables}
           euroRate={euroRate}
+          secondaryCurrency={secondaryCurrencyInfo}
           customCurrencies={(() => {
             try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
           })()}
@@ -1503,6 +1526,7 @@ export default function Home() {
               transactionsByCat={txByCat}
               allCategories={categories}
               euroRate={euroRate}
+              secondaryCurrency={secondaryCurrencyInfo}
               highlightedCategoryIds={highlightedCategoryIds}
               onClearSearch={() => setSearch('')}
               onEdit={(cat, tx) => setEditTarget({ category: cat, tx: tx ?? null })}
@@ -1919,15 +1943,14 @@ export default function Home() {
 
       <footer className="sticky bottom-0 z-30 border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="max-w-3xl mx-auto px-3 py-2 flex items-center justify-between gap-2">
-          {/* Left: user name + settings + refresh */}
+          {/* Left: user name (click to switch) + settings + refresh */}
           <div className="flex items-center gap-1.5 text-xs flex-1">
             <button
               onClick={() => setSwitchUserOpen(true)}
               className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted hover:bg-muted/80 font-medium touch-manipulation"
-              title="Trocar de usuário"
+              title={`Trocar de usuário (atual: ${user})`}
             >
-              <span className="text-muted-foreground hidden sm:inline">Você é</span>
-              <span className="sm:hidden text-muted-foreground">👤</span>
+              <span className="text-muted-foreground">👤</span>
               <span>{user}</span>
             </button>
             <Button
@@ -2010,6 +2033,7 @@ export default function Home() {
         month={month}
         year={year}
         euroRate={euroRate}
+        secondaryCurrency={secondaryCurrencyInfo}
         customCurrencies={(() => {
           try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
         })()}
@@ -2106,6 +2130,14 @@ export default function Home() {
           window.dispatchEvent(new CustomEvent('finance:patch', {
             detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(currencies) }, by: { name: user, color: USER_COLOR }, at: Date.now() }
           }))
+        }}
+        secondaryCurrency={secondaryCurrencyInfo.code}
+        onSaveSecondaryCurrency={async (code) => {
+          await updateConfig('secondaryCurrency', code, user)
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: { type: 'config', action: 'update', payload: { key: 'secondaryCurrency', value: code }, by: { name: user, color: USER_COLOR }, at: Date.now() }
+          }))
+          toast.success(`Moeda secundária alterada para ${code}`)
         }}
       />
 

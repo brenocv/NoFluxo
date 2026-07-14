@@ -16,7 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { Category, formatMoney, MONTHS_PT_LONG, Transaction } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Trash2, RefreshCw, AlertTriangle } from 'lucide-react'
-import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
+import { PREDEFINED_CURRENCIES, SecondaryCurrencyInfo } from '@/lib/currencies'
 
 const PRESET_COLORS = [
   '#dc2626', '#ea580c', '#d97706', '#ca8a04', '#65a30d',
@@ -36,6 +36,7 @@ interface Props {
   month: number
   year: number
   euroRate: number
+  secondaryCurrency?: SecondaryCurrencyInfo
   customCurrencies?: CustomCurrency[]
   onOpenChange: (open: boolean) => void
   onSave: (args: {
@@ -56,7 +57,7 @@ interface Props {
 }
 
 export function TransactionEditor({
-  open, category, transaction, month, year, euroRate, customCurrencies,
+  open, category, transaction, month, year, euroRate, secondaryCurrency, customCurrencies,
   onOpenChange, onSave, onClear, onStopRecurring, onUpdateCategory,
 }: Props) {
   const [raw, setRaw] = useState('')
@@ -204,11 +205,23 @@ export function TransactionEditor({
               <p className="text-xs text-muted-foreground tabular-nums">
                 {isIncome ? '+' : isReserve || isReceivable ? '' : '−'}
                 {formatMoney(parsed, category.currency)}
-                <span className="ml-1.5">
-                  ≈ {category.currency === 'BRL'
-                    ? formatMoney(parsed / euroRate, 'EUR')
-                    : formatMoney(parsed * euroRate, 'BRL')}
-                </span>
+                {(() => {
+                  // Show the secondary currency equivalent next to the value.
+                  // If the category's currency IS the secondary, show BRL instead.
+                  const sec = secondaryCurrency ?? { code: 'EUR', rate: euroRate, symbol: '€', name: 'Euro', flag: '🇪🇺' }
+                  const secRate = sec.rate || euroRate
+                  if (category.currency === 'BRL') {
+                    // Show secondary currency in parentheses
+                    return <span className="ml-1.5">≈ {formatMoney(parsed / secRate, sec.code)}</span>
+                  } else if (category.currency === sec.code) {
+                    // Category is in the secondary currency — show BRL equivalent
+                    return <span className="ml-1.5">≈ {formatMoney(parsed * secRate, 'BRL')}</span>
+                  } else {
+                    // Category uses a third currency — show BRL equivalent using its own rate
+                    const customRate = (customCurrencies ?? []).find(c => c.code === category.currency)?.rate ?? 1
+                    return <span className="ml-1.5">≈ {formatMoney(parsed * customRate, 'BRL')}</span>
+                  }
+                })()}
               </p>
             )}
           </div>

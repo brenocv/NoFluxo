@@ -12,6 +12,7 @@ import {
   Category, formatMoney, GroupTreeNode, computeNodeTotal,
   buildCategoryTree, computeCategoryNodeTotal, Transaction,
 } from '@/lib/finance'
+import { SecondaryCurrencyInfo } from '@/lib/currencies'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
   AlertTriangle, RefreshCw, Check, FolderPlus, Move,
@@ -25,6 +26,7 @@ interface Props {
   transactionsByCat: Record<string, Transaction | undefined>
   allCategories: Category[]
   euroRate: number
+  secondaryCurrency?: SecondaryCurrencyInfo
   highlightedCategoryIds: Set<string>
   onClearSearch: () => void
   onEdit: (category: Category, current: Transaction | undefined) => void
@@ -76,6 +78,9 @@ const ATTR_BY_TYPE: Record<DnDType, string> = {
 
 export function GroupNode(props: Props) {
   const { node, transactionsByCat, euroRate, allCategories } = props
+  // Secondary currency for the "(€ X)" displays; defaults to EUR for backwards compat
+  const sec = props.secondaryCurrency ?? { code: 'EUR', rate: euroRate, symbol: '€', name: 'Euro', flag: '🇪🇺' }
+  const secRate = sec.rate || euroRate
   const [userOpen, setUserOpen] = useState(true)
   const hasSearch = props.highlightedCategoryIds.size > 0
   const hasHighlightedInTree = (n: GroupTreeNode): boolean => {
@@ -322,7 +327,7 @@ export function GroupNode(props: Props) {
         <span className="text-xs sm:text-sm font-semibold tabular-nums ml-0.5 sm:ml-1 text-right" style={{ color }}>
           {totalSign}{formatMoney(Math.abs(total), 'BRL')}
           <span className="text-[10px] text-muted-foreground ml-1 font-normal hidden sm:inline">
-            ({formatMoney(Math.abs(total) / euroRate, 'EUR')})
+            ({formatMoney(Math.abs(total) / secRate, sec.code)})
           </span>
         </span>
       </div>
@@ -447,6 +452,9 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
 }) {
   const { category, children } = catNode
   const { transactionsByCat, euroRate } = allProps
+  // Secondary currency for the "(€ X)" display; defaults to EUR for backwards compat
+  const sec = allProps.secondaryCurrency ?? { code: 'EUR', rate: euroRate, symbol: '€', name: 'Euro', flag: '🇪🇺' }
+  const secRate = sec.rate || euroRate
   const [userOpen, setUserOpen] = useState(false)
 
   const dndState = useCategoryDnd()
@@ -642,7 +650,9 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
                   {sign}{formatMoney(Math.abs(displayValue), category.currency)}
                 </span>
                 <span className="text-[10px] text-muted-foreground tabular-nums whitespace-nowrap hidden sm:block">
-                  {category.currency === 'BRL' ? formatMoney(Math.abs(displayValue) / euroRate, 'EUR') : formatMoney(Math.abs(displayValue) * euroRate, 'BRL')}
+                  {category.currency === 'BRL'
+                    ? formatMoney(Math.abs(displayValue) / secRate, sec.code)
+                    : formatMoney(Math.abs(displayValue) * secRate, 'BRL')}
                 </span>
               </div>
             )}
