@@ -196,16 +196,9 @@ export function WorkbookSwitcher({
               placeholder="Ex.: Vitória 2026, Viagem Europa…"
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
-              <input
-                type="checkbox"
-                checked={copyFrom}
-                onChange={(e) => setCopyFrom(e.target.checked)}
-                className="h-3.5 w-3.5"
-              />
-              <Copy className="h-3 w-3" />
-              Copiar estrutura da planilha atual (categorias e subgrupos, sem valores)
-            </label>
+            <p className="text-xs text-muted-foreground">
+              A nova planilha será criada zerada, com os cards Despesas, Rendimentos e Reservas prontos para uso.
+            </p>
             <Button
               onClick={handleCreate}
               disabled={!newName.trim() || creating}

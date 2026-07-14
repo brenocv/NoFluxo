@@ -33,6 +33,7 @@ interface Props {
   onRename: (key: string, value: string) => void
   onStopRecurring: (seriesId: string, currentMonth: number) => void
   onAddSubgroup: (parentKey: string) => void
+  onAddToCard: (cardKey: string, cardName: string, cardType: 'EXPENSE' | 'INCOME' | 'RESERVE') => void
   onDeleteSubgroup: (node: GroupTreeNode) => void
   onMoveCategory: (cat: Category) => void
   onDropCategory?: (draggedId: string, targetId: string, position: 'before' | 'after') => void
@@ -280,19 +281,21 @@ export function GroupNode(props: Props) {
           onRename={(v) => props.onRename(isTopLevel ? 'group:' + node.key : 'subgroup:' + node.key, v)}
           small={!isTopLevel}
         />
-        {/* + button: top-level creates subgroup, subgroups create sub-item (category) inside */}
+        {/* + button: top-level opens choice dialog (item with value OR subgroup),
+            subgroups create sub-item (category) inside */}
         <button
           onClick={(e) => {
             e.stopPropagation()
             if (isTopLevel) {
-              props.onAddSubgroup(node.key)
+              // Open the choice dialog (item com valor OU criar subgrupo)
+              props.onAddToCard(node.key, node.label, node.groupType as 'EXPENSE' | 'INCOME' | 'RESERVE')
             } else {
               props.onAddCategory(node.key, null)
             }
           }}
           className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors touch-manipulation"
-          aria-label={isTopLevel ? 'Novo subgrupo' : 'Novo sub-item'}
-          title={isTopLevel ? 'Criar subgrupo aqui' : 'Adicionar sub-item aqui'}
+          aria-label={isTopLevel ? 'Adicionar em ' + node.label : 'Novo sub-item'}
+          title={isTopLevel ? 'Adicionar item ou subgrupo' : 'Adicionar sub-item aqui'}
           style={{ color }}
         >
           <FolderPlus className={isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5'} />
