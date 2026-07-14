@@ -120,6 +120,7 @@ export default function Home() {
   const [prevMonthLabel, setPrevMonthLabel] = useState<string>('')
 
   const euroRate = parseFloat(config.euroToBrl ?? '6') || 6
+  const euroName = config.euroName || 'Euro'
 
   // Fetch workbook name when workbookId changes — also sets a default workbook if none is selected
   useEffect(() => {
@@ -679,13 +680,26 @@ export default function Home() {
   async function handleSaveEuroRate(v: number) {
     try {
       await updateConfig('euroToBrl', String(v), user)
-      const detail = `Atualizou câmbio Euro → R$ ${v.toFixed(2)}`
+      const detail = `Atualizou câmbio ${euroName} → R$ ${v.toFixed(2)}`
       dispatchChange('config', 'update', { key: 'euroToBrl', value: String(v) }, detail, {
         user, action: 'update', entity: 'config', detail, createdAt: new Date().toISOString(),
       })
       toast.success('Cotação atualizada')
     } catch (e: any) {
       toast.error(e.message || 'Erro ao atualizar cotação')
+    }
+  }
+
+  async function handleSaveEuroName(name: string) {
+    try {
+      await updateConfig('euroName', name, user)
+      const detail = `Renomeou moeda alternativa para "${name}"`
+      dispatchChange('config', 'update', { key: 'euroName', value: name }, detail, {
+        user, action: 'update', entity: 'config', detail, createdAt: new Date().toISOString(),
+      })
+      toast.success('Nome atualizado')
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao atualizar nome')
     }
   }
 
@@ -1252,6 +1266,7 @@ export default function Home() {
           includeReceivables={includeReceivables}
           onToggleReceivables={handleToggleReceivables}
           euroRate={euroRate}
+          euroName={euroName}
           onEntradasClick={() => scrollToGroup('rendimentos')}
           onSaidasClick={() => scrollToGroup('despesas')}
         />
@@ -1778,6 +1793,7 @@ export default function Home() {
         month={month}
         year={year}
         euroRate={euroRate}
+        euroName={euroName}
         onOpenChange={(o) => !o && setEditTarget(null)}
         onSave={handleSaveTransaction}
         onClear={handleClearTransaction}
@@ -1791,6 +1807,7 @@ export default function Home() {
         labels={labels}
         subgroups={subgroups}
         topGroups={topGroups}
+        euroName={euroName}
         onOpenChange={(o) => !o && setNewCatGroup(null)}
         onCreate={handleCreateCategory}
       />
@@ -1817,6 +1834,8 @@ export default function Home() {
         onSetUser={setUser}
         euroRate={euroRate}
         onSaveEuroRate={handleSaveEuroRate}
+        euroName={euroName}
+        onSaveEuroName={handleSaveEuroName}
         onExportExcel={handleExportExcel}
       />
 
@@ -1866,6 +1885,7 @@ export default function Home() {
         topGroups={topGroups}
         labels={labels}
         initialGroup={quickAddInitialGroup}
+        euroName={euroName}
         onOpenChange={setQuickAddOpen}
         onCreate={handleQuickAdd}
       />

@@ -13,6 +13,8 @@ export type Currency = 'BRL' | 'EUR'
 //   "rendimentos.valores_a_receber"-> subgroup inside Rendimentos
 //   "reservas"                     -> top-level "Reservas"
 export type Group = string
+// Alias kept for backwards compatibility — many components still import CategoryGroup.
+export type CategoryGroup = string
 
 export interface Category {
   id: string

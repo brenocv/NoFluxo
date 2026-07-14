@@ -44,6 +44,7 @@ interface Props {
   labels: Record<string, string>
   subgroups: Subgroup[]
   topGroups: TopGroup[]
+  euroName?: string
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
@@ -53,10 +54,11 @@ interface Props {
     note?: string
     excludeFromTotal?: boolean
     monthlyGoal?: number | null
+    color?: string | null
   }) => Promise<void>
 }
 
-export function CategoryEditor({ open, group, labels, subgroups, topGroups, onOpenChange, onCreate }: Props) {
+export function CategoryEditor({ open, group, labels, subgroups, topGroups, euroName = 'Euro', onOpenChange, onCreate }: Props) {
   const [name, setName] = useState('')
   const [note, setNote] = useState('')
   const [groupVal, setGroupVal] = useState<string>('')
@@ -196,7 +198,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, onOp
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="BRL">Real (R$)</SelectItem>
-                  <SelectItem value="EUR">Euro (€)</SelectItem>
+                  <SelectItem value="EUR">{euroName} (€)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

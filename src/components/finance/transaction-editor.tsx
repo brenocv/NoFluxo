@@ -30,6 +30,7 @@ interface Props {
   month: number
   year: number
   euroRate: number
+  euroName?: string
   onOpenChange: (open: boolean) => void
   onSave: (args: {
     value: number | null
@@ -49,7 +50,7 @@ interface Props {
 }
 
 export function TransactionEditor({
-  open, category, transaction, month, year, euroRate,
+  open, category, transaction, month, year, euroRate, euroName = 'Euro',
   onOpenChange, onSave, onClear, onStopRecurring, onUpdateCategory,
 }: Props) {
   const [raw, setRaw] = useState('')
@@ -357,7 +358,7 @@ export function TransactionEditor({
                     type="button"
                     onClick={() => setCatCurrency('EUR')}
                     className={cn('h-9 rounded-md text-sm font-medium border-2 transition-all', catCurrency === 'EUR' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300' : 'border-border bg-muted/50 text-muted-foreground')}
-                  >€ Euro</button>
+                  >€ {euroName}</button>
                 </div>
               </div>
 

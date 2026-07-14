@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,8 @@ interface Props {
   onSetUser: (name: string) => void
   euroRate: number
   onSaveEuroRate: (v: number) => Promise<void>
+  euroName: string
+  onSaveEuroName: (name: string) => Promise<void>
   onExportExcel?: () => void
 }
 
@@ -34,18 +36,30 @@ export function SettingsDialog({
   onSetUser,
   euroRate,
   onSaveEuroRate,
+  euroName,
+  onSaveEuroName,
   onExportExcel,
 }: Props) {
   const [rate, setRate] = useState(String(euroRate))
-  const [saving, setSaving] = useState(false)
+  const [name, setName] = useState(euroName)
+  const [savingRate, setSavingRate] = useState(false)
+  const [savingName, setSavingName] = useState(false)
+
+  // Sync local state when dialog opens or props change
+  useEffect(() => {
+    if (open) {
+      setRate(String(euroRate))
+      setName(euroName)
+    }
+  }, [open, euroRate, euroName])
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Configurações</DialogTitle>
           <DialogDescription className="sr-only">
-            Defina quem está usando este dispositivo e a cotação do Euro usada nos cálculos.
+            Defina quem está usando este dispositivo, o nome da moeda alternativa e a cotação usada nos cálculos.
           </DialogDescription>
         </DialogHeader>
 
@@ -74,9 +88,45 @@ export function SettingsDialog({
             </p>
           </div>
 
+          {/* Euro name (editable) */}
+          <div className="space-y-2">
+            <Label htmlFor="euro-name">Nome da moeda alternativa</Label>
+            <div className="flex gap-2">
+              <Input
+                id="euro-name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Euro"
+                className="flex-1"
+                autoComplete="off"
+              />
+              <Button
+                onClick={async () => {
+                  const v = name.trim() || 'Euro'
+                  setSavingName(true)
+                  try {
+                    await onSaveEuroName(v)
+                  } finally {
+                    setSavingName(false)
+                  }
+                }}
+                disabled={savingName || (name.trim() || 'Euro') === euroName}
+              >
+                {savingName ? 'Salvando…' : 'Salvar'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Você pode renomear a moeda alternativa para &quot;Euro PT&quot;, &quot;Dólar&quot;, etc.
+              O símbolo (€) continua o mesmo.
+            </p>
+          </div>
+
           {/* Exchange rate */}
           <div className="space-y-2">
-            <Label htmlFor="rate">Cotação do Euro (em R$)</Label>
+            <Label htmlFor="rate">
+              Cotação do {euroName} (em R$)
+            </Label>
             <div className="flex gap-2">
               <Input
                 id="rate"
@@ -91,16 +141,16 @@ export function SettingsDialog({
                 onClick={async () => {
                   const v = parseFloat(rate.replace(',', '.'))
                   if (isNaN(v) || v <= 0) return
-                  setSaving(true)
+                  setSavingRate(true)
                   try {
                     await onSaveEuroRate(v)
                   } finally {
-                    setSaving(false)
+                    setSavingRate(false)
                   }
                 }}
-                disabled={saving}
+                disabled={savingRate}
               >
-                {saving ? 'Salvando…' : 'Salvar'}
+                {savingRate ? 'Salvando…' : 'Salvar'}
               </Button>
             </div>
             <p className="text-xs text-muted-foreground">

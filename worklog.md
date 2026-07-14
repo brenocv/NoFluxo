@@ -865,3 +865,62 @@ Stage Summary:
 - FolderPlus em subgrupo: abre CategoryEditor (form completo)
 - Footer: [usuário] [atualizar] ... [desfazer] [refazer] ... [valor rápido]
 - Lint limpo
+
+---
+Task ID: v20
+Agent: super-z (main)
+Task: Corrigir bug crítico: erro ao criar valores e planilhas. Revisar todo o código. Adicionar nome editável para o Euro.
+
+Work Log:
+1. CAUSA RAIZ ENCONTRADA — Prisma schema desalinhado com o banco de dados:
+   - O `prisma/schema.prisma` estava com `provider = "postgresql"` mas o arquivo `.env` aponta para SQLite (`file:/home/z/my-project/db/custom.db`).
+   - O arquivo `db/custom.db` confirmadamente é SQLite (magic header "SQLite format 3").
+   - Resultado: TODAS as chamadas de API que tocam o banco falhavam com erro de conexão — criar transação, criar planilha, criar categoria, etc. Por isso o usuário via "o mesmo erro" em várias ações.
+   - Fix: trocado `provider = "postgresql"` para `provider = "sqlite"` no schema. Rodado `prisma generate` + `prisma db push` (banco já estava em sync).
+
+2. Adicionado alias `CategoryGroup` em `src/lib/finance.ts`:
+   - Múltiplos componentes (page.tsx, cat-editor.tsx, category-editor.tsx, top-group-card.tsx) importavam `CategoryGroup` de `@/lib/finance`, mas só `Group` era exportado.
+   - Adicionado `export type CategoryGroup = string` como alias — elimina os erros TS.
+
+3. Corrigido `color` field nos tipos de `onCreate` em `cat-editor.tsx` e `category-editor.tsx`:
+   - O código passava `color: color || null` no onCreate, mas o tipo não tinha `color?`. Adicionado `color?: string | null` ao tipo.
+
+4. Corrigido `dnd.setTarget` em `gn6.tsx` linha 514:
+   - `targetRow.dataset.catId` é `string | undefined`, mas `setTarget` espera `string | null`. Adicionado `?? null`.
+
+5. Corrigido `formatMoney` em `src/app/api/transactions/route.ts`:
+   - O parâmetro `currency` estava tipado como `'BRL' | 'EUR'` mas recebia `category.currency` (string). Trocado para `string`.
+
+6. Corrigido `src/app/api/backup/import/route.ts`:
+   - `where: { key: sg.key }` não funciona (Subgroup tem unique em `id` ou `workbookId_key`). Trocado para `where: { id: sg.id }`.
+   - Adicionado `workbookId` em todos os `create` de Subgroup, Category, Note.
+   - `where: { year_month: ... }` em Note não funcionava — o compound unique é `workbookId_year_month`. Corrigido.
+   - Adicionado fallback para `workbookId` quando ausente no backup.
+   - Quando `workbookId` é fornecido no body, o `replace` mode agora deleta apenas os dados daquele workbook (não zera o banco todo).
+
+7. Euro com nome editável (tarefa pendente da conversa anterior):
+   - `SettingsDialog` agora tem um campo "Nome da moeda alternativa" (Input + Salvar).
+   - Novo handler `handleSaveEuroName` em `page.tsx` — salva em `config.euroName` (default "Euro").
+   - `euroName` derivado de `config.euroName || 'Euro'` em `page.tsx`.
+   - Passado para `SummaryCard`, `TransactionEditor`, `CategoryEditor`, `QuickAddDialog`.
+   - Em `SummaryCard`: mostra `(Euro PT)` ao lado do saldo em EUR.
+   - Em `TransactionEditor`: botão de moeda mostra `€ {euroName}` ao invés de `€ Euro`.
+   - Em `CategoryEditor` (cat-editor): dropdown de moeda mostra `{euroName} (€)`.
+   - Em `SettingsDialog`: label "Cotação do {euroName} (em R$)" — atualiza dinamicamente.
+
+8. Testes de runtime (dev server):
+   - GET /api/workbooks → 200, retorna 1 workbook ("Porto 2026")
+   - POST /api/workbooks (criar "Test Plan" copiando estrutura) → 200, criou com sucesso
+   - GET /api/data?year=2026&workbookId=... → 200, 29 categorias, 3 topGroups, 12 subgrupos, 213 transações
+   - POST /api/transactions (criar transação) → 200, criou com sucesso
+   - POST /api/categories (criar categoria) → 200, criou com sucesso
+   - PATCH /api/config (euroName = "Euro PT") → 200, salvou com sucesso
+   - DELETE /api/workbooks → 200, deletou com sucesso
+   - Page HTML carrega com status 200
+
+Stage Summary:
+- BUG CRÍTICO CORRIGIDO: Prisma schema agora é SQLite, alinhado com o banco de dados real. Todas as operações de criar valor/planilha/categoria funcionam.
+- Sistema de moedas mantido simples: apenas BRL + EUR, com o símbolo € fixo mas o NOME "Euro" agora é editável nas Configurações.
+- Erros de TypeScript periféricos corrigidos (CategoryGroup alias, color field, setTarget null).
+- Backup/import route corrigido para incluir workbookId (não zera múltiplos workbooks em modo replace).
+- ZIP gerado: download/porto-finance-nofluxo-v20.zip

@@ -18,6 +18,7 @@ interface Props {
   includeReceivables: boolean
   onToggleReceivables: (v: boolean) => void
   euroRate: number
+  euroName?: string
   onEntradasClick: () => void
   onSaidasClick: () => void
 }
@@ -26,6 +27,7 @@ export function SummaryCard({
   entradasBRL, saidasBRL, entradasEUR, saidasEUR,
   reservasBRL, receivablesBRL, receivablesEUR,
   includeReceivables, onToggleReceivables, euroRate,
+  euroName = 'Euro',
   onEntradasClick, onSaidasClick,
 }: Props) {
   const totalEntradasBRL = entradasBRL + entradasEUR * euroRate
@@ -61,7 +63,7 @@ export function SummaryCard({
           {formatBRL(saldoTotalBRL)}
         </div>
         <div className={cn('text-sm font-medium tabular-nums', saldoTotalEUR >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80')}>
-          ≈ {formatEUR(saldoTotalEUR)}
+          ≈ {formatEUR(saldoTotalEUR)} <span className="text-[10px] text-muted-foreground">({euroName})</span>
         </div>
       </div>
 

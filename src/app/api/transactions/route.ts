@@ -192,7 +192,7 @@ const MONTHS_PT = [
   'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
 ]
 
-function formatMoney(v: number, currency: 'BRL' | 'EUR') {
+function formatMoney(v: number, currency: string) {
   if (currency === 'BRL') return `R$ ${v.toFixed(2)}`
   return `€ ${v.toFixed(2)}`
 }

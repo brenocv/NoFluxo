@@ -29,6 +29,7 @@ interface Props {
   topGroups: TopGroup[]
   labels: Record<string, string>
   initialGroup?: string
+  euroName?: string
   onOpenChange: (open: boolean) => void
   onCreate: (args: {
     name: string
@@ -51,7 +52,7 @@ const TYPE_OPTIONS: { value: QuickType; label: string; icon: typeof TrendingDown
 ]
 
 export function QuickAddDialog({
-  open, month, year, categories, subgroups, topGroups, labels, initialGroup, onOpenChange, onCreate,
+  open, month, year, categories, subgroups, topGroups, labels, initialGroup, euroName = 'Euro', onOpenChange, onCreate,
 }: Props) {
   const [name, setName] = useState('')
   const [raw, setRaw] = useState('')
