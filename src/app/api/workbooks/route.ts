@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     const sourceCats = await db.category.findMany({ where: { workbookId: String(body.copyFrom) } })
     const sourceSubs = await db.subgroup.findMany({ where: { workbookId: String(body.copyFrom) } })
 
-    // Clone subgroups that don't already exist (skip defaults)
+    // Clone subgroups that don't already exist (skip defaults we just created)
     for (const sg of sourceSubs) {
       const exists = await db.subgroup.findUnique({
         where: { workbookId_key: { workbookId: wb.id, key: sg.key } },
@@ -159,7 +159,8 @@ export async function DELETE(req: NextRequest) {
   const user = String(body.user || 'Anônimo').slice(0, 30)
 
   const count = await db.workbook.count()
-  if (count <= 1) {
+  // Allow deleting last workbook if user is 'reset' (full reset)
+  if (count <= 1 && user !== 'reset') {
     return NextResponse.json({ error: 'Não é possível remover a única planilha' }, { status: 400 })
   }
 

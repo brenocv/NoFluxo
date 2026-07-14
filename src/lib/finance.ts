@@ -7,14 +7,12 @@ export type Currency = 'BRL' | 'EUR'
 //   "despesas"                     -> top-level "Despesas"
 //   "despesas.cartoes"             -> subgroup inside Despesas
 //   "despesas.contas_casa"         -> subgroup inside Despesas
-//   "rendimentos"                  -> top-level "Rendimentos"
-//   "rendimentos.brl"              -> subgroup inside Rendimentos
-//   "rendimentos.eur"              -> subgroup inside Rendimentos
-//   "rendimentos.valores_a_receber"-> subgroup inside Rendimentos
+//   "rendimentos"                  -> top-level "Receitas"
+//   "rendimentos.brl"              -> subgroup inside Receitas
+//   "rendimentos.eur"              -> subgroup inside Receitas
+//   "rendimentos.valores_a_receber"-> subgroup inside Receitas
 //   "reservas"                     -> top-level "Reservas"
 export type Group = string
-// Alias kept for backwards compatibility — many components still import CategoryGroup.
-export type CategoryGroup = string
 
 export interface Category {
   id: string
@@ -116,7 +114,7 @@ export const GROUP_STRUCTURE: GroupDef[] = [
   },
   {
     key: 'rendimentos',
-    label: 'Rendimentos',
+    label: 'Receitas',
     subgroups: [
       { key: 'rendimentos.brl', label: 'Em Real (R$)' },
       { key: 'rendimentos.eur', label: 'Em Euro (€)' },
@@ -289,8 +287,9 @@ export function computeNodeTotal(
   for (const cat of node.categories) {
     const tx = transactionsByCat[cat.id]
     if (!tx) continue
-    if (cat.currency === 'EUR') total += tx.value * euroRate
-    else total += tx.value
+    if (cat.currency === 'BRL') total += tx.value
+    else if (cat.currency === 'EUR') total += tx.value * euroRate
+    else total += tx.value // Other currencies: stored in their own value, converted at display
   }
   for (const child of node.children) {
     total += computeNodeTotal(child, transactionsByCat, euroRate)
@@ -442,7 +441,9 @@ export function computeCategoryNodeTotal(
   let total = 0
   const tx = transactionsByCat[node.category.id]
   if (tx) {
-    total += node.category.currency === 'EUR' ? tx.value * euroRate : tx.value
+    if (node.category.currency === 'BRL') total += tx.value
+    else if (node.category.currency === 'EUR') total += tx.value * euroRate
+    else total += tx.value // Custom currencies
   }
   for (const child of node.children) {
     total += computeCategoryNodeTotal(child, transactionsByCat, euroRate)
@@ -464,13 +465,17 @@ export const MONTHS_PT_LONG = [
 
 // ---- Formatting ----
 
-export function formatMoney(v: number, currency: Currency) {
+export function formatMoney(v: number, currency: string): string {
   const sign = v < 0 ? '-' : ''
   const abs = Math.abs(v)
-  if (currency === 'BRL') {
-    return `${sign}R$ ${abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const formatted = abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  // Predefined symbols
+  const symbols: Record<string, string> = {
+    BRL: 'R$', USD: '$', CAD: 'C$', EUR: '€', GBP: '£',
+    DKK: 'kr', HUF: 'Ft', CZK: 'Kč',
   }
-  return `${sign}€ ${abs.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const symbol = symbols[currency] ?? currency
+  return `${sign}${symbol} ${formatted}`
 }
 
 export function formatBRL(v: number) {
