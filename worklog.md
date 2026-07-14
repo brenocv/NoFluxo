@@ -924,3 +924,39 @@ Stage Summary:
 - Erros de TypeScript periféricos corrigidos (CategoryGroup alias, color field, setTarget null).
 - Backup/import route corrigido para incluir workbookId (não zera múltiplos workbooks em modo replace).
 - ZIP gerado: download/porto-finance-nofluxo-v20.zip
+
+---
+Task ID: v29
+Agent: super-z (main)
+Task: Corrigir crash ao criar valor em planilha nova + melhorias de header/footer/settings.
+
+Work Log:
+1. CAUSA RAIZ DO CRASH "This page couldn't load":
+   - Quando o usuário criava uma planilha nova (sem copyFrom), a API POST /api/workbooks criava apenas o registro Workbook, sem os 3 TopGroups padrão (Despesas/Rendimentos/Reservas) e sem os subgrupos padrão.
+   - A UI tentava renderizar `groupTree = []` (vazio), e quando o usuário tentava adicionar um valor ou clicar em FolderPlus, crashava porque não havia grupo/categoria pai.
+   - Fix: POST /api/workbooks agora CRIA SEMPRE os 3 TopGroups padrão + 5 subgrupos padrão (cartoes, contas_casa, brl, eur, valores_a_receber) ao criar uma planilha nova, MESMO quando copyFrom é usado (defaults são criados primeiro, depois clona os extras da planilha origem).
+
+2. Header — nome da planilha em evidência:
+   - Antes: "Porto 2026 • Controle financeiro • 2026"
+   - Agora: "Planilha "Porto 2026" • 2026" (com "Planilha" em cinza, nome em negrito, ano em cinza)
+
+3. Footer — botão do usuário:
+   - Antes: "Você é [nome]" (Você é só em telas grandes)
+   - Agora: botão único mostra "Você é [nome]" em telas grandes, "👤 [nome]" em mobile, todos clicáveis
+
+4. Settings Dialog — Sair da conta:
+   - Adicionado prop `onLogout` no SettingsDialog
+   - Botão "Sair da conta" (variante ghost, vermelho) no canto inferior esquerdo do dialog
+   - Pede confirmação antes de sair
+   - Handler `handleLogout` em page.tsx: limpa todas as chaves porto_* e nofluxo_* do localStorage e recarrega a página
+
+5. Build de produção validado:
+   - `DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx next build` → sucesso, todas as 26 rotas (página + APIs) compiladas
+
+Stage Summary:
+- BUG CRÍTICO CORRIGIDO: planilhas novas agora vêm com Despesas/Rendimentos/Reservas + subgrupos padrão prontos para uso. Não há mais crash ao adicionar valor.
+- Header mais limpo e legível: "Planilha "Porto 2026" • 2026"
+- Botão de usuário mais claro: "Você é [nome]" | "👤 [nome]"
+- Settings tem botão "Sair da conta" que volta para tela de login
+- ZIP: download/porto-finance-nofluxo-v29.zip (365 KB)
+- GitHub: brenocv/porto-finance main → 7625f11
