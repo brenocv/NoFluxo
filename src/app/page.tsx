@@ -136,7 +136,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
-  Wifi, WifiOff, Settings, Plus, Eye, EyeOff, Copy, Eraser,
+  Settings, Plus, Eye, EyeOff, Copy, Eraser,
   Database, Bell, BellOff, Upload, RefreshCw, Zap, Download, Coins,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -502,12 +502,12 @@ export default function Home() {
   }
 
   async function handleCreateCategory(args: {
-    name: string; group: CategoryGroup; type: CategoryType; currency: Currency
+    name: string; group: CategoryGroup; type: CategoryType; currency: string
     note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null; color?: string | null
     value?: number | null
   }) {
     try {
-      const r = await createCategory({ ...args, parentCategoryId: newCatParent, workbookId, user })
+      const r = await createCategory({ ...args, currency: args.currency as Currency, parentCategoryId: newCatParent, workbookId, user })
       const detail = newCatParent
         ? `Criou sub-item "${r.category.name}"`
         : `Criou categoria "${r.category.name}"`
@@ -544,7 +544,7 @@ export default function Home() {
           })
         },
         redo: async () => {
-          const rr = await createCategory({ ...args, parentCategoryId: newCatParent, workbookId, user })
+          const rr = await createCategory({ ...args, currency: args.currency as Currency, parentCategoryId: newCatParent, workbookId, user })
           idRef.current = rr.category.id
           dispatchChange('category', 'create', { category: rr.category }, `Refazendo: ${detail}`, {
             user, action: 'create', entity: 'category', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
@@ -569,7 +569,7 @@ export default function Home() {
   }
 
   async function handleQuickAdd(args: {
-    name: string; value: number; currency: Currency; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
+    name: string; value: number; currency: string; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
     group: string; note?: string; isRecurring: boolean; installmentsTotal?: number | null
     newSubgroupName?: string; existingCategoryId?: string
   }) {
@@ -610,7 +610,7 @@ export default function Home() {
         name: args.name,
         group: finalGroup,
         type: args.type as any,
-        currency: args.currency,
+        currency: args.currency as Currency,
         note: args.note,
         workbookId,
         user,
@@ -655,7 +655,7 @@ export default function Home() {
         redo: async () => {
           const rr = await createCategory({
             name: args.name, group: args.group, type: args.type as any,
-            currency: args.currency, note: args.note, workbookId, user,
+            currency: args.currency as Currency, note: args.note, workbookId, user,
           })
           idRef.current = rr.category.id
           dispatchChange('category', 'create', { category: rr.category }, `Refazendo: adicionou ${args.name}`, {
@@ -1389,14 +1389,16 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col bg-muted/30">
-      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border">
+      <header className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 border-b border-border shadow-soft">
         <div className="max-w-3xl mx-auto px-3 py-2 space-y-2">
           {/* Top row: Logo+NoFluxo (left) | Workbook name (right) */}
           <div className="flex items-center justify-between gap-2">
             {/* Left: Logo + NoFluxo */}
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-6 w-6" />
-              <span className="text-base font-bold text-primary">NoFluxo</span>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="h-7 w-7 rounded-lg bg-accent flex items-center justify-center">
+                <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-5 w-5" />
+              </div>
+              <span className="text-base font-bold text-foreground tracking-tight">NoFluxo</span>
             </div>
 
             {/* Right: Workbook name → click to switch */}
@@ -1432,17 +1434,17 @@ export default function Home() {
             </Button>
             {notifications.supported && (
               <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => notifications.enabled ? notifications.disable() : notifications.requestPermission()} aria-label="Notificações" title={notifications.enabled ? 'Desativar notificações' : 'Ativar notificações de vencimento'}>
-                {notifications.enabled ? <Bell className="h-4 w-4 text-emerald-600" /> : <BellOff className="h-4 w-4" />}
+                {notifications.enabled ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4" />}
               </Button>
             )}
             <ThemeToggle />
             {/* Online/Offline status */}
             <Badge variant="outline" className={cn(
-              'gap-1 px-1.5 h-8 text-[10px] flex-shrink-0',
-              live.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-rose-200 bg-rose-50 text-rose-700'
+              'gap-1.5 px-2 h-8 text-[10px] flex-shrink-0 font-medium',
+              live.connected ? 'border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-400'
             )}>
-              {live.connected ? <><Wifi className="h-3 w-3" /><span>Online</span></>
-                : <><WifiOff className="h-3 w-3" /><span>Offline</span></>}
+              <span className={cn('h-1.5 w-1.5 rounded-full', live.connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500')} />
+              {live.connected ? 'Online' : 'Offline'}
             </Badge>
           </div>
         </div>

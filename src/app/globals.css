@@ -37,79 +37,108 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 3px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-xl: calc(var(--radius) + 6px);
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* NoFluxo brand palette — built around the logo green (#16a34a), with warm
+     neutrals instead of flat gray so the whole app reads as one designed
+     product rather than a stock admin template. Radius bumped up for a
+     friendlier, more "money app" feel. */
+  --radius: 0.85rem;
+
+  --background: oklch(0.987 0.004 155);
+  --foreground: oklch(0.2 0.02 165);
+
+  --card: oklch(0.995 0.002 155);
+  --card-foreground: oklch(0.2 0.02 165);
+
+  --popover: oklch(0.995 0.002 155);
+  --popover-foreground: oklch(0.2 0.02 165);
+
+  --primary: oklch(0.586 0.17 149.2);
+  --primary-foreground: oklch(0.99 0.005 155);
+
+  --secondary: oklch(0.955 0.01 155);
+  --secondary-foreground: oklch(0.25 0.02 165);
+
+  --muted: oklch(0.96 0.008 155);
+  --muted-foreground: oklch(0.5 0.02 165);
+
+  --accent: oklch(0.945 0.022 155.8);
+  --accent-foreground: oklch(0.35 0.1 152);
+
+  --destructive: oklch(0.586 0.222 17.585);
+
+  --border: oklch(0.91 0.012 155);
+  --input: oklch(0.91 0.012 155);
+  --ring: oklch(0.586 0.17 149.2);
+
+  --chart-1: oklch(0.586 0.17 149.2);
+  --chart-2: oklch(0.586 0.222 17.585);
+  --chart-3: oklch(0.769 0.165 70.08);
+  --chart-4: oklch(0.588 0.139 241.966);
+  --chart-5: oklch(0.541 0.247 293.009);
+
+  --sidebar: oklch(0.98 0.006 155);
+  --sidebar-foreground: oklch(0.2 0.02 165);
+  --sidebar-primary: oklch(0.586 0.17 149.2);
+  --sidebar-primary-foreground: oklch(0.99 0.005 155);
+  --sidebar-accent: oklch(0.945 0.022 155.8);
+  --sidebar-accent-foreground: oklch(0.35 0.1 152);
+  --sidebar-border: oklch(0.91 0.012 155);
+  --sidebar-ring: oklch(0.586 0.17 149.2);
+
+  /* Soft, slightly brand-tinted elevation shadows — used instead of flat
+     Tailwind shadow-sm on cards so surfaces feel lifted, not just outlined. */
+  --shadow-color: 149.2deg 30% 30%;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --background: oklch(0.187 0.012 167);
+  --foreground: oklch(0.96 0.006 155);
+
+  --card: oklch(0.231 0.019 160.5);
+  --card-foreground: oklch(0.96 0.006 155);
+
+  --popover: oklch(0.231 0.019 160.5);
+  --popover-foreground: oklch(0.96 0.006 155);
+
+  --primary: oklch(0.75 0.19 150);
+  --primary-foreground: oklch(0.16 0.03 155);
+
+  --secondary: oklch(0.28 0.018 160);
+  --secondary-foreground: oklch(0.94 0.006 155);
+
+  --muted: oklch(0.28 0.018 160);
+  --muted-foreground: oklch(0.66 0.02 155);
+
+  --accent: oklch(0.32 0.045 155);
+  --accent-foreground: oklch(0.85 0.15 150);
+
   --destructive: oklch(0.704 0.191 22.216);
+
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.75 0.19 150);
+
+  --chart-1: oklch(0.75 0.19 150);
+  --chart-2: oklch(0.704 0.191 22.216);
+  --chart-3: oklch(0.837 0.164 84.429);
+  --chart-4: oklch(0.65 0.15 240);
+  --chart-5: oklch(0.65 0.22 293);
+
+  --sidebar: oklch(0.21 0.016 163);
+  --sidebar-foreground: oklch(0.96 0.006 155);
+  --sidebar-primary: oklch(0.75 0.19 150);
+  --sidebar-primary-foreground: oklch(0.16 0.03 155);
+  --sidebar-accent: oklch(0.28 0.018 160);
+  --sidebar-accent-foreground: oklch(0.94 0.006 155);
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar-ring: oklch(0.75 0.19 150);
 }
 
 @layer base {
@@ -119,6 +148,7 @@
   body {
     @apply bg-background text-foreground;
     -webkit-tap-highlight-color: transparent;
+    font-feature-settings: "cv11", "ss01";
   }
 }
 
@@ -139,8 +169,42 @@
     background: oklch(0.85 0 0);
     border-radius: 9999px;
   }
+  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: oklch(0.4 0.02 160);
+  }
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
+  }
+
+  /* Soft elevation — replaces flat `shadow-sm` on cards with a subtle,
+     brand-tinted double shadow so surfaces feel lifted rather than boxed. */
+  .shadow-soft {
+    box-shadow:
+      0 1px 2px oklch(0.2 0.05 155 / 0.04),
+      0 4px 16px -4px oklch(0.2 0.08 155 / 0.08);
+  }
+  .dark .shadow-soft {
+    box-shadow:
+      0 1px 2px oklch(0 0 0 / 0.3),
+      0 4px 20px -4px oklch(0 0 0 / 0.35);
+  }
+  .shadow-elevated {
+    box-shadow:
+      0 2px 4px oklch(0.2 0.05 155 / 0.06),
+      0 12px 28px -8px oklch(0.2 0.08 155 / 0.16);
+  }
+  .dark .shadow-elevated {
+    box-shadow:
+      0 2px 4px oklch(0 0 0 / 0.35),
+      0 16px 32px -8px oklch(0 0 0 / 0.45);
+  }
+
+  /* Brand gradient — used sparingly for the hero balance card / primary CTAs */
+  .bg-gradient-brand {
+    background: linear-gradient(135deg, oklch(0.586 0.17 149.2), oklch(0.66 0.16 163));
+  }
+  .dark .bg-gradient-brand {
+    background: linear-gradient(135deg, oklch(0.42 0.1 155), oklch(0.34 0.06 165));
   }
 }
 

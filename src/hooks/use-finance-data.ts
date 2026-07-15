@@ -27,7 +27,7 @@ interface State {
 interface LiveMeta {
   connected: boolean
   presences: PresenceUser[]
-  lastChange: { by: string; detail: string; at: number } | null
+  lastChange: { by: string; detail: string | undefined; at: number } | null
 }
 
 export function useFinanceData(currentUser: string, year: number, workbookId: string) {
@@ -264,7 +264,7 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
     const onLocalPatch = (e: Event) => {
       const detail = (e as CustomEvent).detail as ChangeMessage
       // Handle special 'reload' type — re-fetch all data
-      if (detail.type === ('reload' as any)) {
+      if (detail.type === 'reload') {
         if (!workbookId) return
         setState((s) => ({ ...s, loading: true }))
         ;(async () => {

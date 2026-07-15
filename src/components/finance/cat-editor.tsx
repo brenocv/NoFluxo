@@ -26,7 +26,6 @@ import {
   collectGroupPaths,
   CategoryGroup,
   CategoryType,
-  Currency,
   Subgroup,
   TopGroup,
 } from '@/lib/finance'
@@ -55,6 +54,7 @@ interface Props {
     note?: string
     excludeFromTotal?: boolean
     monthlyGoal?: number | null
+    color?: string | null
     value?: number | null
   }) => Promise<void>
 }

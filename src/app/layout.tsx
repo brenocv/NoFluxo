@@ -38,13 +38,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   themeColor: "#0f172a",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "black-translucent",
-    title: "NoFluxo",
-  },
 };
 
 export default function RootLayout({

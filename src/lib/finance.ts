@@ -86,7 +86,7 @@ export interface PresenceUser {
 }
 
 export interface ChangeMessage {
-  type: 'transaction' | 'category' | 'config' | 'activity' | 'label' | 'subgroup'
+  type: 'transaction' | 'category' | 'config' | 'activity' | 'label' | 'subgroup' | 'reload'
   action: 'create' | 'update' | 'delete'
   payload: any
   by: { name: string; color: string } | null
@@ -130,6 +130,18 @@ export const GROUP_STRUCTURE: GroupDef[] = [
 
 // Order of top-level groups for rendering.
 export const TOP_GROUP_ORDER = ['despesas', 'rendimentos', 'reservas']
+
+// Backward-compatible aliases: several components were written against an
+// older, fixed-enum version of the group model. `Group` is now a free-form
+// string, so `CategoryGroup` is kept as a type alias, and `GROUP_LABELS` is
+// derived from `GROUP_STRUCTURE` so both stay in sync automatically.
+export type CategoryGroup = Group
+export const GROUP_LABELS: Record<string, string> = Object.fromEntries(
+  GROUP_STRUCTURE.flatMap((g) => [
+    [g.key, g.label] as const,
+    ...g.subgroups.map((s) => [s.key, s.label] as const),
+  ])
+)
 
 // Get the top-level group key from a full group string.
 export function getTopGroup(group: string): string {

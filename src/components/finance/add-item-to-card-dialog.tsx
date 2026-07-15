@@ -83,10 +83,9 @@ export function AddItemToCardDialog({
 
   // Available currency options: BRL + EUR + custom currencies
   const currencyOptions = [
-    { code: 'BRL', ...PREDEFINED_CURRENCIES.find(p => p.code === 'BRL')! },
-    { code: 'EUR', ...PREDEFINED_CURRENCIES.find(p => p.code === 'EUR')! },
+    { ...PREDEFINED_CURRENCIES.find(p => p.code === 'BRL')! },
+    { ...PREDEFINED_CURRENCIES.find(p => p.code === 'EUR')! },
     ...customCurrencies.map(c => ({
-      code: c.code,
       ...PREDEFINED_CURRENCIES.find(p => p.code === c.code)!,
     })),
   ].filter(c => c.symbol)

@@ -526,7 +526,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         if (targetRow && targetRow.dataset.catId !== category.id) {
           const targetRect = targetRow.getBoundingClientRect()
           const isAbove = ev.clientY < targetRect.top + targetRect.height / 2
-          dnd.setTarget(targetRow.dataset.catId, isAbove ? 'before' : 'after')
+          dnd.setTarget(targetRow.dataset.catId ?? null, isAbove ? 'before' : 'after')
         } else {
           dnd.setTarget(null, null)
         }

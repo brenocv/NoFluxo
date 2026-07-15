@@ -72,7 +72,6 @@ export function CurrenciesDialog({
   // Currencies eligible to be the secondary one (shown alongside BRL).
   // EUR is always eligible. Other currencies are eligible if they're in the display list.
   const secondaryOptions = displayList.map((c) => ({
-    code: c.code,
     ...getCurrencyDef(c.code)!,
   })).filter((o) => o.symbol)
 
