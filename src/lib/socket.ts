@@ -15,7 +15,7 @@ export function getSocket(): Socket {
   if (isProduction) {
     // Production: return a dummy socket that does nothing
     // (real-time sync is handled by page refresh)
-    const dummy = {
+    const dummy: Socket = {
       connected: false,
       emit: () => {},
       on: () => {},
@@ -23,7 +23,7 @@ export function getSocket(): Socket {
       disconnect: () => {},
     } as unknown as Socket
     socket = dummy
-    return dummy
+    return socket
   }
 
   // Development: connect to the separate mini-service via Caddy gateway

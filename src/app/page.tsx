@@ -771,10 +771,10 @@ export default function Home() {
 
       // 3. Reload to get the updated tree
       window.dispatchEvent(new CustomEvent('finance:patch', {
-        detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+        detail: { type: 'reload' as any, action: 'update' as any, payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
       }))
       broadcast({
-        type: 'reload', action: 'update', payload: {},
+        type: 'reload' as any, action: 'update' as any, payload: {},
         detail: `Agrupou subgrupos em "${newSubgroupName}"`,
       })
 
@@ -2263,7 +2263,10 @@ export default function Home() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name, user, copyFrom, accountName }),
             })
-            if (!r.ok) throw new Error('Falha')
+            if (!r.ok) {
+              const err = await r.json().catch(() => ({}))
+              throw new Error(err.error || `Falha (${r.status})`)
+            }
             const data = await r.json()
             setWorkbook(data.workbook.id)
             // Save the new workbook ID scoped to this account

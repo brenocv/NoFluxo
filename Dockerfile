@@ -19,8 +19,11 @@ ENV PORT=8080
 RUN npx prisma generate --schema=./prisma/schema.prisma
 RUN npx next build
 
+# Make startup script executable
+RUN chmod +x start.sh
+
 # Expose the port Railway expects
 EXPOSE 8080
 
-# Start Next.js (it reads PORT env var automatically)
-CMD ["node_modules/.bin/next", "start"]
+# Start: runs prisma db push (syncs schema with DB) then next start
+CMD ["sh", "start.sh"]

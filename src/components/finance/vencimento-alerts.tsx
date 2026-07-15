@@ -22,7 +22,7 @@ function parseVencimentoDay(note: string | null): number | null {
 }
 
 export function VencimentoAlerts({ categories, currentDay, daysInMonth }: Props) {
-  const vencimentos: { category: Category; day: number; daysUntil: number }[] = []
+  const vencimentos: { category: typeof categories[number]; day: number; daysUntil: number }[] = []
   for (const c of categories) {
     if (c.type !== 'EXPENSE') continue
     const day = parseVencimentoDay(c.note)
