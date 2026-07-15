@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+download
+upload
+tool-results
+examples
+skills
+mini-services
+*.log
+*.zip
+db
+.env*
+server.log

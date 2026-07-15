@@ -1,0 +1,17 @@
+# Railway configuration
+# This file tells Railway how to build and run the app.
+
+[deploy]
+# Railway automatically detects Node.js/Bun and runs:
+#   Install: bun install (or npm install)
+#   Build:   bun run build (or npm run build)
+#   Start:   bun run start (or npm start)
+#
+# The start command is defined in package.json:
+#   "start": "NODE_ENV=production node server.js"
+#
+# Railway sets the PORT environment variable automatically.
+# The app listens on PORT (defaults to 3000).
+
+[environments.production]
+# No special config needed — Railway auto-detects everything.

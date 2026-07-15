@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// GET /api/workbooks -> returns all workbooks
-export async function GET() {
-  const workbooks = await db.workbook.findMany({ orderBy: { sortOrder: 'asc' } })
+// GET /api/workbooks?accountName=xxx -> returns workbooks for that account
+// (If no accountName is provided, returns ALL workbooks — used for admin/debug.)
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url)
+  const accountName = url.searchParams.get('accountName')
+  const where = accountName ? { accountName } : {}
+  const workbooks = await db.workbook.findMany({ where, orderBy: { sortOrder: 'asc' } })
   return NextResponse.json({ workbooks })
 }
 
@@ -16,16 +20,19 @@ export async function POST(req: NextRequest) {
   }
   const user = String(body.user || 'Anônimo').slice(0, 30)
   const name = String(body.name).trim().slice(0, 60)
+  const accountName = body.accountName ? String(body.accountName).slice(0, 60) : null
 
   const maxOrder = await db.workbook.aggregate({ _max: { sortOrder: true } })
   const wb = await db.workbook.create({
-    data: { name, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
+    data: { name, accountName, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
   })
 
   // Always create the 3 default TopGroups (cards) so the user sees
-  // Despesas / Rendimentos / Reservas as soon as they open the new workbook.
+  // Despesas / Receitas / Reservas as soon as they open the new workbook.
   // Without these, the page renders an empty tree and any attempt to add a
   // value crashes because there's no group to attach it to.
+  // Per user request: NO default subgroups — the 3 cards start completely empty.
+  // The user creates subgroups themselves via the FolderPlus button on each card.
   const DEFAULT_TOP_GROUPS = [
     { key: 'despesas',    name: 'Despesas',    color: '#dc2626', type: 'EXPENSE', sortOrder: 0 },
     { key: 'rendimentos', name: 'Receitas',    color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
@@ -45,33 +52,11 @@ export async function POST(req: NextRequest) {
     })
   }
 
-  // Always create the default subgroups (these are referenced by the
-  // finance.ts GROUP_STRUCTURE and used by the cat-editor for default
-  // currency/type selection).
-  const DEFAULT_SUBGROUPS = [
-    { key: 'despesas.cartoes',                parentKey: 'despesas',    name: 'Cartões BR',        sortOrder: 0 },
-    { key: 'despesas.contas_casa',            parentKey: 'despesas',    name: 'Contas casa',       sortOrder: 1 },
-    { key: 'rendimentos.brl',                 parentKey: 'rendimentos', name: 'Em Real (R$)',      sortOrder: 0 },
-    { key: 'rendimentos.eur',                 parentKey: 'rendimentos', name: 'Em Euro (€)',       sortOrder: 1 },
-    { key: 'rendimentos.valores_a_receber',   parentKey: 'rendimentos', name: 'Valores a receber', sortOrder: 2 },
-  ]
-  for (const sg of DEFAULT_SUBGROUPS) {
-    await db.subgroup.create({
-      data: {
-        workbookId: wb.id,
-        key: sg.key,
-        parentKey: sg.parentKey,
-        name: sg.name,
-        sortOrder: sg.sortOrder,
-      },
-    })
-  }
-
-  // NOTE: New workbooks are always created ZEROED — only the 3 default cards
-  // and 5 default subgroups are created. No categories, no transactions.
-  // The previous `copyFrom` behavior (cloning categories from another
-  // workbook) has been removed by user request: every new planilha starts
-  // empty so the user can populate it from scratch.
+  // NOTE: New workbooks are always created ZEROED:
+  // - Only the 3 default cards (Despesas, Receitas, Reservas) — NO subgroups
+  // - No categories, no transactions
+  // - Currency config starts clean: BRL primary, EUR secondary (default rate 6)
+  //   No custom currencies are carried over from other workbooks.
 
   await db.activityLog.create({
     data: { user, action: 'create', entity: 'config', detail: `Criou planilha "${name}"` },

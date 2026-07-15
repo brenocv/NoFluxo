@@ -13,11 +13,12 @@ datasource db {
 // All categories, subgroups, notes, and budgets belong to a workbook.
 // Switching workbooks shows a completely different set of data.
 model Workbook {
-  id        String   @id @default(cuid())
-  name      String
-  sortOrder Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  accountName String?  // which account owns this workbook (null = legacy/shared)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   categories Category[]
   subgroups  Subgroup[]

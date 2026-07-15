@@ -85,20 +85,20 @@ export function LoginScreen({ onLogin }: Props) {
 
   async function createEmptyWorkbook(name: string) {
     try {
-      // POST /api/workbooks ALREADY creates the 3 default TopGroups
-      // (Despesas/Rendimentos/Reservas) + 5 default subgroups on the server side.
-      // We just need to create the workbook and get its ID.
+      // POST /api/workbooks creates the 3 default TopGroups (Despesas/Receitas/Reservas)
+      // on the server side. We just need to create the workbook and get its ID.
+      // We pass accountName so the workbook is scoped to this account (won't show
+      // up in other accounts' workbook lists).
       const r = await fetch('/api/workbooks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, accountName: selectedAccount }),
       })
       if (!r.ok) return
       const data = await r.json()
       const wbId = data.workbook.id
 
-      // Save the workbook ID scoped to THIS account so that switching accounts
-      // doesn't accidentally load another account's workbook.
+      // Save the workbook ID scoped to THIS account
       localStorage.setItem(`nofluxo_wb_${selectedAccount}`, wbId)
       localStorage.setItem('porto_workbook_id', wbId)
       return wbId

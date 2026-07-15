@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { Plus, Trash2, Coins, Star } from 'lucide-react'
-import { PREDEFINED_CURRENCIES, DEFAULT_OFFERED_CURRENCIES, getCurrencyDef } from '@/lib/currencies'
+import { PREDEFINED_CURRENCIES, getCurrencyDef } from '@/lib/currencies'
 
 interface ActiveCurrency {
   code: string
@@ -25,6 +25,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   euroRate: number
+  euroRemoved?: boolean
+  onSetEuroRemoved?: (removed: boolean) => Promise<void>
   onSaveEuroRate: (v: number) => Promise<void>
   currencies?: ActiveCurrency[]
   onSaveCurrencies?: (currencies: ActiveCurrency[]) => Promise<void>
@@ -36,14 +38,17 @@ export function CurrenciesDialog({
   open,
   onOpenChange,
   euroRate,
+  euroRemoved = false,
+  onSetEuroRemoved,
   onSaveEuroRate,
   currencies = [],
   onSaveCurrencies,
   secondaryCurrency = 'EUR',
   onSaveSecondaryCurrency,
 }: Props) {
-  const [rate, setRate] = useState(String(euroRate))
   const [saving, setSaving] = useState(false)
+  // The "active" list always includes EUR (uses euroRate) + any custom currencies.
+  // We display EUR as just another row in the list, not as a separate section.
   const [activeCurrencies, setActiveCurrencies] = useState<ActiveCurrency[]>(currencies)
   const [newCurrencyCode, setNewCurrencyCode] = useState('')
   const [newCurrencyRate, setNewCurrencyRate] = useState('')
@@ -52,29 +57,43 @@ export function CurrenciesDialog({
     setActiveCurrencies(currencies)
   }, [currencies])
 
-  useEffect(() => {
-    if (open) setRate(String(euroRate))
-  }, [open, euroRate])
+  // The full list of currencies to display: EUR first (if not removed) + any custom currencies.
+  const displayList: ActiveCurrency[] = [
+    ...(euroRemoved ? [] : [{ code: 'EUR', rate: euroRate }]),
+    ...activeCurrencies.filter((c) => c.code !== 'EUR'),
+  ]
 
-  // Only USD is offered by default (per user request: just Real + Euro + Dólar).
-  // The full PREDEFINED_CURRENCIES list is still used for symbol/name lookup
-  // when displaying active currencies.
-  const availableCurrencies = DEFAULT_OFFERED_CURRENCIES.filter(c =>
-    !activeCurrencies.find(a => a.code === c.code)
+  // Available currencies to add: all predefined except BRL (primary) and those already active.
+  // EUR shows up in the "add" list if it was removed.
+  const availableCurrencies = PREDEFINED_CURRENCIES.filter(
+    (c) => c.code !== 'BRL' && !displayList.find((d) => d.code === c.code)
   )
 
-  // All currencies eligible to be the secondary one (shown alongside BRL).
-  // EUR is always eligible (uses config.euroToBrl). Other currencies are
-  // only eligible if they're already in the active customCurrencies list.
-  const secondaryOptions = [
-    { code: 'EUR', ...getCurrencyDef('EUR')! },
-    ...activeCurrencies.map((c) => ({ code: c.code, ...getCurrencyDef(c.code)! })).filter(o => o.symbol),
-  ]
+  // Currencies eligible to be the secondary one (shown alongside BRL).
+  // EUR is always eligible. Other currencies are eligible if they're in the display list.
+  const secondaryOptions = displayList.map((c) => ({
+    code: c.code,
+    ...getCurrencyDef(c.code)!,
+  })).filter((o) => o.symbol)
 
   async function handleAddCurrency() {
     if (!newCurrencyCode || !newCurrencyRate) return
     const r = parseFloat(newCurrencyRate.replace(',', '.'))
     if (isNaN(r) || r <= 0) return
+    // If adding EUR back (after it was removed), just clear the euroRemoved flag
+    // and save the rate via onSaveEuroRate.
+    if (newCurrencyCode === 'EUR') {
+      if (onSetEuroRemoved) {
+        setSaving(true)
+        try {
+          await onSetEuroRemoved(false)
+          if (onSaveEuroRate) await onSaveEuroRate(r)
+        } finally { setSaving(false) }
+      }
+      setNewCurrencyCode('')
+      setNewCurrencyRate('')
+      return
+    }
     const updated = [...activeCurrencies, { code: newCurrencyCode, rate: r }]
     setActiveCurrencies(updated)
     setNewCurrencyCode('')
@@ -86,8 +105,28 @@ export function CurrenciesDialog({
   }
 
   async function handleRemoveCurrency(code: string) {
-    const updated = activeCurrencies.filter(c => c.code !== code)
+    if (code === 'EUR') {
+      // Mark EUR as removed. If it was the secondary, switch to another available
+      // currency (or BRL if none left).
+      if (onSetEuroRemoved) {
+        setSaving(true)
+        try { await onSetEuroRemoved(true) } finally { setSaving(false) }
+      }
+      if (secondaryCurrency === 'EUR' && onSaveSecondaryCurrency) {
+        // Pick the next available currency (first in activeCurrencies), or BRL
+        const nextCode = activeCurrencies[0]?.code ?? 'BRL'
+        await onSaveSecondaryCurrency(nextCode)
+      }
+      return
+    }
+    const updated = activeCurrencies.filter((c) => c.code !== code)
     setActiveCurrencies(updated)
+    // If the removed currency was the secondary, switch back to EUR (if available)
+    // or to the first remaining currency, or BRL.
+    if (secondaryCurrency === code && onSaveSecondaryCurrency) {
+      const nextCode = !euroRemoved ? 'EUR' : (updated[0]?.code ?? 'BRL')
+      await onSaveSecondaryCurrency(nextCode)
+    }
     if (onSaveCurrencies) {
       setSaving(true)
       try { await onSaveCurrencies(updated) } finally { setSaving(false) }
@@ -97,11 +136,19 @@ export function CurrenciesDialog({
   async function handleUpdateCurrencyRate(code: string, newRate: string) {
     const r = parseFloat(newRate.replace(',', '.'))
     if (isNaN(r) || r <= 0) return
-    const updated = activeCurrencies.map(c => c.code === code ? { ...c, rate: r } : c)
-    setActiveCurrencies(updated)
-    if (onSaveCurrencies) {
-      setSaving(true)
-      try { await onSaveCurrencies(updated) } finally { setSaving(false) }
+    if (code === 'EUR') {
+      // EUR rate is stored in config.euroToBrl
+      if (onSaveEuroRate) {
+        setSaving(true)
+        try { await onSaveEuroRate(r) } finally { setSaving(false) }
+      }
+    } else {
+      const updated = activeCurrencies.map((c) => c.code === code ? { ...c, rate: r } : c)
+      setActiveCurrencies(updated)
+      if (onSaveCurrencies) {
+        setSaving(true)
+        try { await onSaveCurrencies(updated) } finally { setSaving(false) }
+      }
     }
   }
 
@@ -114,52 +161,20 @@ export function CurrenciesDialog({
             Moedas
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Defina a cotação do Euro e de outras moedas usadas nos cálculos.
+            Escolha a moeda secundária e gerencie as cotações. O Real (R$) é sempre a moeda principal.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5 py-2">
-          {/* Euro rate — always present */}
-          <div className="space-y-2">
-            <Label htmlFor="euro-rate">
-              🇪🇺 Euro (€) — cotação em R$
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="euro-rate"
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={rate}
-                onChange={(e) => setRate(e.target.value)}
-                className="flex-1"
-              />
-              <Button
-                onClick={async () => {
-                  const v = parseFloat(rate.replace(',', '.'))
-                  if (isNaN(v) || v <= 0) return
-                  setSaving(true)
-                  try { await onSaveEuroRate(v) } finally { setSaving(false) }
-                }}
-                disabled={saving}
-              >
-                {saving ? 'Salvando…' : 'Salvar'}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              O Real (R$) é a moeda principal. Todas as outras cotações são em relação a ele.
-            </p>
-          </div>
-
+        <div className="space-y-4 py-2">
           {/* Secondary currency selector — the one shown alongside BRL */}
           {onSaveSecondaryCurrency && (
-            <div className="space-y-2 pt-4 border-t border-border">
+            <div className="space-y-2">
               <Label className="flex items-center gap-1.5">
                 <Star className="h-3.5 w-3.5 text-amber-500" />
                 Moeda secundária
               </Label>
               <p className="text-xs text-muted-foreground">
-                Esta é a moeda que aparece ao lado do Real nos valores (ex.: R$ 100 ({secondaryCurrency === 'EUR' ? '€' : getCurrencyDef(secondaryCurrency)?.symbol} 16,67)).
+                Aparece ao lado do Real nos valores (ex.: R$ 100 ({getCurrencyDef(secondaryCurrency)?.symbol ?? '?'} 16,67)).
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {secondaryOptions.map((opt) => (
@@ -185,77 +200,84 @@ export function CurrenciesDialog({
                   </button>
                 ))}
               </div>
-              {secondaryOptions.length === 1 && (
-                <p className="text-[11px] text-muted-foreground">
-                  Adicione outras moedas abaixo para poder escolhê-las como secundária.
-                </p>
-              )}
             </div>
           )}
 
-          {/* Other currencies */}
-          {onSaveCurrencies && (
-            <div className="space-y-3 pt-4 border-t border-border">
-              <Label>Outras moedas</Label>
-              <p className="text-xs text-muted-foreground">
-                Escolha moedas da lista. A cotação é em relação ao Real (R$).
-              </p>
-
-              {activeCurrencies.length > 0 && (
-                <div className="space-y-2">
-                  {activeCurrencies.map((c) => {
-                    const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
-                    return (
-                      <div key={c.code} className="flex items-center gap-2 p-2 rounded-md bg-muted/50">
-                        <span className="text-lg">{def?.flag}</span>
-                        <span className="text-sm font-medium flex-1">{def?.symbol} {def?.name}</span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          inputMode="decimal"
-                          defaultValue={String(c.rate)}
-                          onBlur={(e) => handleUpdateCurrencyRate(c.code, e.target.value)}
-                          className="w-24 h-8 text-xs"
-                          title="Cotação em R$"
-                        />
-                        <span className="text-xs text-muted-foreground">R$</span>
-                        <button
-                          onClick={() => handleRemoveCurrency(c.code)}
-                          className="p-1 rounded hover:bg-destructive/10 hover:text-destructive"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {availableCurrencies.length > 0 && (
-                <div className="flex gap-2">
-                  <select
-                    value={newCurrencyCode}
-                    onChange={(e) => setNewCurrencyCode(e.target.value)}
-                    className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+          {/* Currency list — EUR + custom currencies, all in one list */}
+          <div className="space-y-2 pt-4 border-t border-border">
+            <Label>Cotações</Label>
+            <p className="text-xs text-muted-foreground">
+              O Real (R$) é a moeda principal. Todas as cotações são em relação a ele.
+            </p>
+            <div className="space-y-2">
+              {displayList.map((c) => {
+                const def = getCurrencyDef(c.code)
+                const isSecondary = secondaryCurrency === c.code
+                return (
+                  <div
+                    key={c.code}
+                    className={cn(
+                      'flex items-center gap-2 p-2 rounded-md',
+                      isSecondary ? 'bg-amber-50 dark:bg-amber-950/20 border border-amber-200/50 dark:border-amber-800/30' : 'bg-muted/50'
+                    )}
                   >
-                    <option value="">Escolher moeda...</option>
-                    {availableCurrencies.map((c) => (
-                      <option key={c.code} value={c.code}>{c.flag} {c.symbol} {c.name}</option>
-                    ))}
-                  </select>
-                  <Input
-                    value={newCurrencyRate}
-                    onChange={(e) => setNewCurrencyRate(e.target.value)}
-                    placeholder="Valor em R$"
-                    inputMode="decimal"
-                    className="w-28"
-                    title="Cotação em Real (ex: 5.50)"
-                  />
-                  <Button onClick={handleAddCurrency} disabled={!newCurrencyCode || !newCurrencyRate} size="icon">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+                    <span className="text-lg">{def?.flag ?? '💱'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium flex items-center gap-1">
+                        {def?.symbol ?? c.code} {def?.name ?? c.code}
+                        {isSecondary && <Star className="h-3 w-3 fill-amber-500 text-amber-500" />}
+                      </div>
+                    </div>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      defaultValue={String(c.rate)}
+                      onBlur={(e) => handleUpdateCurrencyRate(c.code, e.target.value)}
+                      className="w-24 h-8 text-xs"
+                      title="Cotação em R$"
+                    />
+                    <span className="text-xs text-muted-foreground">R$</span>
+                    <button
+                      onClick={() => handleRemoveCurrency(c.code)}
+                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive"
+                      title="Remover moeda"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Add currency — full predefined list (USD, CAD, GBP, DKK, HUF, CZK) */}
+          {availableCurrencies.length > 0 && (
+            <div className="space-y-2 pt-4 border-t border-border">
+              <Label>Adicionar moeda</Label>
+              <div className="flex gap-2">
+                <select
+                  value={newCurrencyCode}
+                  onChange={(e) => setNewCurrencyCode(e.target.value)}
+                  className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Escolher moeda...</option>
+                  {availableCurrencies.map((c) => (
+                    <option key={c.code} value={c.code}>{c.flag} {c.symbol} {c.name}</option>
+                  ))}
+                </select>
+                <Input
+                  value={newCurrencyRate}
+                  onChange={(e) => setNewCurrencyRate(e.target.value)}
+                  placeholder="Valor em R$"
+                  inputMode="decimal"
+                  className="w-28"
+                  title="Cotação em Real (ex: 5.50)"
+                />
+                <Button onClick={handleAddCurrency} disabled={!newCurrencyCode || !newCurrencyRate || saving} size="icon">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           )}
         </div>

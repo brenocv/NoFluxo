@@ -1788,32 +1788,11 @@ export default function Home() {
 
                 try {
                   await reorderTopGroups(items)
-                  // Update local state without reload
-                  const newSortOrderMap = new Map(items.map((it) => [it.id, it.sortOrder]))
-                  for (const tg of topGroups) {
-                    if (newSortOrderMap.has(tg.id)) {
-                      window.dispatchEvent(new CustomEvent('finance:patch', {
-                        detail: {
-                          type: 'config', action: 'update',
-                          payload: { key: 'topGroups', value: '' },
-                          by: { name: user, color: USER_COLOR }, at: Date.now(),
-                        }
-                      }))
-                    }
-                  }
-                  // Trigger local re-render via a reload of topGroups
-                  const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
-                  if (r.ok) {
-                    const data = await r.json()
-                    if (data.topGroups) {
-                      window.dispatchEvent(new CustomEvent('finance:patch', {
-                        detail: {
-                          type: 'reload', action: 'update', payload: {},
-                          by: { name: user, color: USER_COLOR }, at: Date.now(),
-                        }
-                      }))
-                    }
-                  }
+                  // Dispatch a full data reload so topGroups re-render with new sortOrder.
+                  // (topGroups don't have a per-item dispatch path like categories/subgroups do.)
+                  window.dispatchEvent(new CustomEvent('finance:patch', {
+                    detail: { type: 'reload' as any, action: 'update' as any, payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+                  }))
                   broadcast({
                     type: 'config', action: 'update',
                     payload: { key: 'topGroups', value: '' },
@@ -1824,21 +1803,15 @@ export default function Home() {
                     description: `Moveu card`,
                     undo: async () => {
                       await reorderTopGroups(prevSortOrders)
-                      const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
-                      if (r.ok) {
-                        window.dispatchEvent(new CustomEvent('finance:patch', {
-                          detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
-                        }))
-                      }
+                      window.dispatchEvent(new CustomEvent('finance:patch', {
+                        detail: { type: 'reload' as any, action: 'update' as any, payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+                      }))
                     },
                     redo: async () => {
                       await reorderTopGroups(items)
-                      const r = await fetch(`/api/data?year=${year}&workbookId=${workbookId}`)
-                      if (r.ok) {
-                        window.dispatchEvent(new CustomEvent('finance:patch', {
-                          detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
-                        }))
-                      }
+                      window.dispatchEvent(new CustomEvent('finance:patch', {
+                        detail: { type: 'reload' as any, action: 'update' as any, payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+                      }))
                     },
                   })
 
@@ -2077,22 +2050,9 @@ export default function Home() {
       <SettingsDialog
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
-        euroRate={euroRate}
-        onSaveEuroRate={handleSaveEuroRate}
         onExportExcel={handleExportExcel}
+        onOpenCurrencies={() => setCurrenciesOpen(true)}
         accountName={accountName}
-        currencies={(() => {
-          try {
-            const stored = config.customCurrencies
-            return stored ? JSON.parse(stored) : []
-          } catch { return [] }
-        })()}
-        onSaveCurrencies={async (currencies) => {
-          await updateConfig('customCurrencies', JSON.stringify(currencies), user)
-          window.dispatchEvent(new CustomEvent('finance:patch', {
-            detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(currencies) }, by: { name: user, color: USER_COLOR }, at: Date.now() }
-          }))
-        }}
         onDeleteAccount={() => {
           try {
             const stored = localStorage.getItem('nofluxo_accounts')
@@ -2100,6 +2060,7 @@ export default function Home() {
             const updated = accounts.filter((a: any) => a.name !== accountName)
             localStorage.setItem('nofluxo_accounts', JSON.stringify(updated))
             localStorage.removeItem(`nofluxo_users_${accountName}`)
+            localStorage.removeItem(`nofluxo_wb_${accountName}`)
             localStorage.removeItem('nofluxo_workbook')
             localStorage.removeItem('porto_workbook_id')
             localStorage.removeItem('porto_finance_user')
@@ -2120,6 +2081,14 @@ export default function Home() {
         open={currenciesOpen}
         onOpenChange={setCurrenciesOpen}
         euroRate={euroRate}
+        euroRemoved={config.euroRemoved === '1'}
+        onSetEuroRemoved={async (removed) => {
+          await updateConfig('euroRemoved', removed ? '1' : '0', user)
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: { type: 'config', action: 'update', payload: { key: 'euroRemoved', value: removed ? '1' : '0' }, by: { name: user, color: USER_COLOR }, at: Date.now() }
+          }))
+          toast.success(removed ? 'Euro removido' : 'Euro adicionado')
+        }}
         onSaveEuroRate={handleSaveEuroRate}
         currencies={(() => {
           try {
@@ -2283,17 +2252,20 @@ export default function Home() {
         open={workbookOpen}
         onOpenChange={setWorkbookOpen}
         currentWorkbookId={workbookId}
+        accountName={accountName}
         onSelect={(id) => setWorkbook(id)}
         onCreate={async (name, copyFrom) => {
           try {
             const r = await fetch('/api/workbooks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name, user, copyFrom }),
+              body: JSON.stringify({ name, user, copyFrom, accountName }),
             })
             if (!r.ok) throw new Error('Falha')
             const data = await r.json()
             setWorkbook(data.workbook.id)
+            // Save the new workbook ID scoped to this account
+            try { localStorage.setItem(`nofluxo_wb_${accountName}`, data.workbook.id) } catch {}
             setWorkbookName(data.workbook.name)
             toast.success(`Planilha "${name}" criada`)
           } catch (e: any) {
