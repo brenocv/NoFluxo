@@ -47,9 +47,12 @@ export function SummaryCard({
 }: Props) {
   // Default to EUR if no secondary currency is provided (backwards compat)
   const sec: SecondaryCurrencyInfo = secondaryCurrency ?? {
-    code: 'EUR', rate: euroRate, symbol: '€', name: 'Euro', flag: '🇪🇺',
+    code: 'EUR', rate: euroRate, symbol: '€', name: 'Euro', flag: '🇪🇺', available: true,
   }
   const secRate = sec.rate || euroRate
+  // If the secondary currency is not available (e.g., EUR was removed and no
+  // other currency is set as secondary), hide the secondary displays.
+  const showSecondary = sec.available && sec.code !== 'BRL'
 
   const totalEntradasBRL = entradasBRL + entradasEUR * euroRate
   const totalSaidasBRL = saidasBRL + saidasEUR * euroRate
@@ -66,56 +69,30 @@ export function SummaryCard({
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Resumo do mês
         </span>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-          <span>
-            {sec.symbol}1 = R$ {secRate.toFixed(2).replace('.', ',')}
-            {' '}<button onClick={() => {
-              const newRate = window.prompt(`Nova cotação de ${sec.name} (em R$):`, String(secRate))
-              if (newRate !== null) {
-                const parsed = parseFloat(newRate.replace(',', '.'))
-                if (!isNaN(parsed) && parsed > 0) {
-                  // If secondary is EUR, save to euroToBrl; otherwise save to customCurrencies
-                  if (sec.code === 'EUR') {
-                    fetch('/api/config', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user' }),
-                    }).then(() => {
-                      // Update state in-place via the finance:patch event (NO page reload)
-                      window.dispatchEvent(new CustomEvent('finance:patch', {
-                        detail: { type: 'config', action: 'update', payload: { key: 'euroToBrl', value: String(parsed) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
-                      }))
-                    })
-                  } else {
-                    const updated = (customCurrencies ?? []).map((cur: any) =>
-                      cur.code === sec.code ? { ...cur, rate: parsed } : cur
-                    )
-                    fetch('/api/config', {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
-                    }).then(() => {
-                      window.dispatchEvent(new CustomEvent('finance:patch', {
-                        detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(updated) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
-                      }))
-                    })
-                  }
-                }
-              }
-            }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
-          </span>
-          {(customCurrencies ?? []).filter(c => c.code !== sec.code).map((c) => {
-            const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
-            return (
-              <span key={c.code}>
-                {def?.symbol ?? c.code}1 = R$ {c.rate.toFixed(2).replace('.', ',')}
-                {' '}<button onClick={() => {
-                  const newRate = window.prompt(`Nova cotação de ${def?.name ?? c.code} (em R$):`, String(c.rate))
-                  if (newRate !== null) {
-                    const parsed = parseFloat(newRate.replace(',', '.'))
-                    if (!isNaN(parsed) && parsed > 0) {
+        {showSecondary && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+            <span>
+              {sec.symbol}1 = R$ {secRate.toFixed(2).replace('.', ',')}
+              {' '}<button onClick={() => {
+                const newRate = window.prompt(`Nova cotação de ${sec.name} (em R$):`, String(secRate))
+                if (newRate !== null) {
+                  const parsed = parseFloat(newRate.replace(',', '.'))
+                  if (!isNaN(parsed) && parsed > 0) {
+                    // If secondary is EUR, save to euroToBrl; otherwise save to customCurrencies
+                    if (sec.code === 'EUR') {
+                      fetch('/api/config', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user' }),
+                      }).then(() => {
+                        // Update state in-place via the finance:patch event (NO page reload)
+                        window.dispatchEvent(new CustomEvent('finance:patch', {
+                          detail: { type: 'config', action: 'update', payload: { key: 'euroToBrl', value: String(parsed) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
+                        }))
+                      })
+                    } else {
                       const updated = (customCurrencies ?? []).map((cur: any) =>
-                        cur.code === c.code ? { ...cur, rate: parsed } : cur
+                        cur.code === sec.code ? { ...cur, rate: parsed } : cur
                       )
                       fetch('/api/config', {
                         method: 'PATCH',
@@ -128,11 +105,39 @@ export function SummaryCard({
                       })
                     }
                   }
-                }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
-              </span>
-            )
-          })}
-        </div>
+                }
+              }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
+            </span>
+            {(customCurrencies ?? []).filter(c => c.code !== sec.code).map((c) => {
+              const def = PREDEFINED_CURRENCIES.find(p => p.code === c.code)
+              return (
+                <span key={c.code}>
+                  {def?.symbol ?? c.code}1 = R$ {c.rate.toFixed(2).replace('.', ',')}
+                  {' '}<button onClick={() => {
+                    const newRate = window.prompt(`Nova cotação de ${def?.name ?? c.code} (em R$):`, String(c.rate))
+                    if (newRate !== null) {
+                      const parsed = parseFloat(newRate.replace(',', '.'))
+                      if (!isNaN(parsed) && parsed > 0) {
+                        const updated = (customCurrencies ?? []).map((cur: any) =>
+                          cur.code === c.code ? { ...cur, rate: parsed } : cur
+                        )
+                        fetch('/api/config', {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
+                        }).then(() => {
+                          window.dispatchEvent(new CustomEvent('finance:patch', {
+                            detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(updated) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
+                          }))
+                        })
+                      }
+                    }
+                  }} className="text-primary underline hover:no-underline" tabIndex={-1}>editar</button>
+                </span>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       <div className="space-y-1">
@@ -147,9 +152,11 @@ export function SummaryCard({
         <div className={cn('text-3xl font-bold tabular-nums', saldoTotalBRL >= 0 ? 'text-emerald-600' : 'text-rose-600')}>
           {formatBRL(saldoTotalBRL)}
         </div>
-        <div className={cn('text-sm font-medium tabular-nums', saldoTotalSec >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80')}>
-          ≈ {formatSecondary(saldoTotalSec, sec)}
-        </div>
+        {showSecondary && (
+          <div className={cn('text-sm font-medium tabular-nums', saldoTotalSec >= 0 ? 'text-emerald-600/80' : 'text-rose-600/80')}>
+            ≈ {formatSecondary(saldoTotalSec, sec)}
+          </div>
+        )}
       </div>
 
       {/* Entradas / Saídas — clickable to scroll to the corresponding group */}
@@ -167,9 +174,11 @@ export function SummaryCard({
             <div className="text-sm font-semibold tabular-nums text-emerald-600">
               {formatBRL(totalEntradasBRL)}
             </div>
-            <div className="text-[10px] text-muted-foreground tabular-nums">
-              ≈ {formatSecondary(totalEntradasBRL / secRate, sec)}
-            </div>
+            {showSecondary && (
+              <div className="text-[10px] text-muted-foreground tabular-nums">
+                ≈ {formatSecondary(totalEntradasBRL / secRate, sec)}
+              </div>
+            )}
           </div>
         </button>
         <button
@@ -185,9 +194,11 @@ export function SummaryCard({
             <div className="text-sm font-semibold tabular-nums text-rose-600">
               {formatBRL(totalSaidasBRL)}
             </div>
-            <div className="text-[10px] text-muted-foreground tabular-nums">
-              ≈ {formatSecondary(totalSaidasBRL / secRate, sec)}
-            </div>
+            {showSecondary && (
+              <div className="text-[10px] text-muted-foreground tabular-nums">
+                ≈ {formatSecondary(totalSaidasBRL / secRate, sec)}
+              </div>
+            )}
           </div>
         </button>
       </div>
@@ -200,9 +211,11 @@ export function SummaryCard({
           </span>
           <span className="text-xs font-semibold text-foreground tabular-nums">
             {formatBRL(reservasBRL)}
-            <span className="text-[10px] text-muted-foreground ml-1 font-normal">
-              ({formatSecondary(reservasBRL / secRate, sec)})
-            </span>
+            {showSecondary && (
+              <span className="text-[10px] text-muted-foreground ml-1 font-normal">
+                ({formatSecondary(reservasBRL / secRate, sec)})
+              </span>
+            )}
           </span>
         </div>
       )}

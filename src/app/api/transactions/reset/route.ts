@@ -68,7 +68,8 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Clear currency config so only BRL (primary) + EUR (secondary, rate 6) remain.
-    //    Reset euroToBrl to default, clear customCurrencies, and reset secondaryCurrency to EUR.
+    //    Reset euroToBrl to default, clear customCurrencies, reset secondaryCurrency to EUR,
+    //    and clear euroRemoved so EUR is back in the active list.
     await db.config.upsert({
       where: { key: 'euroToBrl' },
       update: { value: '6' },
@@ -83,6 +84,11 @@ export async function POST(req: NextRequest) {
       where: { key: 'secondaryCurrency' },
       update: { value: 'EUR' },
       create: { key: 'secondaryCurrency', value: 'EUR' },
+    })
+    await db.config.upsert({
+      where: { key: 'euroRemoved' },
+      update: { value: '0' },
+      create: { key: 'euroRemoved', value: '0' },
     })
 
     const detail = `Resetou a planilha para o estado inicial (${txResult.count} transações, ${catResult.count} itens, ${subResult.count} subgrupos, ${topResult.count} cards removidos)`

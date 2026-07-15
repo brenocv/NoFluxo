@@ -25,6 +25,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   euroRate: number
+  euroRemoved?: boolean
+  onSetEuroRemoved?: (removed: boolean) => Promise<void>
   onSaveEuroRate: (v: number) => Promise<void>
   currencies?: ActiveCurrency[]
   onSaveCurrencies?: (currencies: ActiveCurrency[]) => Promise<void>
@@ -36,6 +38,8 @@ export function CurrenciesDialog({
   open,
   onOpenChange,
   euroRate,
+  euroRemoved = false,
+  onSetEuroRemoved,
   onSaveEuroRate,
   currencies = [],
   onSaveCurrencies,
@@ -53,14 +57,14 @@ export function CurrenciesDialog({
     setActiveCurrencies(currencies)
   }, [currencies])
 
-  // The full list of currencies to display: EUR first (always present, uses euroRate),
-  // then any custom currencies the user has added.
+  // The full list of currencies to display: EUR first (if not removed) + any custom currencies.
   const displayList: ActiveCurrency[] = [
-    { code: 'EUR', rate: euroRate },
+    ...(euroRemoved ? [] : [{ code: 'EUR', rate: euroRate }]),
     ...activeCurrencies.filter((c) => c.code !== 'EUR'),
   ]
 
   // Available currencies to add: all predefined except BRL (primary) and those already active.
+  // EUR shows up in the "add" list if it was removed.
   const availableCurrencies = PREDEFINED_CURRENCIES.filter(
     (c) => c.code !== 'BRL' && !displayList.find((d) => d.code === c.code)
   )
@@ -76,6 +80,20 @@ export function CurrenciesDialog({
     if (!newCurrencyCode || !newCurrencyRate) return
     const r = parseFloat(newCurrencyRate.replace(',', '.'))
     if (isNaN(r) || r <= 0) return
+    // If adding EUR back (after it was removed), just clear the euroRemoved flag
+    // and save the rate via onSaveEuroRate.
+    if (newCurrencyCode === 'EUR') {
+      if (onSetEuroRemoved) {
+        setSaving(true)
+        try {
+          await onSetEuroRemoved(false)
+          if (onSaveEuroRate) await onSaveEuroRate(r)
+        } finally { setSaving(false) }
+      }
+      setNewCurrencyCode('')
+      setNewCurrencyRate('')
+      return
+    }
     const updated = [...activeCurrencies, { code: newCurrencyCode, rate: r }]
     setActiveCurrencies(updated)
     setNewCurrencyCode('')
@@ -87,13 +105,27 @@ export function CurrenciesDialog({
   }
 
   async function handleRemoveCurrency(code: string) {
-    // EUR cannot be removed (it's the default secondary)
-    if (code === 'EUR') return
+    if (code === 'EUR') {
+      // Mark EUR as removed. If it was the secondary, switch to another available
+      // currency (or BRL if none left).
+      if (onSetEuroRemoved) {
+        setSaving(true)
+        try { await onSetEuroRemoved(true) } finally { setSaving(false) }
+      }
+      if (secondaryCurrency === 'EUR' && onSaveSecondaryCurrency) {
+        // Pick the next available currency (first in activeCurrencies), or BRL
+        const nextCode = activeCurrencies[0]?.code ?? 'BRL'
+        await onSaveSecondaryCurrency(nextCode)
+      }
+      return
+    }
     const updated = activeCurrencies.filter((c) => c.code !== code)
     setActiveCurrencies(updated)
-    // If the removed currency was the secondary, switch back to EUR
+    // If the removed currency was the secondary, switch back to EUR (if available)
+    // or to the first remaining currency, or BRL.
     if (secondaryCurrency === code && onSaveSecondaryCurrency) {
-      await onSaveSecondaryCurrency('EUR')
+      const nextCode = !euroRemoved ? 'EUR' : (updated[0]?.code ?? 'BRL')
+      await onSaveSecondaryCurrency(nextCode)
     }
     if (onSaveCurrencies) {
       setSaving(true)
@@ -195,9 +227,6 @@ export function CurrenciesDialog({
                         {def?.symbol ?? c.code} {def?.name ?? c.code}
                         {isSecondary && <Star className="h-3 w-3 fill-amber-500 text-amber-500" />}
                       </div>
-                      {c.code === 'EUR' && (
-                        <div className="text-[10px] text-muted-foreground">Moeda padrão</div>
-                      )}
                     </div>
                     <Input
                       type="number"
@@ -209,15 +238,13 @@ export function CurrenciesDialog({
                       title="Cotação em R$"
                     />
                     <span className="text-xs text-muted-foreground">R$</span>
-                    {c.code !== 'EUR' && (
-                      <button
-                        onClick={() => handleRemoveCurrency(c.code)}
-                        className="p-1 rounded hover:bg-destructive/10 hover:text-destructive"
-                        title="Remover moeda"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleRemoveCurrency(c.code)}
+                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive"
+                      title="Remover moeda"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
                   </div>
                 )
               })}

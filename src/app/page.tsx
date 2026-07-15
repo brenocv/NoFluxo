@@ -2081,6 +2081,14 @@ export default function Home() {
         open={currenciesOpen}
         onOpenChange={setCurrenciesOpen}
         euroRate={euroRate}
+        euroRemoved={config.euroRemoved === '1'}
+        onSetEuroRemoved={async (removed) => {
+          await updateConfig('euroRemoved', removed ? '1' : '0', user)
+          window.dispatchEvent(new CustomEvent('finance:patch', {
+            detail: { type: 'config', action: 'update', payload: { key: 'euroRemoved', value: removed ? '1' : '0' }, by: { name: user, color: USER_COLOR }, at: Date.now() }
+          }))
+          toast.success(removed ? 'Euro removido' : 'Euro adicionado')
+        }}
         onSaveEuroRate={handleSaveEuroRate}
         currencies={(() => {
           try {

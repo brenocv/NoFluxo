@@ -63,6 +63,7 @@ export interface SecondaryCurrencyInfo {
   symbol: string     // e.g. '€', '$'
   name: string       // e.g. 'Euro', 'Dólar'
   flag: string       // e.g. '🇪🇺'
+  available: boolean // false if the configured secondary currency no longer exists
 }
 
 export function getSecondaryCurrency(
@@ -70,6 +71,35 @@ export function getSecondaryCurrency(
   customCurrencies: { code: string; rate: number }[] = []
 ): SecondaryCurrencyInfo {
   const code = config.secondaryCurrency || 'EUR'
+
+  // Check if the configured secondary currency is actually available.
+  // EUR is available only if `euroToBrl` is set (or the user hasn't removed it).
+  // Other currencies are available only if they're in the customCurrencies list
+  // AND the user hasn't removed EUR-from-active (we track this via `euroRemoved` config).
+  const euroRemoved = config.euroRemoved === '1'
+  const eurAvailable = !euroRemoved
+  const otherAvailable = customCurrencies.some((c) => c.code === code)
+
+  let available: boolean
+  if (code === 'EUR') {
+    available = eurAvailable
+  } else {
+    available = otherAvailable
+  }
+
+  // If the configured secondary is no longer available, fall back to BRL
+  // (which means "no secondary currency shown").
+  if (!available) {
+    const brlDef = getCurrencyDef('BRL')!
+    return {
+      code: 'BRL',
+      rate: 1,
+      symbol: brlDef.symbol,
+      name: brlDef.name,
+      flag: brlDef.flag,
+      available: false,
+    }
+  }
 
   // EUR is special — its rate lives in `config.euroToBrl` for backwards compat
   let rate: number
@@ -87,5 +117,6 @@ export function getSecondaryCurrency(
     symbol: def?.symbol ?? code,
     name: def?.name ?? code,
     flag: def?.flag ?? '',
+    available: true,
   }
 }
