@@ -25,6 +25,7 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   currentWorkbookId: string
+  accountName?: string
   onSelect: (id: string) => void
   onCreate: (name: string, copyFrom?: string) => Promise<void>
   onRename: (id: string, name: string) => Promise<void>
@@ -32,7 +33,7 @@ interface Props {
 }
 
 export function WorkbookSwitcher({
-  open, onOpenChange, currentWorkbookId, onSelect, onCreate, onRename, onDelete,
+  open, onOpenChange, currentWorkbookId, accountName, onSelect, onCreate, onRename, onDelete,
 }: Props) {
   const [workbooks, setWorkbooks] = useState<Workbook[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,7 +49,7 @@ export function WorkbookSwitcher({
     setLoading(true)
     ;(async () => {
       try {
-        const r = await fetch('/api/workbooks')
+        const r = await fetch(`/api/workbooks?accountName=${encodeURIComponent(accountName ?? '')}`)
         if (!r.ok) throw new Error('fail')
         const data = await r.json()
         if (cancelled) return
@@ -70,7 +71,7 @@ export function WorkbookSwitcher({
       setNewName('')
       setCreating(false)
       // Refresh list
-      const r = await fetch('/api/workbooks')
+      const r = await fetch(`/api/workbooks?accountName=${encodeURIComponent(accountName ?? '')}`)
       const data = await r.json()
       setWorkbooks(data.workbooks)
     } finally {
@@ -82,7 +83,7 @@ export function WorkbookSwitcher({
     if (!editName.trim()) return
     await onRename(id, editName.trim())
     setEditingId(null)
-    const r = await fetch('/api/workbooks')
+    const r = await fetch(`/api/workbooks?accountName=${encodeURIComponent(accountName ?? '')}`)
     const data = await r.json()
     setWorkbooks(data.workbooks)
   }
@@ -90,7 +91,7 @@ export function WorkbookSwitcher({
   async function handleDelete(id: string, name: string) {
     if (!confirm(`Remover a planilha "${name}"? Todas as categorias e transações serão perdidas.`)) return
     await onDelete(id)
-    const r = await fetch('/api/workbooks')
+    const r = await fetch(`/api/workbooks?accountName=${encodeURIComponent(accountName ?? '')}`)
     const data = await r.json()
     setWorkbooks(data.workbooks)
     // If we deleted the current one, switch to the first available

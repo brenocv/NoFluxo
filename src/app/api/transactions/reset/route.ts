@@ -41,17 +41,8 @@ export async function POST(req: NextRequest) {
     // 2. Delete all categories of the workbook (items + sub-items)
     const catResult = await db.category.deleteMany({ where: { workbookId } })
 
-    // 3. Delete non-default subgroups (keep the 5 default ones)
-    const defaultSubKeys = [
-      'despesas.cartoes',
-      'despesas.contas_casa',
-      'rendimentos.brl',
-      'rendimentos.eur',
-      'rendimentos.valores_a_receber',
-    ]
-    const subResult = await db.subgroup.deleteMany({
-      where: { workbookId, key: { notIn: defaultSubKeys } },
-    })
+    // 3. Delete ALL subgroups (the new "zeroed" state has no subgroups at all)
+    const subResult = await db.subgroup.deleteMany({ where: { workbookId } })
 
     // 4. Delete non-default topGroups (keep despesas/rendimentos/reservas)
     const defaultTopKeys = ['despesas', 'rendimentos', 'reservas']
@@ -59,9 +50,7 @@ export async function POST(req: NextRequest) {
       where: { workbookId, key: { notIn: defaultTopKeys } },
     })
 
-    // 5. ENSURE the 3 default TopGroups exist (create if missing — this can
-    // happen if the workbook was created before the "defaults on create" fix,
-    // or if a user accidentally deleted one).
+    // 5. ENSURE the 3 default TopGroups exist (create if missing)
     const DEFAULT_TOP_GROUPS = [
       { key: 'despesas',    name: 'Despesas',    color: '#dc2626', type: 'EXPENSE', sortOrder: 0 },
       { key: 'rendimentos', name: 'Receitas',    color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
@@ -78,24 +67,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 6. ENSURE the 5 default subgroups exist (create if missing)
-    const DEFAULT_SUBGROUPS = [
-      { key: 'despesas.cartoes',                parentKey: 'despesas',    name: 'Cartões BR',        sortOrder: 0 },
-      { key: 'despesas.contas_casa',            parentKey: 'despesas',    name: 'Contas casa',       sortOrder: 1 },
-      { key: 'rendimentos.brl',                 parentKey: 'rendimentos', name: 'Em Real (R$)',      sortOrder: 0 },
-      { key: 'rendimentos.eur',                 parentKey: 'rendimentos', name: 'Em Euro (€)',       sortOrder: 1 },
-      { key: 'rendimentos.valores_a_receber',   parentKey: 'rendimentos', name: 'Valores a receber', sortOrder: 2 },
-    ]
-    for (const sg of DEFAULT_SUBGROUPS) {
-      const exists = await db.subgroup.findUnique({
-        where: { workbookId_key: { workbookId, key: sg.key } },
-      })
-      if (!exists) {
-        await db.subgroup.create({
-          data: { ...sg, workbookId },
-        })
-      }
-    }
+    // 6. Clear currency config so only BRL (primary) + EUR (secondary, rate 6) remain.
+    //    Reset euroToBrl to default, clear customCurrencies, and reset secondaryCurrency to EUR.
+    await db.config.upsert({
+      where: { key: 'euroToBrl' },
+      update: { value: '6' },
+      create: { key: 'euroToBrl', value: '6' },
+    })
+    await db.config.upsert({
+      where: { key: 'customCurrencies' },
+      update: { value: '[]' },
+      create: { key: 'customCurrencies', value: '[]' },
+    })
+    await db.config.upsert({
+      where: { key: 'secondaryCurrency' },
+      update: { value: 'EUR' },
+      create: { key: 'secondaryCurrency', value: 'EUR' },
+    })
 
     const detail = `Resetou a planilha para o estado inicial (${txResult.count} transações, ${catResult.count} itens, ${subResult.count} subgrupos, ${topResult.count} cards removidos)`
     await db.activityLog.create({

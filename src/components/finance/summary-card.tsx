@@ -207,24 +207,25 @@ export function SummaryCard({
         </div>
       )}
 
-      {(receivablesBRL > 0 || receivablesEUR > 0) && (
-        <div className="flex items-center justify-between pt-2 border-t border-border gap-3">
-          <div className="flex-1 min-w-0">
-            <Label htmlFor="include-receivables" className="text-xs font-medium cursor-pointer flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              Incluir valores a receber
-            </Label>
-            <p className="text-[10px] text-muted-foreground truncate tabular-nums">
-              {formatBRL(receivablesBRL + receivablesEUR * euroRate)} pendente
-            </p>
-          </div>
-          <Switch
-            id="include-receivables"
-            checked={includeReceivables}
-            onCheckedChange={onToggleReceivables}
-          />
+      {/* "Incluir valores a receber" toggle — always visible so the user can
+          toggle it even when there are no receivables yet. Shows the pending
+          amount when there are receivables; otherwise shows "0 pendente". */}
+      <div className="flex items-center justify-between pt-2 border-t border-border gap-3">
+        <div className="flex-1 min-w-0">
+          <Label htmlFor="include-receivables" className="text-xs font-medium cursor-pointer flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            Incluir valores a receber
+          </Label>
+          <p className="text-[10px] text-muted-foreground truncate tabular-nums">
+            {formatBRL(receivablesBRL + receivablesEUR * euroRate)} pendente
+          </p>
         </div>
-      )}
+        <Switch
+          id="include-receivables"
+          checked={includeReceivables}
+          onCheckedChange={onToggleReceivables}
+        />
+      </div>
     </Card>
   )
 }
