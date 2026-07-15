@@ -56,7 +56,6 @@ interface Props {
     monthlyGoal?: number | null
     color?: string | null
     value?: number | null
-    color?: string | null
   }) => Promise<void>
 }
 

@@ -106,7 +106,7 @@ export interface SaveCategoryArgs {
   name: string
   group: string
   type: 'EXPENSE' | 'INCOME' | 'RESERVE'
-  currency: string
+  currency: Currency
   note?: string
   excludeFromTotal?: boolean
   monthlyGoal?: number | null

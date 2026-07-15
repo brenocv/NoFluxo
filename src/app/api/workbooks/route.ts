@@ -22,45 +22,47 @@ export async function POST(req: NextRequest) {
   const name = String(body.name).trim().slice(0, 60)
   const accountName = body.accountName ? String(body.accountName).slice(0, 60) : null
 
-  try {
-    const maxOrder = await db.workbook.aggregate({ _max: { sortOrder: true } })
-    const wb = await db.workbook.create({
-      data: { name, accountName, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
+  const maxOrder = await db.workbook.aggregate({ _max: { sortOrder: true } })
+  const wb = await db.workbook.create({
+    data: { name, accountName, sortOrder: (maxOrder._max.sortOrder ?? -1) + 1 },
+  })
+
+  // Always create the 3 default TopGroups (cards) so the user sees
+  // Despesas / Receitas / Reservas as soon as they open the new workbook.
+  // Without these, the page renders an empty tree and any attempt to add a
+  // value crashes because there's no group to attach it to.
+  // Per user request: NO default subgroups — the 3 cards start completely empty.
+  // The user creates subgroups themselves via the FolderPlus button on each card.
+  const DEFAULT_TOP_GROUPS = [
+    { key: 'despesas',    name: 'Despesas',    color: '#dc2626', type: 'EXPENSE', sortOrder: 0 },
+    { key: 'rendimentos', name: 'Receitas',    color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
+    { key: 'reservas',    name: 'Reservas',    color: '#d97706', type: 'RESERVE', sortOrder: 2 },
+  ]
+  for (const tg of DEFAULT_TOP_GROUPS) {
+    await db.topGroup.create({
+      data: {
+        workbookId: wb.id,
+        key: tg.key,
+        name: tg.name,
+        color: tg.color,
+        type: tg.type,
+        sortOrder: tg.sortOrder,
+        isDefault: true,
+      },
     })
-
-    // Always create the 3 default TopGroups (cards) so the user sees
-    // Despesas / Receitas / Reservas as soon as they open the new workbook.
-    const DEFAULT_TOP_GROUPS = [
-      { key: 'despesas',    name: 'Despesas',    color: '#dc2626', type: 'EXPENSE', sortOrder: 0 },
-      { key: 'rendimentos', name: 'Receitas',    color: '#16a34a', type: 'INCOME',  sortOrder: 1 },
-      { key: 'reservas',    name: 'Reservas',    color: '#d97706', type: 'RESERVE', sortOrder: 2 },
-    ]
-    for (const tg of DEFAULT_TOP_GROUPS) {
-      await db.topGroup.create({
-        data: {
-          workbookId: wb.id,
-          key: tg.key,
-          name: tg.name,
-          color: tg.color,
-          type: tg.type,
-          sortOrder: tg.sortOrder,
-          isDefault: true,
-        },
-      })
-    }
-
-    await db.activityLog.create({
-      data: { user, action: 'create', entity: 'config', detail: `Criou planilha "${name}"` },
-    })
-
-    return NextResponse.json({ ok: true, workbook: wb })
-  } catch (e: any) {
-    // Return the actual error message so the client can display it
-    return NextResponse.json(
-      { error: e.message || 'Erro interno ao criar planilha' },
-      { status: 500 }
-    )
   }
+
+  // NOTE: New workbooks are always created ZEROED:
+  // - Only the 3 default cards (Despesas, Receitas, Reservas) — NO subgroups
+  // - No categories, no transactions
+  // - Currency config starts clean: BRL primary, EUR secondary (default rate 6)
+  //   No custom currencies are carried over from other workbooks.
+
+  await db.activityLog.create({
+    data: { user, action: 'create', entity: 'config', detail: `Criou planilha "${name}"` },
+  })
+
+  return NextResponse.json({ ok: true, workbook: wb })
 }
 
 // PATCH /api/workbooks -> body: { id, name, user } — renames a workbook
