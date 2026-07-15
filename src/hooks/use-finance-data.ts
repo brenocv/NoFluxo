@@ -27,7 +27,7 @@ interface State {
 interface LiveMeta {
   connected: boolean
   presences: PresenceUser[]
-  lastChange: { by: string; detail: string; at: number } | null
+  lastChange: { by: string; detail: string | undefined; at: number } | null
 }
 
 export function useFinanceData(currentUser: string, year: number, workbookId: string) {

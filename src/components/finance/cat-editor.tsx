@@ -56,6 +56,7 @@ interface Props {
     excludeFromTotal?: boolean
     monthlyGoal?: number | null
     value?: number | null
+    color?: string | null
   }) => Promise<void>
 }
 

@@ -14,11 +14,11 @@ interface Props {
 
 export function AnnualDashboard({ data, selectedMonth, onSelectMonth, euroRate }: Props) {
   const cumulativeData = data.reduce(
-    (acc: (typeof data)[number] & { cumulative: number }[], d) => {
+    (acc: ((typeof data)[number] & { cumulative: number })[], d) => {
       const prev = acc.length > 0 ? acc[acc.length - 1].cumulative : 0
       return [...acc, { ...d, cumulative: prev + d.saldo }]
     },
-    []
+    [] as ((typeof data)[number] & { cumulative: number })[]
   )
   const totalSaldo = cumulativeData[cumulativeData.length - 1]?.cumulative ?? 0
   const bestMonth = data.reduce((best, d) => d.saldo > best.saldo ? d : best, data[0])

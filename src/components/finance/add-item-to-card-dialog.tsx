@@ -83,13 +83,10 @@ export function AddItemToCardDialog({
 
   // Available currency options: BRL + EUR + custom currencies
   const currencyOptions = [
-    { code: 'BRL', ...PREDEFINED_CURRENCIES.find(p => p.code === 'BRL')! },
-    { code: 'EUR', ...PREDEFINED_CURRENCIES.find(p => p.code === 'EUR')! },
-    ...customCurrencies.map(c => ({
-      code: c.code,
-      ...PREDEFINED_CURRENCIES.find(p => p.code === c.code)!,
-    })),
-  ].filter(c => c.symbol)
+    PREDEFINED_CURRENCIES.find(p => p.code === 'BRL')!,
+    PREDEFINED_CURRENCIES.find(p => p.code === 'EUR')!,
+    ...customCurrencies.map(c => PREDEFINED_CURRENCIES.find(p => p.code === c.code)!).filter(Boolean),
+  ].filter(c => c && c.symbol)
 
   const parsed = parseFloat(raw.replace(',', '.'))
   const valid = !isNaN(parsed) && parsed >= 0 &&

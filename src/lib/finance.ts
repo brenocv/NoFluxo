@@ -13,6 +13,10 @@ export type Currency = 'BRL' | 'EUR'
 //   "rendimentos.valores_a_receber"-> subgroup inside Receitas
 //   "reservas"                     -> top-level "Reservas"
 export type Group = string
+// Backward-compatibility alias. Several files still import CategoryGroup from
+// here (pre-refactor name). Group is now a dynamic string key like
+// "despesas" or "despesas.cartoes".
+export type CategoryGroup = Group
 
 export interface Category {
   id: string
@@ -130,6 +134,19 @@ export const GROUP_STRUCTURE: GroupDef[] = [
 
 // Order of top-level groups for rendering.
 export const TOP_GROUP_ORDER = ['despesas', 'rendimentos', 'reservas']
+
+// Backward-compatibility lookup table reconstructed from GROUP_STRUCTURE.
+// Some older files still use GROUP_LABELS instead of getGroupLabel().
+export const GROUP_LABELS: Record<string, string> = GROUP_STRUCTURE.reduce(
+  (acc, g) => {
+    acc[g.key] = g.label
+    for (const sg of g.subgroups) {
+      acc[sg.key] = sg.label
+    }
+    return acc
+  },
+  {} as Record<string, string>
+)
 
 // Get the top-level group key from a full group string.
 export function getTopGroup(group: string): string {

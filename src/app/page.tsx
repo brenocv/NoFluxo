@@ -502,7 +502,7 @@ export default function Home() {
   }
 
   async function handleCreateCategory(args: {
-    name: string; group: CategoryGroup; type: CategoryType; currency: Currency
+    name: string; group: CategoryGroup; type: CategoryType; currency: string
     note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null; color?: string | null
     value?: number | null
   }) {
@@ -569,7 +569,7 @@ export default function Home() {
   }
 
   async function handleQuickAdd(args: {
-    name: string; value: number; currency: Currency; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
+    name: string; value: number; currency: string; type: 'EXPENSE' | 'INCOME' | 'RESERVE'
     group: string; note?: string; isRecurring: boolean; installmentsTotal?: number | null
     newSubgroupName?: string; existingCategoryId?: string
   }) {
@@ -771,10 +771,10 @@ export default function Home() {
 
       // 3. Reload to get the updated tree
       window.dispatchEvent(new CustomEvent('finance:patch', {
-        detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
+        detail: { type: 'reload' as any, action: 'update' as any, payload: {}, by: { name: user, color: USER_COLOR }, at: Date.now() }
       }))
       broadcast({
-        type: 'reload', action: 'update', payload: {},
+        type: 'reload' as any, action: 'update' as any, payload: {},
         detail: `Agrupou subgrupos em "${newSubgroupName}"`,
       })
 
