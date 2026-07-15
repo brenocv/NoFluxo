@@ -2261,7 +2261,10 @@ export default function Home() {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ name, user, copyFrom, accountName }),
             })
-            if (!r.ok) throw new Error('Falha')
+            if (!r.ok) {
+              const err = await r.json().catch(() => ({}))
+              throw new Error(err.error || `Falha (${r.status})`)
+            }
             const data = await r.json()
             setWorkbook(data.workbook.id)
             // Save the new workbook ID scoped to this account
