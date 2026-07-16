@@ -96,9 +96,16 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
 
     const onConnect = () => {
       setLive((l) => ({ ...l, connected: true }))
-      socket.emit('identify', { name: currentUser })
+      socket.emit('identify', { name: currentUser, workbookId })
     }
     const onDisconnect = () => setLive((l) => ({ ...l, connected: false }))
+
+    // Re-identify immediately if we're already connected (e.g. the user
+    // switched workbooks) — otherwise identify only happens on the next
+    // 'connect' event, which won't fire again on an already-open socket.
+    if (socket.connected) {
+      socket.emit('identify', { name: currentUser, workbookId })
+    }
 
     const onPresenceList = (users: PresenceUser[]) => {
       setLive((l) => ({ ...l, presences: users }))

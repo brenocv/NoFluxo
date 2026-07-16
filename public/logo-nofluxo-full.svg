@@ -13,9 +13,18 @@
       <stop offset="100%" stop-color="#0B9C49"/>
     </linearGradient>
   </defs>
+
   <rect width="512" height="512" rx="114" fill="url(#navyBg)"/>
-  <path d="M 289.65,130.43 A 130 130 0 0 0 130.43,289.65" fill="none" stroke="url(#redGrad)" stroke-width="50" stroke-linecap="round"/>
-  <polygon points="130.43,289.65 89.27,236.49 139.50,223.03" fill="url(#redGrad)"/>
-  <path d="M 222.35,381.57 A 130 130 0 0 0 381.57,222.35" fill="none" stroke="url(#greenGrad)" stroke-width="50" stroke-linecap="round"/>
-  <polygon points="381.57,222.35 422.73,275.51 372.50,288.97" fill="url(#greenGrad)"/>
+
+  <!-- Cycle mark -->
+  <path d="M 283.95,100.68 A 108 108 0 0 0 151.68,232.95" fill="none" stroke="url(#redGrad)" stroke-width="44" stroke-linecap="round"/>
+  <polygon points="151.68,232.95 116.97,188.42 159.47,177.03" fill="url(#redGrad)"/>
+
+  <path d="M 228.05,309.32 A 108 108 0 0 0 360.32,177.05" fill="none" stroke="url(#greenGrad)" stroke-width="44" stroke-linecap="round"/>
+  <polygon points="360.32,177.05 395.03,221.58 352.53,232.97" fill="url(#greenGrad)"/>
+
+  <!-- Wordmark -->
+  <text x="256" y="410" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="800" font-size="80" letter-spacing="-1.5">
+    <tspan fill="#FFFFFF">No</tspan><tspan fill="#FFC01E">Fluxo</tspan>
+  </text>
 </svg>

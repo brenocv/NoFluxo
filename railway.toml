@@ -1,17 +1,12 @@
 # Railway configuration
 # This file tells Railway how to build and run the app.
-
-[deploy]
-# Railway automatically detects Node.js/Bun and runs:
-#   Install: bun install (or npm install)
-#   Build:   bun run build (or npm run build)
-#   Start:   bun run start (or npm start)
 #
-# The start command is defined in package.json:
-#   "start": "NODE_ENV=production node server.js"
-#
-# Railway sets the PORT environment variable automatically.
-# The app listens on PORT (defaults to 3000).
+# NOTE: this project has both a Dockerfile and Nixpacks config (nixpacks.toml /
+# railway.json). Railway uses whichever "Builder" is selected in the service's
+# Settings → Build page — check that setting if deploys don't match what you'd
+# expect from editing one of these files. Both paths are kept consistent:
+# they build with `prisma generate && next build`, then start the app via the
+# custom server.ts (Next.js + Socket.IO on the same port), NOT `next start`.
 
 [environments.production]
 # No special config needed — Railway auto-detects everything.

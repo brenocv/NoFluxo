@@ -18,7 +18,7 @@ import {
   AlertTriangle, RefreshCw, Check, FolderPlus, Move,
   TrendingUp, TrendingDown, PiggyBank, GripVertical,
 } from 'lucide-react'
-import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType } from './category-dnd'
+import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType, findClosestDropTarget } from './category-dnd'
 
 interface Props {
   node: GroupTreeNode
@@ -121,7 +121,6 @@ export function GroupNode(props: Props) {
     const startX = e.clientX
     const startY = e.clientY
     const rowEl = e.currentTarget
-    const cardEl = rowEl.closest('[class*="overflow-hidden"]') as HTMLElement | null
     const rect = rowEl.getBoundingClientRect()
     let dragging = false
     let mergeTimer: ReturnType<typeof setTimeout> | null = null
@@ -157,23 +156,17 @@ export function GroupNode(props: Props) {
       if (dragging) {
         ev.preventDefault()
         dnd.move(ev.clientX, ev.clientY)
-        if (cardEl) cardEl.style.pointerEvents = 'none'
-        const el = document.elementFromPoint(ev.clientX, ev.clientY)
-        if (cardEl) cardEl.style.pointerEvents = ''
         const attrName = ATTR_BY_TYPE[dragType]
-        const targetEl = el?.closest(`[${attrName}]`) as HTMLElement | null
-        if (targetEl && targetEl.getAttribute(attrName) !== dragId) {
-          const targetKey = targetEl.getAttribute(attrName)!
-          const targetRect = targetEl.getBoundingClientRect()
-          const isAbove = ev.clientY < targetRect.top + targetRect.height / 2
-          dnd.setTarget(targetKey, isAbove ? 'before' : 'after')
+        const closest = findClosestDropTarget(attrName, dragId, ev.clientY)
+        if (closest) {
+          dnd.setTarget(closest.id, closest.position)
 
           // Merge detection: if hovering over the SAME subgroup target for 2 seconds,
           // trigger the merge dialog. Only for subgroups (not topgroups).
           if (dragType === 'subgroup' && props.onMergeSubgroups) {
-            if (targetKey !== lastMergeTarget) {
+            if (closest.id !== lastMergeTarget) {
               clearMergeTimer()
-              lastMergeTarget = targetKey
+              lastMergeTarget = closest.id
               mergeTimer = setTimeout(() => {
                 // Trigger merge
                 const result = dnd.end()
@@ -184,7 +177,7 @@ export function GroupNode(props: Props) {
                 window.removeEventListener('pointerup', handleUp)
                 window.removeEventListener('pointercancel', handleUp)
                 if (result) {
-                  props.onMergeSubgroups!(dragId, targetKey)
+                  props.onMergeSubgroups!(dragId, closest.id)
                 }
               }, 2000)
             }
@@ -257,7 +250,7 @@ export function GroupNode(props: Props) {
           <BlockIcon className="flex-shrink-0 h-4 w-4" style={{ color }} />
         ) : (
           <span
-            className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+            className="h-2.5 w-2.5 rounded-[3px] flex-shrink-0"
             style={{ backgroundColor: color }}
           />
         )}
@@ -352,19 +345,23 @@ export function GroupNode(props: Props) {
     </div>
   ) : null
 
-  // Subgroups: flat section inside the parent card (no Card wrapper, no border)
+  // Subgroups: a visually distinct "box within a box" — tinted background +
+  // colored left border + rounded corners + margin, so the nesting under its
+  // parent card reads clearly at a glance instead of just a thin separator line.
   if (!isTopLevel) {
     return (
       <div
-        className="relative"
-        style={{ marginLeft: 0 }}
+        className="relative mx-2 my-1.5 rounded-lg overflow-hidden"
+        style={{
+          backgroundColor: alpha(color, 0.07),
+          borderLeft: '3px solid ' + alpha(color, 0.55),
+        }}
       >
-        {/* Subtle separator line + colored accent */}
         <div
           {...headerAttr}
           onPointerDown={handleHeaderPointerDown}
           className={cn(
-            'w-full flex items-center gap-1 px-2.5 py-2 transition-colors relative border-t border-border/40',
+            'w-full flex items-center gap-1 px-2.5 py-2 transition-colors relative',
             isBeingDragged && 'opacity-40',
           )}
         >
@@ -519,14 +516,9 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
       if (dragging) {
         ev.preventDefault()
         dnd.move(ev.clientX, ev.clientY)
-        rowEl.style.pointerEvents = 'none'
-        const el = document.elementFromPoint(ev.clientX, ev.clientY)
-        rowEl.style.pointerEvents = ''
-        const targetRow = el?.closest('[data-cat-id]') as HTMLElement | null
-        if (targetRow && targetRow.dataset.catId !== category.id) {
-          const targetRect = targetRow.getBoundingClientRect()
-          const isAbove = ev.clientY < targetRect.top + targetRect.height / 2
-          dnd.setTarget(targetRow.dataset.catId ?? null, isAbove ? 'before' : 'after')
+        const closest = findClosestDropTarget('data-cat-id', category.id, ev.clientY)
+        if (closest) {
+          dnd.setTarget(closest.id, closest.position)
         } else {
           dnd.setTarget(null, null)
         }
@@ -566,7 +558,11 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
         )}
         style={{
           paddingLeft: indent + 'px',
-          background: isHighlighted ? 'rgba(250, 204, 21, 0.18)' : isBeingDragged ? 'rgba(0,0,0,0.04)' : undefined,
+          background: isHighlighted
+            ? 'rgba(250, 204, 21, 0.18)'
+            : isBeingDragged
+              ? 'rgba(0,0,0,0.04)'
+              : alpha(category.color || color, 0.05),
         }}
       >
         {dropPosition === 'before' && (
@@ -592,7 +588,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             <span className="w-5 flex-shrink-0" />
           )}
           <span
-            className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+            className="h-2.5 w-2.5 rounded-[3px] flex-shrink-0"
             style={{ backgroundColor: category.color || color }}
           />
           <button

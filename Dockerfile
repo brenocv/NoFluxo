@@ -22,5 +22,5 @@ RUN npx next build
 # Expose the port Railway expects
 EXPOSE 8080
 
-# Start Next.js (it reads PORT env var automatically)
-CMD ["node_modules/.bin/next", "start"]
+# Start the custom server (Next.js + Socket.io integrated on the same port)
+CMD ["npx", "tsx", "server.ts"]

@@ -137,7 +137,7 @@ import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
 import {
   Settings, Plus, Eye, EyeOff, Copy, Eraser,
-  Database, Bell, BellOff, Upload, RefreshCw, Zap, Download, Coins,
+  Database, Bell, BellOff, Upload, Zap, Download, Coins,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -357,7 +357,10 @@ export default function Home() {
   const scrollToGroup = useCallback((topKey: string) => {
     const el = document.getElementById(`group-${topKey}`)
     if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      const headerEl = document.querySelector('header')
+      const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0
+      const top = el.getBoundingClientRect().top + window.scrollY - headerHeight - 12
+      window.scrollTo({ top, behavior: 'smooth' })
       el.classList.add('ring-2', 'ring-primary', 'ring-offset-2')
       setTimeout(() => { el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2') }, 1500)
     }
@@ -1939,16 +1942,6 @@ export default function Home() {
               title="Configurações (moeda, conta, planilha)"
             >
               <Settings className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              className="h-8 w-8 rounded-full"
-              onClick={() => window.location.reload()}
-              aria-label="Atualizar página"
-              title="Atualizar página"
-            >
-              <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
           {/* Center: Undo/Redo */}

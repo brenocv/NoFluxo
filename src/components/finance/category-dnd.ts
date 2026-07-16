@@ -109,3 +109,29 @@ export const dnd = {
 
 // Distance threshold (px) to differentiate a click from a drag
 export const DRAG_THRESHOLD = 5
+
+// Finds the closest drop-target element (by attribute + vertical distance to the
+// pointer) among all elements matching the attribute in the document.
+// This is far more forgiving than exact pixel hit-testing via elementFromPoint,
+// which silently finds nothing when the pointer is over the small gap/padding
+// between two rows — the #1 cause of "drop did nothing" bugs in hand-rolled DnD.
+export function findClosestDropTarget(
+  attrName: string,
+  excludeId: string,
+  pointerY: number
+): { id: string; position: 'before' | 'after' } | null {
+  const rows = Array.from(document.querySelectorAll<HTMLElement>(`[${attrName}]`))
+  let best: { id: string; position: 'before' | 'after'; dist: number } | null = null
+  for (const row of rows) {
+    const id = row.getAttribute(attrName)
+    if (!id || id === excludeId) continue
+    const rect = row.getBoundingClientRect()
+    if (rect.height === 0) continue // hidden/collapsed, skip
+    const mid = rect.top + rect.height / 2
+    const dist = Math.abs(pointerY - mid)
+    if (!best || dist < best.dist) {
+      best = { id, position: pointerY < mid ? 'before' : 'after', dist }
+    }
+  }
+  return best ? { id: best.id, position: best.position } : null
+}

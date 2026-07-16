@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { User, Plus, ArrowLeft, Eye, EyeOff, Trash2 } from 'lucide-react'
+import { OnboardingTour } from './onboarding-tour'
 
 interface Account {
   name: string
@@ -17,7 +18,8 @@ interface Props {
 }
 
 export function LoginScreen({ onLogin }: Props) {
-  const [mode, setMode] = useState<'login' | 'register' | 'select-user' | 'create-workbook'>('login')
+  const [mode, setMode] = useState<'login' | 'register' | 'select-user' | 'create-workbook' | 'onboarding'>('login')
+  const [pendingLogin, setPendingLogin] = useState<{ accName: string; userName: string; wbId?: string } | null>(null)
   const [accountName, setAccountName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -174,7 +176,19 @@ export function LoginScreen({ onLogin }: Props) {
   async function handleCreateWorkbook() {
     if (!workbookName.trim()) return
     const wbId = await createEmptyWorkbook(workbookName.trim())
-    onLogin(selectedAccount, selectedUser, wbId)
+    setPendingLogin({ accName: selectedAccount, userName: selectedUser, wbId })
+    setMode('onboarding')
+  }
+
+  // ---- Onboarding mode (shown once, right after creating the first workbook) ----
+  if (mode === 'onboarding') {
+    return (
+      <OnboardingTour
+        onComplete={() => {
+          if (pendingLogin) onLogin(pendingLogin.accName, pendingLogin.userName, pendingLogin.wbId)
+        }}
+      />
+    )
   }
 
   // ---- Create workbook mode ----
