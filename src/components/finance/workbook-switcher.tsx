@@ -102,7 +102,7 @@ export function WorkbookSwitcher({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-4 w-4" />
@@ -133,7 +133,6 @@ export function WorkbookSwitcher({
                     <Input
                       value={editName}
                       onChange={(e) => setEditName(e.target.value)}
-                      autoFocus
                       onKeyDown={(e) => e.key === 'Enter' && handleRename(wb.id)}
                       className="h-8 text-sm"
                     />

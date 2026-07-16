@@ -47,7 +47,7 @@ export function SubgroupEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderPlus className="h-4 w-4" />
@@ -69,7 +69,6 @@ export function SubgroupEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex.: Mesada Breno, Gastos escolares, Extras…"
-              autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
           </div>

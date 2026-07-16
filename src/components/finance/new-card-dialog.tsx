@@ -40,7 +40,7 @@ export function NewCardDialog({ open, onOpenChange, onCreate }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="h-4 w-4" /> Novo card
@@ -53,7 +53,7 @@ export function NewCardDialog({ open, onOpenChange, onCreate }: Props) {
         <div className="space-y-4 py-2">
           <div className="space-y-1.5">
             <Label htmlFor="card-name">Nome do card</Label>
-            <Input id="card-name" value={name} onChange={e => setName(e.target.value)} placeholder="Ex.: Investimentos, Viagens, Projetos..." autoFocus onKeyDown={e => e.key === 'Enter' && handleCreate()} />
+            <Input id="card-name" value={name} onChange={e => setName(e.target.value)} placeholder="Ex.: Investimentos, Viagens, Projetos..." onKeyDown={e => e.key === 'Enter' && handleCreate()} />
           </div>
 
           {/* Type selector */}

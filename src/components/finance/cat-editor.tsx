@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Coins } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -133,7 +134,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova categoria</DialogTitle>
           <p className="text-xs text-muted-foreground">
@@ -152,7 +153,6 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex.: Nubank, Supermercado, Freela…"
-              autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
           </div>
@@ -226,6 +226,9 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
                   })}
                 </SelectContent>
               </Select>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                Quer outra moeda? Toque no ícone <Coins className="h-3 w-3 inline align-text-bottom" /> no topo da tela para adicionar.
+              </p>
             </div>
           </div>
 

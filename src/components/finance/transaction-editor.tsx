@@ -176,7 +176,7 @@ export function TransactionEditor({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-md max-h-[90vh] overflow-y-auto"
+        className="max-w-md max-h-[90dvh] overflow-y-auto"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>

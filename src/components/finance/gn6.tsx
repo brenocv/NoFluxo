@@ -719,7 +719,7 @@ function RenameButton({ currentLabel, onRename, small }: { currentLabel: string;
       <PopoverContent className="w-64" onClick={(e) => e.stopPropagation()}>
         <div className="space-y-2">
           <label className="text-xs font-medium text-muted-foreground">Renomear</label>
-          <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={currentLabel} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') { onRename(value.trim()); setOpen(false) } }} />
+          <Input value={value} onChange={(e) => setValue(e.target.value)} placeholder={currentLabel} onKeyDown={(e) => { if (e.key === 'Enter') { onRename(value.trim()); setOpen(false) } }} />
           <div className="flex gap-2 justify-end">
             <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button size="sm" onClick={() => { onRename(value.trim()); setOpen(false) }}><Check className="h-3 w-3 mr-1" />Salvar</Button>

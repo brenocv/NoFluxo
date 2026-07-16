@@ -100,7 +100,7 @@ export function useVencimentoNotifications(
           try {
             new Notification('Vencimento próximo', {
               body: msg,
-              icon: '/logo.svg',
+              icon: '/logo-nofluxo-mark.png',
               tag: notifKey,
             })
             localStorage.setItem(notifKey, '1')

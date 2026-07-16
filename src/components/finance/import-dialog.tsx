@@ -161,7 +161,7 @@ export function ImportStatementDialog({ open, onOpenChange, workbookId, year, mo
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) reset(); onOpenChange(o) }}>
-      <DialogContent className="max-w-[95vw] w-full max-h-[95vh] p-4 sm:p-6 overflow-hidden flex flex-col">
+      <DialogContent className="max-w-[95vw] w-full max-h-[95dvh] p-4 sm:p-6 overflow-hidden flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <Upload className="h-4 w-4" />

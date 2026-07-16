@@ -44,7 +44,7 @@ export function SubItemEditor({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FolderPlus className="h-4 w-4" />
@@ -66,7 +66,6 @@ export function SubItemEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex.: Comercio, Mercado, Extras…"
-              autoFocus
               onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
             />
           </div>

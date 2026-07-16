@@ -1398,9 +1398,7 @@ export default function Home() {
           <div className="flex items-center justify-between gap-2">
             {/* Left: Logo + NoFluxo */}
             <div className="flex items-center gap-2 flex-shrink-0">
-              <div className="h-7 w-7 rounded-lg bg-accent flex items-center justify-center">
-                <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-5 w-5" />
-              </div>
+              <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-7 w-7 rounded-lg" />
               <span className="text-base font-bold text-foreground tracking-tight">NoFluxo</span>
             </div>
 

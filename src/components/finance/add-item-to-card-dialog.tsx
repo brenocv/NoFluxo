@@ -16,7 +16,7 @@ import { Switch } from '@/components/ui/switch'
 import { Subgroup, TopGroup, MONTHS_PT_LONG } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { RefreshCw, FolderPlus, Plus } from 'lucide-react'
+import { RefreshCw, FolderPlus, Plus, Coins } from 'lucide-react'
 import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
 
 type ItemType = 'EXPENSE' | 'INCOME' | 'RESERVE'
@@ -126,7 +126,7 @@ export function AddItemToCardDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-md max-h-[90vh] overflow-y-auto"
+        className="max-w-md max-h-[90dvh] overflow-y-auto"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
@@ -151,7 +151,6 @@ export function AddItemToCardDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="Ex.: Salário Breno, Aluguel, Mercado…"
               autoComplete="off"
-              autoFocus
               onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
             />
           </div>
@@ -183,7 +182,6 @@ export function AddItemToCardDialog({
                 value={newSubgroupName}
                 onChange={(e) => setNewSubgroupName(e.target.value)}
                 placeholder="Nome do novo subgrupo (ex.: Cartões BR, Extras…)"
-                autoFocus
                 onKeyDown={(e) => { if (e.key === 'Enter' && valid) handleSave() }}
               />
             )}
@@ -233,6 +231,9 @@ export function AddItemToCardDialog({
               </Select>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground leading-snug -mt-2">
+            Quer outra moeda? Toque no ícone <Coins className="h-3 w-3 inline align-text-bottom" /> no topo da tela para adicionar.
+          </p>
 
           {/* Nota */}
           <div className="space-y-1.5">

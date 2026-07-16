@@ -112,7 +112,6 @@ export function BudgetCard({ year, user, workbookId }: Props) {
                 value={goalInput}
                 onChange={(e) => setGoalInput(e.target.value)}
                 placeholder="Ex.: 12000"
-                autoFocus
                 onKeyDown={(e) => e.key === 'Enter' && saveGoal()}
               />
               <p className="text-[10px] text-muted-foreground">

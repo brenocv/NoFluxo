@@ -98,49 +98,49 @@
 }
 
 .dark {
-  /* Navy, not green — matches the NoFluxo logo's background. Green stays as
-     the accent color (buttons, income, primary actions) but the app's dark
-     "canvas" is now this deep navy instead of a green-tinted neutral. */
-  --background: oklch(0.185 0.077 264);
-  --foreground: oklch(0.95 0.008 260);
+  /* Graphite/charcoal gray — not navy, not green-tinted. Green stays as the
+     accent color (buttons, income, primary actions); the app's dark "canvas"
+     is now a near-neutral dark gray. */
+  --background: oklch(0.208 0.006 286);
+  --foreground: oklch(0.95 0.003 286);
 
-  --card: oklch(0.238 0.075 264);
-  --card-foreground: oklch(0.95 0.008 260);
+  --card: oklch(0.257 0.006 286);
+  --card-foreground: oklch(0.95 0.003 286);
 
-  --popover: oklch(0.238 0.075 264);
-  --popover-foreground: oklch(0.95 0.008 260);
+  --popover: oklch(0.257 0.006 286);
+  --popover-foreground: oklch(0.95 0.003 286);
 
   --primary: oklch(0.75 0.19 150);
   --primary-foreground: oklch(0.16 0.03 155);
 
-  --secondary: oklch(0.28 0.06 264);
-  --secondary-foreground: oklch(0.93 0.008 260);
+  --secondary: oklch(0.3 0.007 286);
+  --secondary-foreground: oklch(0.93 0.003 286);
 
-  --muted: oklch(0.28 0.06 264);
-  --muted-foreground: oklch(0.68 0.03 260);
+  --muted: oklch(0.3 0.007 286);
+  --muted-foreground: oklch(0.65 0.008 286);
 
-  --accent: oklch(0.32 0.09 264);
+  --accent: oklch(0.33 0.02 286);
   --accent-foreground: oklch(0.85 0.15 150);
 
   --destructive: oklch(0.704 0.191 22.216);
 
-  --border: oklch(0.3 0.07 264);
-  --input: oklch(0.28 0.08 264);
+  --border: oklch(0.34 0.009 286);
+  --input: oklch(0.32 0.01 286);
   --ring: oklch(0.75 0.19 150);
 
   --chart-1: oklch(0.75 0.19 150);
   --chart-2: oklch(0.704 0.191 22.216);
   --chart-3: oklch(0.837 0.164 84.429);
-  --chart-4: oklch(0.65 0.14 264);
+  --chart-4: oklch(0.65 0.05 260);
   --chart-5: oklch(0.65 0.22 293);
 
-  --sidebar: oklch(0.21 0.07 264);
-  --sidebar-foreground: oklch(0.95 0.008 260);
+  --sidebar: oklch(0.23 0.006 286);
+  --sidebar-foreground: oklch(0.95 0.003 286);
   --sidebar-primary: oklch(0.75 0.19 150);
   --sidebar-primary-foreground: oklch(0.16 0.03 155);
-  --sidebar-accent: oklch(0.28 0.06 264);
-  --sidebar-accent-foreground: oklch(0.93 0.008 260);
-  --sidebar-border: oklch(0.3 0.07 264);
+  --sidebar-accent: oklch(0.3 0.007 286);
+  --sidebar-accent-foreground: oklch(0.93 0.003 286);
+  --sidebar-border: oklch(0.34 0.009 286);
   --sidebar-ring: oklch(0.75 0.19 150);
 }
 

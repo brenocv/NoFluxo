@@ -18,7 +18,7 @@ import {
 } from '@/lib/finance'
 import { cn } from '@/lib/utils'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
-import { Zap, RefreshCw, FolderPlus, TrendingDown, TrendingUp, PiggyBank } from 'lucide-react'
+import { Zap, RefreshCw, FolderPlus, TrendingDown, TrendingUp, PiggyBank, Coins } from 'lucide-react'
 import { PREDEFINED_CURRENCIES } from '@/lib/currencies'
 
 type QuickType = 'EXPENSE' | 'INCOME' | 'RESERVE'
@@ -182,7 +182,7 @@ export function QuickAddDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-md max-h-[90vh] overflow-y-auto"
+        className="max-w-md max-h-[90dvh] overflow-y-auto"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
@@ -310,6 +310,9 @@ export function QuickAddDialog({
               </div>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground leading-snug -mt-2">
+            Quer outra moeda? Toque no ícone <Coins className="h-3 w-3 inline align-text-bottom" /> no topo da tela para adicionar.
+          </p>
 
           {/* New subgroup toggle — only when not selecting existing category */}
           {!isExistingCategory && (

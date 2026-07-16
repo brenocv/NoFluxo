@@ -153,7 +153,7 @@ export function CurrenciesDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Coins className="h-4 w-4 text-primary" />
@@ -186,16 +186,16 @@ export function CurrenciesDialog({
                     }}
                     disabled={saving}
                     className={cn(
-                      'flex items-center gap-2 h-10 px-3 rounded-md border-2 text-sm font-medium transition-all touch-manipulation',
+                      'flex items-center gap-2 h-10 px-3 rounded-md border-2 text-sm font-medium transition-all touch-manipulation min-w-0',
                       secondaryCurrency === opt.code
                         ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300'
                         : 'border-border bg-muted/50 text-muted-foreground hover:bg-muted'
                     )}
                   >
-                    <span className="text-base">{opt.flag}</span>
-                    <span>{opt.symbol}</span>
-                    <span className="text-xs font-normal">{opt.name}</span>
-                    {secondaryCurrency === opt.code && <Star className="h-3 w-3 ml-auto fill-amber-500 text-amber-500" />}
+                    <span className="text-base flex-shrink-0">{opt.flag}</span>
+                    <span className="flex-shrink-0">{opt.symbol}</span>
+                    <span className="text-xs font-normal truncate min-w-0">{opt.name}</span>
+                    {secondaryCurrency === opt.code && <Star className="h-3 w-3 ml-auto fill-amber-500 text-amber-500 flex-shrink-0" />}
                   </button>
                 ))}
               </div>
@@ -222,9 +222,9 @@ export function CurrenciesDialog({
                   >
                     <span className="text-lg">{def?.flag ?? '💱'}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium flex items-center gap-1">
+                      <div className="text-sm font-medium flex items-center gap-1 truncate">
                         {def?.symbol ?? c.code} {def?.name ?? c.code}
-                        {isSecondary && <Star className="h-3 w-3 fill-amber-500 text-amber-500" />}
+                        {isSecondary && <Star className="h-3 w-3 fill-amber-500 text-amber-500 flex-shrink-0" />}
                       </div>
                     </div>
                     <Input
@@ -233,13 +233,13 @@ export function CurrenciesDialog({
                       inputMode="decimal"
                       defaultValue={String(c.rate)}
                       onBlur={(e) => handleUpdateCurrencyRate(c.code, e.target.value)}
-                      className="w-24 h-8 text-xs"
+                      className="w-20 h-8 text-xs flex-shrink-0"
                       title="Cotação em R$"
                     />
-                    <span className="text-xs text-muted-foreground">R$</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">R$</span>
                     <button
                       onClick={() => handleRemoveCurrency(c.code)}
-                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive"
+                      className="p-1 rounded hover:bg-destructive/10 hover:text-destructive flex-shrink-0"
                       title="Remover moeda"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
@@ -254,26 +254,26 @@ export function CurrenciesDialog({
           {availableCurrencies.length > 0 && (
             <div className="space-y-2 pt-4 border-t border-border">
               <Label>Adicionar moeda</Label>
+              <select
+                value={newCurrencyCode}
+                onChange={(e) => setNewCurrencyCode(e.target.value)}
+                className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Escolher moeda...</option>
+                {availableCurrencies.map((c) => (
+                  <option key={c.code} value={c.code}>{c.flag} {c.symbol} {c.name}</option>
+                ))}
+              </select>
               <div className="flex gap-2">
-                <select
-                  value={newCurrencyCode}
-                  onChange={(e) => setNewCurrencyCode(e.target.value)}
-                  className="flex-1 h-9 rounded-md border border-input bg-background px-3 text-sm"
-                >
-                  <option value="">Escolher moeda...</option>
-                  {availableCurrencies.map((c) => (
-                    <option key={c.code} value={c.code}>{c.flag} {c.symbol} {c.name}</option>
-                  ))}
-                </select>
                 <Input
                   value={newCurrencyRate}
                   onChange={(e) => setNewCurrencyRate(e.target.value)}
                   placeholder="Valor em R$"
                   inputMode="decimal"
-                  className="w-28"
+                  className="flex-1 min-w-0"
                   title="Cotação em Real (ex: 5.50)"
                 />
-                <Button onClick={handleAddCurrency} disabled={!newCurrencyCode || !newCurrencyRate || saving} size="icon">
+                <Button onClick={handleAddCurrency} disabled={!newCurrencyCode || !newCurrencyRate || saving} size="icon" className="flex-shrink-0">
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>

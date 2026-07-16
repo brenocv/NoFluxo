@@ -46,7 +46,7 @@ export function ResetDialog({ open, onOpenChange, year, month, onReset }: Props)
 
   return (
     <Dialog open={open} onOpenChange={(o) => { onOpenChange(o); if (!o) setConfirmText('') }}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-rose-600 dark:text-rose-400">
             <Trash2 className="h-4 w-4" />

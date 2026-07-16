@@ -6,7 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { User, Plus, ArrowLeft, Eye, EyeOff, Trash2 } from 'lucide-react'
-import { OnboardingTour } from './onboarding-tour'
 
 interface Account {
   name: string
@@ -18,8 +17,7 @@ interface Props {
 }
 
 export function LoginScreen({ onLogin }: Props) {
-  const [mode, setMode] = useState<'login' | 'register' | 'select-user' | 'create-workbook' | 'onboarding'>('login')
-  const [pendingLogin, setPendingLogin] = useState<{ accName: string; userName: string; wbId?: string } | null>(null)
+  const [mode, setMode] = useState<'login' | 'register' | 'select-user' | 'create-workbook'>('login')
   const [accountName, setAccountName] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -176,19 +174,7 @@ export function LoginScreen({ onLogin }: Props) {
   async function handleCreateWorkbook() {
     if (!workbookName.trim()) return
     const wbId = await createEmptyWorkbook(workbookName.trim())
-    setPendingLogin({ accName: selectedAccount, userName: selectedUser, wbId })
-    setMode('onboarding')
-  }
-
-  // ---- Onboarding mode (shown once, right after creating the first workbook) ----
-  if (mode === 'onboarding') {
-    return (
-      <OnboardingTour
-        onComplete={() => {
-          if (pendingLogin) onLogin(pendingLogin.accName, pendingLogin.userName, pendingLogin.wbId)
-        }}
-      />
-    )
+    onLogin(selectedAccount, selectedUser, wbId)
   }
 
   // ---- Create workbook mode ----
@@ -196,7 +182,7 @@ export function LoginScreen({ onLogin }: Props) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
         <div className="mb-8 text-center">
-          <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3" />
+          <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3 rounded-2xl shadow-elevated" />
           <h1 className="text-3xl font-bold text-foreground">NoFluxo</h1>
           <p className="text-sm text-muted-foreground mt-1">Criar primeira planilha</p>
         </div>
@@ -228,7 +214,7 @@ export function LoginScreen({ onLogin }: Props) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
         <div className="mb-8 text-center">
-          <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3" />
+          <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3 rounded-2xl shadow-elevated" />
           <h1 className="text-3xl font-bold text-foreground">NoFluxo</h1>
           <p className="text-sm text-muted-foreground mt-1">Criar nova conta</p>
         </div>
@@ -304,7 +290,7 @@ export function LoginScreen({ onLogin }: Props) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
         <div className="mb-6 text-center">
-          <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-16 w-16 mx-auto mb-2" />
+          <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-16 w-16 mx-auto mb-2 rounded-xl shadow-soft" />
           <h1 className="text-2xl font-bold text-foreground">NoFluxo</h1>
           <p className="text-sm text-muted-foreground">Conta: <strong>{selectedAccount}</strong></p>
         </div>
@@ -354,7 +340,7 @@ export function LoginScreen({ onLogin }: Props) {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
       <div className="mb-8 text-center">
-        <img src="/logo-nofluxo.svg" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3" />
+        <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3 rounded-2xl shadow-elevated" />
         <h1 className="text-3xl font-bold text-foreground">NoFluxo</h1>
         <p className="text-sm text-muted-foreground mt-1">Seu controle financeiro em fluxo</p>
       </div>
