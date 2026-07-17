@@ -4,12 +4,15 @@
 // IMPORTANT: bump this version string whenever static assets (icons, manifest)
 // change — otherwise phones that already installed the PWA keep serving the
 // old cached files (e.g. an outdated app icon) indefinitely.
-const CACHE_NAME = 'nofluxo-v2'
+const CACHE_NAME = 'nofluxo-v3'
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
   '/icon-192.png',
   '/icon-512.png',
+  '/favicon.ico',
+  '/favicon-32.png',
+  '/favicon-16.png',
 ]
 
 // Install: cache static assets
