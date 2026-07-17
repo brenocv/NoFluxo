@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // GET /api/budget?year=2026 -> returns the savings goal for the year
 // POST /api/budget -> body: { year, goal, user } — sets the savings goal
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
     data: {
       user, action: 'update', entity: 'config',
       detail: `Definiu meta de poupança de ${year}: R$ ${goal.toFixed(2)}`,
+      accountName: await getWorkbookAccountName(workbookId),
     },
   })
 

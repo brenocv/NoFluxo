@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/transactions/reset
 //   body: { scope: 'month' | 'year' | 'factory', year, month?, workbookId?, user }
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
 
     const detail = `Resetou a planilha para o estado inicial (${txResult.count} transações, ${catResult.count} itens, ${subResult.count} subgrupos, ${topResult.count} cards removidos)`
     await db.activityLog.create({
-      data: { user, action: 'delete', entity: 'transaction', detail },
+      data: { user, action: 'delete', entity: 'transaction', detail, accountName: await getWorkbookAccountName(workbookId) },
     })
 
     return NextResponse.json({
@@ -112,15 +112,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'year is required for month/year scope' }, { status: 400 })
   }
   const month = body.month ? Number(body.month) : null
+  const workbookId = body.workbookId ? String(body.workbookId) : undefined
+  if (!workbookId) {
+    return NextResponse.json({ error: 'workbookId is required for scope=month/year' }, { status: 400 })
+  }
 
-  let where: any = { year }
+  let where: any = { year, category: { workbookId } }
   let detail = ''
 
   if (scope === 'month') {
     if (!month || month < 1 || month > 12) {
       return NextResponse.json({ error: 'month is required for scope=month' }, { status: 400 })
     }
-    where = { year, month }
+    where = { year, month, category: { workbookId } }
     detail = `Zerou todos os valores de ${MONTHS_PT[month - 1]}/${year}`
   } else {
     detail = `Zerou todos os valores de ${year}`
@@ -129,7 +133,7 @@ export async function POST(req: NextRequest) {
   const result = await db.transaction.deleteMany({ where })
 
   await db.activityLog.create({
-    data: { user, action: 'delete', entity: 'transaction', detail },
+    data: { user, action: 'delete', entity: 'transaction', detail, accountName: await getWorkbookAccountName(workbookId) },
   })
 
   return NextResponse.json({ ok: true, deletedCount: result.count, scope, year, month })

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/import-statement
 //   body: { workbookId, year, month, transactions: [{ description, amount, date }] }
@@ -122,7 +122,7 @@ export async function PUT(req: NextRequest) {
   }
 
   await db.activityLog.create({
-    data: { user, action: 'create', entity: 'transaction', detail: 'Importou ' + created + ' transação(ões) de extrato' },
+    data: { user, action: 'create', entity: 'transaction', detail: 'Importou ' + created + ' transação(ões) de extrato', accountName: await getWorkbookAccountName(workbookId) },
   })
 
   return NextResponse.json({ ok: true, created })

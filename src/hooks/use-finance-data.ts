@@ -30,7 +30,7 @@ interface LiveMeta {
   lastChange: { by: string; detail: string | undefined; at: number } | null
 }
 
-export function useFinanceData(currentUser: string, year: number, workbookId: string) {
+export function useFinanceData(currentUser: string, year: number, workbookId: string, accountName: string) {
   const [state, setState] = useState<State>({
     categories: [],
     transactions: [],
@@ -96,15 +96,15 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
 
     const onConnect = () => {
       setLive((l) => ({ ...l, connected: true }))
-      socket.emit('identify', { name: currentUser, workbookId })
+      socket.emit('identify', { name: currentUser, accountName })
     }
     const onDisconnect = () => setLive((l) => ({ ...l, connected: false }))
 
     // Re-identify immediately if we're already connected (e.g. the user
-    // switched workbooks) — otherwise identify only happens on the next
+    // switched accounts) — otherwise identify only happens on the next
     // 'connect' event, which won't fire again on an already-open socket.
     if (socket.connected) {
-      socket.emit('identify', { name: currentUser, workbookId })
+      socket.emit('identify', { name: currentUser, accountName })
     }
 
     const onPresenceList = (users: PresenceUser[]) => {
@@ -320,7 +320,7 @@ export function useFinanceData(currentUser: string, year: number, workbookId: st
       socket.off('change', onChange)
       window.removeEventListener('finance:patch', onLocalPatch as EventListener)
     }
-  }, [currentUser, workbookId, year])
+  }, [currentUser, accountName, year])
 
   const broadcast = useCallback((msg: Omit<ChangeMessage, 'by' | 'at'>) => {
     const socket = getSocket()

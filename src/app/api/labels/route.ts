@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // GET /api/labels?workbookId=xxx -> returns the labels map for this workbook
 // PATCH /api/labels -> body: { key, value, workbookId, user }
@@ -40,7 +40,9 @@ export async function PATCH(req: NextRequest) {
 
   await db.activityLog.create({
     data: { user, action: 'update', entity: 'label',
-      detail: value.trim() === '' ? `Resetou rótulo` : `Renomeou para "${value}"` },
+      detail: value.trim() === '' ? `Resetou rótulo` : `Renomeou para "${value}"`,
+      accountName: await getWorkbookAccountName(workbookId),
+    },
   })
 
   return NextResponse.json({ ok: true, labels })

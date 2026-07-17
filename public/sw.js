@@ -1,7 +1,10 @@
-// Service Worker para Porto 2026
+// Service Worker para NoFluxo
 // Permite que o app funcione offline (mostra os últimos dados carregados)
 
-const CACHE_NAME = 'porto-2026-v1'
+// IMPORTANT: bump this version string whenever static assets (icons, manifest)
+// change — otherwise phones that already installed the PWA keep serving the
+// old cached files (e.g. an outdated app icon) indefinitely.
+const CACHE_NAME = 'nofluxo-v2'
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
@@ -100,7 +103,7 @@ self.addEventListener('push', (event) => {
     tag: 'porto-vencimento',
   }
   event.waitUntil(
-    self.registration.showNotification('Porto 2026', options)
+    self.registration.showNotification('NoFluxo', options)
   )
 })
 

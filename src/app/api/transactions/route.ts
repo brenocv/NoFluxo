@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/transactions
 //   body: {
@@ -119,6 +119,7 @@ export async function POST(req: NextRequest) {
       data: {
         user, action: 'create', entity: 'transaction',
         detail: `Criou lançamento recorrente "${category.name}" • ${rangeStr} • ${formatMoney(value, category.currency)}${actualTotal ? ` (${actualTotal}x)` : ' (infinito)'}`,
+        accountName: await getWorkbookAccountName(category.workbookId),
       },
     })
 
@@ -181,6 +182,7 @@ export async function POST(req: NextRequest) {
     data: {
       user, action, entity: 'transaction',
       detail: `${action === 'delete' ? 'Removeu' : action === 'create' ? 'Adicionou' : 'Atualizou'} ${category.name} • ${monthName}/${year}${value !== null ? ` • ${formatMoney(value, category.currency)}` : ''}`,
+      accountName: await getWorkbookAccountName(category.workbookId),
     },
   })
 

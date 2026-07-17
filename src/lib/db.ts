@@ -32,3 +32,16 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export { db }
+
+// Resolves the accountName that owns a given workbook, so activity log
+// entries can be scoped per account (not just globally). Returns null for
+// legacy/shared workbooks with no accountName set, or if workbookId is empty.
+export async function getWorkbookAccountName(workbookId: string | null | undefined): Promise<string | null> {
+  if (!workbookId) return null
+  try {
+    const wb = await db.workbook.findUnique({ where: { id: workbookId }, select: { accountName: true } })
+    return wb?.accountName ?? null
+  } catch {
+    return null
+  }
+}

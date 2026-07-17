@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/subgroups
 //   body: { parentKey, name, workbookId, user }
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   })
 
   await db.activityLog.create({
-    data: { user, action: 'create', entity: 'subgroup', detail: 'Criou subgrupo "' + name + '"' },
+    data: { user, action: 'create', entity: 'subgroup', detail: 'Criou subgrupo "' + name + '"', accountName: await getWorkbookAccountName(wbid) },
   })
 
   return NextResponse.json({ ok: true, subgroup: sg })
@@ -134,6 +134,7 @@ export async function DELETE(req: NextRequest) {
     data: {
       user, action: 'delete', entity: 'subgroup',
       detail: 'Removeu subgrupo "' + sg.name + '"' + (mode === 'delete' ? ' (categorias excluídas)' : ' (categorias movidas)'),
+      accountName: await getWorkbookAccountName(wbid),
     },
   })
 
@@ -194,7 +195,7 @@ export async function PATCH(req: NextRequest) {
   })
 
   await db.activityLog.create({
-    data: { user, action: 'update', entity: 'subgroup', detail: 'Moveu subgrupo "' + sg.name + '"' },
+    data: { user, action: 'update', entity: 'subgroup', detail: 'Moveu subgrupo "' + sg.name + '"', accountName: await getWorkbookAccountName(wbid) },
   })
 
   return NextResponse.json({ ok: true, subgroup: updated })

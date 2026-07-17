@@ -23,6 +23,7 @@ interface Props {
   includeReceivables: boolean
   onToggleReceivables: (v: boolean) => void
   euroRate: number
+  workbookId?: string
   secondaryCurrency?: SecondaryCurrencyInfo
   customCurrencies?: ActiveCurrency[]
   onEntradasClick: () => void
@@ -40,6 +41,7 @@ export function SummaryCard({
   entradasBRL, saidasBRL, entradasEUR, saidasEUR,
   reservasBRL, receivablesBRL, receivablesEUR,
   includeReceivables, onToggleReceivables, euroRate,
+  workbookId,
   secondaryCurrency,
   customCurrencies,
   onEntradasClick, onSaidasClick,
@@ -83,7 +85,7 @@ export function SummaryCard({
                         fetch('/api/config', {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user' }),
+                          body: JSON.stringify({ key: 'euroToBrl', value: String(parsed), user: 'user', workbookId }),
                         }).then(() => {
                           // Update state in-place via the finance:patch event (NO page reload)
                           window.dispatchEvent(new CustomEvent('finance:patch', {
@@ -97,7 +99,7 @@ export function SummaryCard({
                         fetch('/api/config', {
                           method: 'PATCH',
                           headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
+                          body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user', workbookId }),
                         }).then(() => {
                           window.dispatchEvent(new CustomEvent('finance:patch', {
                             detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(updated) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }
@@ -124,7 +126,7 @@ export function SummaryCard({
                           fetch('/api/config', {
                             method: 'PATCH',
                             headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user' }),
+                            body: JSON.stringify({ key: 'customCurrencies', value: JSON.stringify(updated), user: 'user', workbookId }),
                           }).then(() => {
                             window.dispatchEvent(new CustomEvent('finance:patch', {
                               detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(updated) }, by: { name: 'user', color: '#16a34a' }, at: Date.now() }

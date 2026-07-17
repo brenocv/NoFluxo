@@ -1,19 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/transactions/copy-month
-//   body: { fromYear, fromMonth, toYear, toMonth, user }
+//   body: { fromYear, fromMonth, toYear, toMonth, workbookId, user }
 //
-// Copies ALL transactions from (fromYear, fromMonth) to (toYear, toMonth).
-// If a transaction already exists for a given category in the target month,
-// it is updated. Otherwise, a new transaction is created.
+// Copies transactions from (fromYear, fromMonth) to (toYear, toMonth), scoped
+// to a single workbook. If a transaction already exists for a given category
+// in the target month, it is updated. Otherwise, a new transaction is created.
 //
 // Recurring transactions: the copy creates standalone (non-recurring)
 // transactions in the target month — it does NOT extend the series.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
-  if (!body || body.fromMonth == null || body.toMonth == null) {
-    return NextResponse.json({ error: 'fromMonth and toMonth are required' }, { status: 400 })
+  if (!body || body.fromMonth == null || body.toMonth == null || !body.workbookId) {
+    return NextResponse.json({ error: 'fromMonth, toMonth and workbookId are required' }, { status: 400 })
   }
 
   const fromYear = Number(body.fromYear ?? 2026)
@@ -21,14 +21,16 @@ export async function POST(req: NextRequest) {
   const toYear = Number(body.toYear ?? fromYear)
   const toMonth = Number(body.toMonth)
   const user = String(body.user || 'Anônimo').slice(0, 30)
+  const workbookId = String(body.workbookId)
 
   if (fromMonth < 1 || fromMonth > 12 || toMonth < 1 || toMonth > 12) {
     return NextResponse.json({ error: 'months must be 1-12' }, { status: 400 })
   }
 
-  // Fetch all source transactions
+  // Fetch source transactions — scoped to this workbook only, otherwise this
+  // would copy every account's transactions for that month/year.
   const sourceTxs = await db.transaction.findMany({
-    where: { year: fromYear, month: fromMonth },
+    where: { year: fromYear, month: fromMonth, category: { workbookId } },
   })
 
   if (sourceTxs.length === 0) {
@@ -84,6 +86,7 @@ export async function POST(req: NextRequest) {
     data: {
       user, action: 'create', entity: 'transaction',
       detail: `Copiou ${sourceTxs.length} valor(es) de ${MONTHS_PT[fromMonth - 1]}/${fromYear} para ${MONTHS_PT[toMonth - 1]}/${toYear}`,
+      accountName: await getWorkbookAccountName(workbookId),
     },
   })
 

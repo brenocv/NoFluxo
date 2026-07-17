@@ -150,10 +150,11 @@ export default function Home() {
   const [year, setYear] = useState<number>(2026)
   const [workbookOpen, setWorkbookOpen] = useState(false)
   const [workbookName, setWorkbookName] = useState<string>('')
+  const [accountName, setAccountName] = useState('')
   const {
     categories, transactions, config, labels, subgroups, topGroups, activity,
     loading, error, live, broadcast,
-  } = useFinanceData(user, year, workbookId)
+  } = useFinanceData(user, year, workbookId, accountName)
 
   const [month, setMonth] = useState<number>(() => new Date().getMonth() + 1)
   const [editTarget, setEditTarget] = useState<{ category: Category; tx: Transaction | null } | null>(null)
@@ -176,7 +177,6 @@ export default function Home() {
   const [newSubItemParent, setNewSubItemParent] = useState<{ id: string; name: string; group: string; type: string; currency: string } | null>(null)
   const [backupOpen, setBackupOpen] = useState(false)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [accountName, setAccountName] = useState('')
   const [switchUserOpen, setSwitchUserOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [newCardOpen, setNewCardOpen] = useState(false)
@@ -856,7 +856,7 @@ export default function Home() {
 
   async function handleSaveEuroRate(v: number) {
     try {
-      await updateConfig('euroToBrl', String(v), user)
+      await updateConfig('euroToBrl', String(v), user, workbookId)
       const detail = `Atualizou câmbio Euro → R$ ${v.toFixed(2)}`
       dispatchChange('config', 'update', { key: 'euroToBrl', value: String(v) }, detail, {
         user, action: 'update', entity: 'config', detail, createdAt: new Date().toISOString(),
@@ -1114,7 +1114,7 @@ export default function Home() {
 
   async function handleCopyMonth(toYear: number, toMonth: number) {
     try {
-      const r = await copyMonth({ fromYear: year, fromMonth: month, toYear, toMonth, user })
+      const r = await copyMonth({ fromYear: year, fromMonth: month, toYear, toMonth, workbookId, user })
       const fromLabel = `${MONTHS_PT[month - 1]}/${year}`
       const toLabel = `${MONTHS_PT[toMonth - 1]}/${toYear}`
       const detail = `Copiou ${r.total} valor(es) de ${fromLabel} para ${toLabel}`
@@ -1148,7 +1148,7 @@ export default function Home() {
           }
         },
         redo: async () => {
-          const rr = await copyMonth({ fromYear: year, fromMonth: month, toYear, toMonth, user })
+          const rr = await copyMonth({ fromYear: year, fromMonth: month, toYear, toMonth, workbookId, user })
           if (toYear === year) {
             dispatchChange('transaction', 'create', { transactions: rr.transactions }, `Refazendo: ${detail}`, {
               user, action: 'create', entity: 'transaction', detail: `Refazendo: ${detail}`, createdAt: new Date().toISOString(),
@@ -1183,7 +1183,7 @@ export default function Home() {
       return true
     })
     try {
-      const r = await resetValues({ scope, year, month, user })
+      const r = await resetValues({ scope, year, month, workbookId, user })
       const detail = scope === 'month'
         ? `Zerou todos os valores de ${MONTHS_PT[month - 1]}/${year}`
         : `Zerou todos os valores de ${year}`
@@ -1209,7 +1209,7 @@ export default function Home() {
           }
         },
         redo: async () => {
-          await resetValues({ scope, year, month, user })
+          await resetValues({ scope, year, month, workbookId, user })
           dispatchChange('transaction', 'delete',
             scope === 'month' ? { deleteYear: year, deleteMonth: month } : { deleteYear: year },
             `Refazendo: ${detail}`,
@@ -1399,7 +1399,7 @@ export default function Home() {
             {/* Left: Logo + NoFluxo */}
             <div className="flex items-center gap-2 flex-shrink-0">
               <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-7 w-7 rounded-lg" />
-              <span className="text-base font-bold text-foreground tracking-tight">NoFluxo</span>
+              <span className="text-base font-bold tracking-tight"><span className="text-foreground">No</span><span className="text-[#FAB80B]">Fluxo</span></span>
             </div>
 
             {/* Right: Workbook name → click to switch */}
@@ -1465,6 +1465,7 @@ export default function Home() {
           includeReceivables={includeReceivables}
           onToggleReceivables={handleToggleReceivables}
           euroRate={euroRate}
+          workbookId={workbookId}
           secondaryCurrency={secondaryCurrencyInfo}
           customCurrencies={(() => {
             try { return config.customCurrencies ? JSON.parse(config.customCurrencies) : [] } catch { return [] }
@@ -2076,7 +2077,7 @@ export default function Home() {
         euroRate={euroRate}
         euroRemoved={config.euroRemoved === '1'}
         onSetEuroRemoved={async (removed) => {
-          await updateConfig('euroRemoved', removed ? '1' : '0', user)
+          await updateConfig('euroRemoved', removed ? '1' : '0', user, workbookId)
           window.dispatchEvent(new CustomEvent('finance:patch', {
             detail: { type: 'config', action: 'update', payload: { key: 'euroRemoved', value: removed ? '1' : '0' }, by: { name: user, color: USER_COLOR }, at: Date.now() }
           }))
@@ -2090,14 +2091,14 @@ export default function Home() {
           } catch { return [] }
         })()}
         onSaveCurrencies={async (currencies) => {
-          await updateConfig('customCurrencies', JSON.stringify(currencies), user)
+          await updateConfig('customCurrencies', JSON.stringify(currencies), user, workbookId)
           window.dispatchEvent(new CustomEvent('finance:patch', {
             detail: { type: 'config', action: 'update', payload: { key: 'customCurrencies', value: JSON.stringify(currencies) }, by: { name: user, color: USER_COLOR }, at: Date.now() }
           }))
         }}
         secondaryCurrency={secondaryCurrencyInfo.code}
         onSaveSecondaryCurrency={async (code) => {
-          await updateConfig('secondaryCurrency', code, user)
+          await updateConfig('secondaryCurrency', code, user, workbookId)
           window.dispatchEvent(new CustomEvent('finance:patch', {
             detail: { type: 'config', action: 'update', payload: { key: 'secondaryCurrency', value: code }, by: { name: user, color: USER_COLOR }, at: Date.now() }
           }))

@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   //   No custom currencies are carried over from other workbooks.
 
   await db.activityLog.create({
-    data: { user, action: 'create', entity: 'config', detail: `Criou planilha "${name}"` },
+    data: { user, action: 'create', entity: 'config', detail: `Criou planilha "${name}"`, accountName: wb.accountName },
   })
 
   return NextResponse.json({ ok: true, workbook: wb })
@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest) {
   })
 
   await db.activityLog.create({
-    data: { user, action: 'update', entity: 'config', detail: `Renomeou planilha para "${name}"` },
+    data: { user, action: 'update', entity: 'config', detail: `Renomeou planilha para "${name}"`, accountName: wb.accountName },
   })
 
   return NextResponse.json({ ok: true, workbook: wb })
@@ -106,7 +106,7 @@ export async function DELETE(req: NextRequest) {
   await db.workbook.delete({ where: { id: wb.id } })
 
   await db.activityLog.create({
-    data: { user, action: 'delete', entity: 'config', detail: `Removeu planilha "${wb.name}"` },
+    data: { user, action: 'delete', entity: 'config', detail: `Removeu planilha "${wb.name}"`, accountName: wb.accountName },
   })
 
   return NextResponse.json({ ok: true })

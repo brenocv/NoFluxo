@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // GET /api/topgroups?workbookId=xxx
 export async function GET(req: NextRequest) {
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   })
 
   await db.activityLog.create({
-    data: { user, action: 'create', entity: 'config', detail: `Criou card "${name}"` },
+    data: { user, action: 'create', entity: 'config', detail: `Criou card "${name}"`, accountName: await getWorkbookAccountName(tg.workbookId) },
   })
 
   return NextResponse.json({ ok: true, topGroup: tg })
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest) {
   const tg = await db.topGroup.update({ where: { id: String(body.id) }, data })
 
   await db.activityLog.create({
-    data: { user, action: 'update', entity: 'config', detail: `Editou card "${tg.name}"` },
+    data: { user, action: 'update', entity: 'config', detail: `Editou card "${tg.name}"`, accountName: await getWorkbookAccountName(tg.workbookId) },
   })
 
   return NextResponse.json({ ok: true, topGroup: tg })
@@ -110,7 +110,7 @@ export async function DELETE(req: NextRequest) {
   await db.topGroup.delete({ where: { id: tg.id } })
 
   await db.activityLog.create({
-    data: { user, action: 'delete', entity: 'config', detail: `Removeu card "${tg.name}"` },
+    data: { user, action: 'delete', entity: 'config', detail: `Removeu card "${tg.name}"`, accountName: await getWorkbookAccountName(tg.workbookId) },
   })
 
   return NextResponse.json({ ok: true })

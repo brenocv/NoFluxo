@@ -183,7 +183,7 @@ export function LoginScreen({ onLogin }: Props) {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
         <div className="mb-8 text-center">
           <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3 rounded-2xl shadow-elevated" />
-          <h1 className="text-3xl font-bold text-foreground">NoFluxo</h1>
+          <h1 className="text-3xl font-bold"><span className="text-foreground">No</span><span className="text-[#FAB80B]">Fluxo</span></h1>
           <p className="text-sm text-muted-foreground mt-1">Criar primeira planilha</p>
         </div>
         <div className="w-full max-w-sm space-y-4">
@@ -215,7 +215,7 @@ export function LoginScreen({ onLogin }: Props) {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
         <div className="mb-8 text-center">
           <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3 rounded-2xl shadow-elevated" />
-          <h1 className="text-3xl font-bold text-foreground">NoFluxo</h1>
+          <h1 className="text-3xl font-bold"><span className="text-foreground">No</span><span className="text-[#FAB80B]">Fluxo</span></h1>
           <p className="text-sm text-muted-foreground mt-1">Criar nova conta</p>
         </div>
         <div className="w-full max-w-sm space-y-4">
@@ -291,7 +291,7 @@ export function LoginScreen({ onLogin }: Props) {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
         <div className="mb-6 text-center">
           <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-16 w-16 mx-auto mb-2 rounded-xl shadow-soft" />
-          <h1 className="text-2xl font-bold text-foreground">NoFluxo</h1>
+          <h1 className="text-2xl font-bold"><span className="text-foreground">No</span><span className="text-[#FAB80B]">Fluxo</span></h1>
           <p className="text-sm text-muted-foreground">Conta: <strong>{selectedAccount}</strong></p>
         </div>
         <div className="w-full max-w-sm space-y-3">
@@ -341,7 +341,7 @@ export function LoginScreen({ onLogin }: Props) {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
       <div className="mb-8 text-center">
         <img src="/logo-nofluxo-mark.png" alt="NoFluxo" className="h-20 w-20 mx-auto mb-3 rounded-2xl shadow-elevated" />
-        <h1 className="text-3xl font-bold text-foreground">NoFluxo</h1>
+        <h1 className="text-3xl font-bold"><span className="text-foreground">No</span><span className="text-[#FAB80B]">Fluxo</span></h1>
         <p className="text-sm text-muted-foreground mt-1">Seu controle financeiro em fluxo</p>
       </div>
       <div className="w-full max-w-sm space-y-4">

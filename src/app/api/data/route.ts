@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // GET /api/data?year=2026&workbookId=xxx -> returns the full app state for the given year + workbook.
 export async function GET(req: NextRequest) {
@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
 
   const catWhere = workbookId ? { workbookId } : {}
   const subWhere = workbookId ? { workbookId } : {}
+  const accountName = await getWorkbookAccountName(workbookId)
 
   const [categories, transactions, configRows, activity, subgroups, topGroups] = await Promise.all([
     db.category.findMany({ where: catWhere, orderBy: [{ group: 'asc' }, { sortOrder: 'asc' }] }),
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest) {
       where: { year, category: workbookId ? { workbookId } : undefined },
     }),
     db.config.findMany(),
-    db.activityLog.findMany({ orderBy: { createdAt: 'desc' }, take: 30 }),
+    db.activityLog.findMany({ where: { accountName }, orderBy: { createdAt: 'desc' }, take: 30 }),
     db.subgroup.findMany({ where: subWhere, orderBy: [{ parentKey: 'asc' }, { sortOrder: 'asc' }] }),
     db.topGroup.findMany({ where: workbookId ? { workbookId } : {}, orderBy: { sortOrder: 'asc' } }),
   ])

@@ -115,12 +115,13 @@ model Subgroup {
 
 // Activity log for who changed what
 model ActivityLog {
-  id        String   @id @default(cuid())
-  user      String
-  action    String
-  entity    String
-  detail    String
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  user        String
+  action      String
+  entity      String
+  detail      String
+  accountName String?
+  createdAt   DateTime @default(now())
 }
 
 // Free-form notes per (workbook, year, month).

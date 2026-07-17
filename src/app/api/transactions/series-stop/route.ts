@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/transactions/series-stop
 //   body: { seriesId, currentMonth, currentYear, user }
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
     data: {
       user, action: 'delete', entity: 'transaction',
       detail: `Desligou recorrência${category ? ` de "${category.name}"` : ''} • ${deleted.count} parcela(s) futura(s) removida(s)`,
+      accountName: await getWorkbookAccountName(category?.workbookId),
     },
   })
 

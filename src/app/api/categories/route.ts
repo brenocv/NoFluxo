@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/categories
 //   body: { name, group, type, currency, note?, sortOrder?, excludeFromTotal?, monthlyGoal?, user }
@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
     data: {
       user, action: 'create', entity: 'category',
       detail: `Criou categoria "${cat.name}"`,
+      accountName: await getWorkbookAccountName(cat.workbookId),
     },
   })
 
@@ -84,6 +85,7 @@ export async function PATCH(req: NextRequest) {
     data: {
       user, action: 'update', entity: 'category',
       detail: `Editou categoria "${cat.name}"`,
+      accountName: await getWorkbookAccountName(cat.workbookId),
     },
   })
   return NextResponse.json({ ok: true, category: cat })
@@ -104,6 +106,7 @@ export async function DELETE(req: NextRequest) {
     data: {
       user, action: 'delete', entity: 'category',
       detail: `Removeu categoria "${cat.name}"`,
+      accountName: await getWorkbookAccountName(cat.workbookId),
     },
   })
   return NextResponse.json({ ok: true })

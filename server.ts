@@ -31,30 +31,30 @@ app.prepare().then(() => {
     name: string
     color: string
     connectedAt: number
-    workbookId: string
+    accountName: string
   }
 
   const presences = new Map<string, Presence>()
   const COLORS = ['#16a34a', '#db2777', '#0891b2', '#d97706']
   let colorIdx = 0
 
-  const room = (workbookId: string) => `workbook:${workbookId}`
+  const room = (accountName: string) => `account:${accountName}`
 
   io.on('connection', (socket) => {
     console.log(`[sync] connected ${socket.id}`)
 
-    socket.on('identify', (data: { name: string; workbookId?: string }) => {
+    socket.on('identify', (data: { name: string; accountName?: string }) => {
       const name = (data?.name || 'Anônimo').trim().slice(0, 30)
-      const workbookId = (data?.workbookId || 'default').trim()
+      const accountName = (data?.accountName || 'default').trim()
 
-      // If this socket was already identified for a different workbook
-      // (e.g. the user switched workbooks without reconnecting), leave the
+      // If this socket was already identified for a different account
+      // (e.g. the user switched accounts without reconnecting), leave the
       // old room and let that room know we left.
       const existing = socket.data.presence as Presence | undefined
-      if (existing && existing.workbookId !== workbookId) {
-        socket.leave(room(existing.workbookId))
+      if (existing && existing.accountName !== accountName) {
+        socket.leave(room(existing.accountName))
         presences.delete(socket.id)
-        socket.to(room(existing.workbookId)).emit('presence:left', existing)
+        socket.to(room(existing.accountName)).emit('presence:left', existing)
       }
 
       const color = COLORS[colorIdx++ % COLORS.length]
@@ -63,19 +63,20 @@ app.prepare().then(() => {
         name,
         color,
         connectedAt: Date.now(),
-        workbookId,
+        accountName,
       }
       presences.set(socket.id, presence)
       socket.data.presence = presence
-      socket.join(room(workbookId))
+      socket.join(room(accountName))
 
-      // Only reveal presence within the SAME workbook — other accounts/
-      // workbooks on this deployment must never see each other's users.
+      // Only reveal presence within the SAME account — other accounts on
+      // this deployment must never see each other's users or activity,
+      // even though they may have multiple workbooks each.
       const roomPresences = Array.from(presences.values()).filter(
-        (p) => p.workbookId === workbookId
+        (p) => p.accountName === accountName
       )
       socket.emit('presence:list', roomPresences)
-      socket.to(room(workbookId)).emit('presence:joined', presence)
+      socket.to(room(accountName)).emit('presence:joined', presence)
     })
 
     socket.on('change', (msg) => {
@@ -86,15 +87,15 @@ app.prepare().then(() => {
         by: { name: presence.name, color: presence.color },
         at: Date.now(),
       }
-      // Only broadcast to other clients viewing the SAME workbook.
-      socket.to(room(presence.workbookId)).emit('change', envelope)
+      // Only broadcast to other clients logged into the SAME account.
+      socket.to(room(presence.accountName)).emit('change', envelope)
     })
 
     socket.on('disconnect', () => {
       const presence = socket.data.presence as Presence | undefined
       if (presence) {
         presences.delete(socket.id)
-        socket.to(room(presence.workbookId)).emit('presence:left', presence)
+        socket.to(room(presence.accountName)).emit('presence:left', presence)
       }
       console.log(`[sync] disconnected ${socket.id}`)
     })

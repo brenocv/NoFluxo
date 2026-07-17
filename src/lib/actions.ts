@@ -63,6 +63,7 @@ export async function copyMonth(args: {
   fromMonth: number
   toYear: number
   toMonth: number
+  workbookId: string
   user: string
 }): Promise<{
   ok: boolean
@@ -168,11 +169,11 @@ export async function deleteCategory(id: string, user: string): Promise<{ ok: bo
   return r.json()
 }
 
-export async function updateConfig(key: string, value: string, user: string): Promise<{ ok: boolean; config: any }> {
+export async function updateConfig(key: string, value: string, user: string, workbookId?: string): Promise<{ ok: boolean; config: any }> {
   const r = await fetch('/api/config', {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key, value, user }),
+    body: JSON.stringify({ key, value, user, workbookId }),
   })
   if (!r.ok) {
     const err = await r.json().catch(() => ({}))

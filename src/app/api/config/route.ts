@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db'
+import { db, getWorkbookAccountName } from '@/lib/db'
 
 // PATCH /api/config
-//   body: { key, value, user }
+//   body: { key, value, user, workbookId? }
 //   Upserts a config entry (used for euroToBrl, year, etc.).
 export async function PATCH(req: NextRequest) {
   const body = await req.json().catch(() => null)
@@ -12,6 +12,7 @@ export async function PATCH(req: NextRequest) {
   const user = String(body.user || 'Anônimo').slice(0, 30)
   const key = String(body.key)
   const value = String(body.value)
+  const workbookId = body.workbookId ? String(body.workbookId) : undefined
 
   const cfg = await db.config.upsert({
     where: { key },
@@ -27,6 +28,7 @@ export async function PATCH(req: NextRequest) {
       detail: key === 'euroToBrl'
         ? `Atualizou câmbio Euro → R$ ${value}`
         : `Atualizou configuração "${key}" = ${value}`,
+      accountName: await getWorkbookAccountName(workbookId),
     },
   })
 
