@@ -45,6 +45,7 @@ interface Props {
   onDeleteTopGroup?: (node: GroupTreeNode) => void
   onQuickAdd?: (group: string) => void
   onMergeSubgroups?: (draggedKey: string, targetKey: string) => void
+  depth?: number
 }
 
 // Fixed colors per block type
@@ -78,6 +79,7 @@ const ATTR_BY_TYPE: Record<DnDType, string> = {
 
 export function GroupNode(props: Props) {
   const { node, transactionsByCat, euroRate, allCategories } = props
+  const depth = props.depth ?? 0
   // Secondary currency for the "(€ X)" displays; defaults to EUR for backwards compat
   const sec = props.secondaryCurrency ?? { code: 'EUR', rate: euroRate, symbol: '€', name: 'Euro', flag: '🇪🇺' }
   const secRate = sec.rate || euroRate
@@ -340,7 +342,7 @@ export function GroupNode(props: Props) {
       )}
       {/* Child subgroups — rendered as flat sections inside the same card */}
       {node.children.map((child) => (
-        <GroupNode key={child.key} {...props} node={child} />
+        <GroupNode key={child.key} {...props} node={child} depth={depth + 1} />
       ))}
     </div>
   ) : null
@@ -348,10 +350,13 @@ export function GroupNode(props: Props) {
   // Subgroups: a visually distinct "box within a box" — tinted background +
   // colored left border + rounded corners + margin, so the nesting under its
   // parent card reads clearly at a glance instead of just a thin separator line.
+  // The horizontal inset (mx-2) is only applied at the first subgroup level —
+  // deeper nesting stays flush so every subgroup name lines up at the same
+  // starting position, regardless of how deep it's nested.
   if (!isTopLevel) {
     return (
       <div
-        className="relative mx-2 my-1.5 rounded-lg overflow-hidden"
+        className={cn('relative my-1.5 rounded-lg overflow-hidden', depth <= 1 ? 'mx-2' : 'mx-0')}
         style={{
           backgroundColor: alpha(color, 0.07),
           borderLeft: '3px solid ' + alpha(color, 0.55),

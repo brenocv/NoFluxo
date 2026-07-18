@@ -27,12 +27,26 @@ export function ExpensePieChart({ categories, transactionsByCat, euroRate }: Pro
       const tx = transactionsByCat[c.id]
       if (!tx) return null
       const vBRL = c.currency === 'BRL' ? tx.value : tx.value * euroRate
-      return { name: c.name, value: vBRL, currency: c.currency, originalValue: tx.value }
+      return { id: c.id, name: c.name, value: vBRL, currency: c.currency, originalValue: tx.value }
     })
-    .filter((d): d is { name: string; value: number; currency: 'BRL' | 'EUR'; originalValue: number } => d !== null && d.value > 0)
+    .filter((d): d is { id: string; name: string; value: number; currency: 'BRL' | 'EUR'; originalValue: number } => d !== null && d.value > 0)
     .sort((a, b) => b.value - a.value)
 
   const total = data.reduce((acc, d) => acc + d.value, 0)
+
+  // Scrolls the page to the clicked category's row, accounting for the sticky
+  // header (same approach used for the summary card's Entradas/Saídas links).
+  function scrollToCategory(id: string) {
+    const el = document.querySelector(`[data-cat-id="${id}"]`) as HTMLElement | null
+    if (el) {
+      const headerEl = document.querySelector('header')
+      const headerHeight = headerEl ? headerEl.getBoundingClientRect().height : 0
+      const top = el.getBoundingClientRect().top + window.scrollY - headerHeight - 12
+      window.scrollTo({ top, behavior: 'smooth' })
+      el.classList.add('ring-2', 'ring-primary', 'ring-offset-2')
+      setTimeout(() => { el.classList.remove('ring-2', 'ring-primary', 'ring-offset-2') }, 1500)
+    }
+  }
 
   return (
     <Card className="p-3 space-y-2 shadow-sm">
@@ -61,12 +75,14 @@ export function ExpensePieChart({ categories, transactionsByCat, euroRate }: Pro
                   outerRadius={70}
                   paddingAngle={1}
                   stroke="none"
+                  onClick={(entry: any) => entry?.id && scrollToCategory(entry.id)}
+                  className="cursor-pointer"
                 >
                   {data.map((_, idx) => (
                     <Cell key={idx} fill={COLORS[idx % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip content={<PieTooltip euroRate={euroRate} />} />
+                <Tooltip content={<PieTooltip euroRate={euroRate} />} wrapperStyle={{ zIndex: 50 }} />
               </PieChart>
             </ResponsiveContainer>
             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -80,7 +96,11 @@ export function ExpensePieChart({ categories, transactionsByCat, euroRate }: Pro
           {/* Legend */}
           <div className="space-y-1 max-h-32 overflow-y-auto scrollbar-thin pr-1">
             {data.slice(0, 8).map((d, idx) => (
-              <div key={d.name} className="flex items-center justify-between text-[10px]">
+              <button
+                key={d.name}
+                onClick={() => scrollToCategory(d.id)}
+                className="w-full flex items-center justify-between text-[10px] hover:bg-muted/50 rounded px-1 -mx-1 py-0.5 transition-colors touch-manipulation"
+              >
                 <div className="flex items-center gap-1.5 min-w-0">
                   <span
                     className="h-2 w-2 rounded-full flex-shrink-0"
@@ -94,7 +114,7 @@ export function ExpensePieChart({ categories, transactionsByCat, euroRate }: Pro
                     ({Math.round((d.value / total) * 100)}%)
                   </span>
                 </span>
-              </div>
+              </button>
             ))}
             {data.length > 8 && (
               <div className="text-[10px] text-muted-foreground text-center pt-1">

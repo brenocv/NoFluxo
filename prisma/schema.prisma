@@ -9,6 +9,18 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// A login account (e.g. "fontinha"). One account can have multiple named
+// users (family members) and multiple workbooks. Previously this lived only
+// in browser localStorage, which meant accounts were invisible outside the
+// browser that created them — this table is the real, shared source of truth.
+model Account {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  password  String   // bcrypt hash, never plaintext
+  users     String   @default("[]") // JSON array of user display names
+  createdAt DateTime @default(now())
+}
+
 // A workbook is a complete independent spreadsheet (e.g. "Porto 2026", "Vitória 2026").
 // All categories, subgroups, notes, and budgets belong to a workbook.
 // Switching workbooks shows a completely different set of data.

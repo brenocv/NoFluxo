@@ -7,11 +7,6 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { User, Plus, ArrowLeft, Eye, EyeOff, Trash2 } from 'lucide-react'
 
-interface Account {
-  name: string
-  password: string
-}
-
 interface Props {
   onLogin: (accountName: string, userName: string, workbookId?: string) => void
 }
@@ -25,35 +20,15 @@ export function LoginScreen({ onLogin }: Props) {
   const [error, setError] = useState('')
   const [selectedAccount, setSelectedAccount] = useState('')
   const [selectedUser, setSelectedUser] = useState('')
+  const [accountUsers, setAccountUsers] = useState<string[]>([])
   const [newUser, setNewUser] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-
-  function getAccounts(): Account[] {
-    try {
-      const stored = localStorage.getItem('nofluxo_accounts')
-      return stored ? JSON.parse(stored) : []
-    } catch { return [] }
-  }
-
-  function saveAccounts(accounts: Account[]) {
-    localStorage.setItem('nofluxo_accounts', JSON.stringify(accounts))
-  }
-
-  function getUsers(accountName: string): string[] {
-    try {
-      const stored = localStorage.getItem(`nofluxo_users_${accountName}`)
-      return stored ? JSON.parse(stored) : []
-    } catch { return [] }
-  }
-
-  function saveUsers(accountName: string, users: string[]) {
-    localStorage.setItem(`nofluxo_users_${accountName}`, JSON.stringify(users))
-  }
+  const [busy, setBusy] = useState(false)
 
   async function handleResetAll() {
     if (!confirm('Apagar TODAS as contas, usuários e planilhas? Esta ação não pode ser desfeita.')) return
-    // Clear database: delete all workbooks (cascade deletes everything)
+    // Clear database: delete all workbooks (cascade deletes everything) and all accounts
     try {
       const r = await fetch('/api/workbooks')
       if (r.ok) {
@@ -66,8 +41,9 @@ export function LoginScreen({ onLogin }: Props) {
           })
         }
       }
+      await fetch('/api/accounts', { method: 'DELETE' })
     } catch {}
-    // Clear all nofluxo data from localStorage
+    // Clear any locally-cached data too
     const keys = Object.keys(localStorage).filter(k => k.startsWith('nofluxo_') || k.startsWith('porto_'))
     for (const k of keys) localStorage.removeItem(k)
     // Reset state
@@ -77,6 +53,7 @@ export function LoginScreen({ onLogin }: Props) {
     setWorkbookName('')
     setSelectedAccount('')
     setSelectedUser('')
+    setAccountUsers([])
     setNewUser('')
     setError('')
     setMode('login')
@@ -97,34 +74,53 @@ export function LoginScreen({ onLogin }: Props) {
       if (!r.ok) return
       const data = await r.json()
       const wbId = data.workbook.id
-
-      // Save the workbook ID scoped to THIS account
-      localStorage.setItem(`nofluxo_wb_${selectedAccount}`, wbId)
-      localStorage.setItem('porto_workbook_id', wbId)
       return wbId
     } catch (e) {
       console.error('Erro ao criar planilha:', e)
     }
   }
 
-  function handleLogin() {
+  // Looks up this account's existing workbook(s) on the SERVER (not
+  // localStorage) — this is what makes login work from any browser/device,
+  // not just the one that originally created the account.
+  async function findAccountWorkbookId(account: string): Promise<string | undefined> {
+    try {
+      const r = await fetch(`/api/workbooks?accountName=${encodeURIComponent(account)}`)
+      if (!r.ok) return undefined
+      const data = await r.json()
+      const wb = data.workbooks?.[0]
+      return wb?.id
+    } catch {
+      return undefined
+    }
+  }
+
+  async function handleLogin() {
     if (!accountName.trim() || !password) {
       setError('Preencha conta e senha')
       return
     }
-    const accounts = getAccounts()
-    const account = accounts.find(a => a.name.toLowerCase() === accountName.trim().toLowerCase())
-    if (!account) {
-      setError('Conta não encontrada')
-      return
-    }
-    if (account.password !== password) {
-      setError('Senha incorreta')
-      return
-    }
+    setBusy(true)
     setError('')
-    setSelectedAccount(account.name)
-    setMode('select-user')
+    try {
+      const r = await fetch('/api/accounts/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: accountName.trim(), password }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        setError(data.error || 'Erro ao entrar')
+        return
+      }
+      setSelectedAccount(data.account.name)
+      setAccountUsers(data.account.users ?? [])
+      setMode('select-user')
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleRegister() {
@@ -136,39 +132,59 @@ export function LoginScreen({ onLogin }: Props) {
       setError('As senhas não coincidem')
       return
     }
-    const accounts = getAccounts()
-    if (accounts.find(a => a.name.toLowerCase() === accountName.trim().toLowerCase())) {
-      setError('Esta conta já existe')
-      return
-    }
-    accounts.push({ name: accountName.trim(), password })
-    saveAccounts(accounts)
+    setBusy(true)
     setError('')
-    setSelectedAccount(accountName.trim())
-    setMode('select-user')
+    try {
+      const r = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: accountName.trim(), password }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        setError(data.error || 'Erro ao criar conta')
+        return
+      }
+      setSelectedAccount(data.account.name)
+      setAccountUsers([])
+      setMode('select-user')
+    } catch {
+      setError('Erro de conexão. Tente novamente.')
+    } finally {
+      setBusy(false)
+    }
   }
 
-  function handleSelectUser(name: string) {
+  async function handleSelectUser(name: string) {
     setSelectedUser(name)
-    // Look up the workbook ID scoped to THIS account (not the global one,
-    // which might belong to a different account).
-    const accountWb = localStorage.getItem(`nofluxo_wb_${selectedAccount}`)
-    if (accountWb) {
-      onLogin(selectedAccount, name, accountWb)
-    } else {
-      // No workbook for this account yet — create one
-      setMode('create-workbook')
+    setBusy(true)
+    try {
+      const wbId = await findAccountWorkbookId(selectedAccount)
+      if (wbId) {
+        onLogin(selectedAccount, name, wbId)
+      } else {
+        // No workbook for this account yet — create one
+        setMode('create-workbook')
+      }
+    } finally {
+      setBusy(false)
     }
   }
 
-  function handleCreateUser() {
+  async function handleCreateUser() {
     if (!newUser.trim()) return
-    const users = getUsers(selectedAccount)
-    if (!users.includes(newUser.trim())) {
-      users.push(newUser.trim())
-      saveUsers(selectedAccount, users)
-    }
-    handleSelectUser(newUser.trim())
+    setBusy(true)
+    try {
+      const r = await fetch('/api/accounts/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountName: selectedAccount, userName: newUser.trim() }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (r.ok) setAccountUsers(data.users ?? [])
+    } catch {}
+    setBusy(false)
+    await handleSelectUser(newUser.trim())
   }
 
   async function handleCreateWorkbook() {
@@ -270,8 +286,8 @@ export function LoginScreen({ onLogin }: Props) {
             </div>
           </div>
           {error && <p className="text-sm text-rose-500">{error}</p>}
-          <Button onClick={handleRegister} className="w-full" disabled={!accountName.trim() || !password}>
-            Criar conta
+          <Button onClick={handleRegister} className="w-full" disabled={!accountName.trim() || !password || busy}>
+            {busy ? 'Criando...' : 'Criar conta'}
           </Button>
           <button
             onClick={() => { setMode('login'); setError(''); setPassword(''); setConfirmPassword('') }}
@@ -286,7 +302,7 @@ export function LoginScreen({ onLogin }: Props) {
 
   // ---- Select user mode ----
   if (mode === 'select-user') {
-    const users = getUsers(selectedAccount)
+    const users = accountUsers
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-emerald-50 to-background dark:from-emerald-950/30 dark:to-background p-4">
         <div className="mb-6 text-center">
@@ -300,7 +316,8 @@ export function LoginScreen({ onLogin }: Props) {
             <button
               key={u}
               onClick={() => handleSelectUser(u)}
-              className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border bg-background hover:border-primary hover:bg-muted/50 transition-all touch-manipulation"
+              disabled={busy}
+              className="w-full flex items-center gap-3 p-4 rounded-xl border-2 border-border bg-background hover:border-primary hover:bg-muted/50 transition-all touch-manipulation disabled:opacity-50"
             >
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
                 <User className="h-5 w-5 text-primary" />
@@ -316,7 +333,7 @@ export function LoginScreen({ onLogin }: Props) {
               onKeyDown={(e) => e.key === 'Enter' && handleCreateUser()}
               className="flex-1"
             />
-            <Button onClick={handleCreateUser} disabled={!newUser.trim()} size="icon">
+            <Button onClick={handleCreateUser} disabled={!newUser.trim() || busy} size="icon">
               <Plus className="h-4 w-4" />
             </Button>
           </div>
@@ -377,8 +394,8 @@ export function LoginScreen({ onLogin }: Props) {
           </div>
         </div>
         {error && <p className="text-sm text-rose-500">{error}</p>}
-        <Button onClick={handleLogin} className="w-full" disabled={!accountName.trim() || !password}>
-          Entrar
+        <Button onClick={handleLogin} className="w-full" disabled={!accountName.trim() || !password || busy}>
+          {busy ? 'Entrando...' : 'Entrar'}
         </Button>
         <div className="flex items-center gap-2 my-4">
           <div className="flex-1 h-px bg-border" />
