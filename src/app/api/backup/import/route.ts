@@ -4,14 +4,19 @@ import { db } from '@/lib/db'
 // POST /api/backup/import
 //   body: { backup: {...}, mode: 'replace' | 'merge', workbookId, user }
 //
-// mode='replace': deletes this workbook's existing cards/categories/subgroups/
-//                 transactions and restores from backup.
-// mode='merge':   keeps existing data, adds only what's missing (by ID).
+// Safety rules (learned the hard way — an earlier version of this route
+// caused real data loss):
 //
-// Everything imported is attached to `workbookId` (the workbook currently
-// open in the app) — NOT whatever workbookId happens to be embedded in the
-// backup file, since you're usually restoring into whichever workbook you
-// have open right now, possibly a brand new one.
+// 1. EVERYTHING runs inside a single database transaction. If anything
+//    fails partway through, the ENTIRE operation is rolled back and the
+//    workbook is left exactly as it was before — never half-migrated.
+// 2. We NEVER delete an entity type unless the backup file actually
+//    contains data to replace it with. An old backup that doesn't include
+//    "topGroups", for example, must never cause existing cards to be wiped
+//    with nothing to put back.
+// 3. Everything is strictly scoped to `workbookId` (the account/workbook
+//    currently open in the app). No other workbook or account is ever
+//    touched, read, or modified.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => null)
   if (!body || !body.backup) {
@@ -27,137 +32,145 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'workbookId is required' }, { status: 400 })
   }
 
-  // Validate backup structure
+  // Validate backup structure BEFORE touching the database at all.
   if (!Array.isArray(backup.categories) || !Array.isArray(backup.transactions)) {
     return NextResponse.json({ error: 'Arquivo de backup inválido (faltam categories/transactions)' }, { status: 400 })
   }
 
+  const hasTopGroups = Array.isArray(backup.topGroups) && backup.topGroups.length > 0
+  const hasSubgroups = Array.isArray(backup.subgroups)
+  const hasNotes = Array.isArray(backup.notes)
+
   try {
-    if (mode === 'replace') {
-      // Delete only THIS workbook's data — never touch other workbooks/accounts.
-      await db.transaction.deleteMany({ where: { category: { workbookId } } })
-      await db.category.deleteMany({ where: { workbookId } })
-      await db.subgroup.deleteMany({ where: { workbookId } })
-      await db.topGroup.deleteMany({ where: { workbookId } })
-    }
-
-    // Import config (global settings like customCurrencies — not per-workbook
-    // in this schema, so these always merge regardless of mode)
-    if (backup.config && typeof backup.config === 'object') {
-      for (const [key, value] of Object.entries(backup.config)) {
-        await db.config.upsert({
-          where: { key },
-          update: { value: String(value) },
-          create: { key, value: String(value) },
-        })
+    const result = await db.$transaction(async (tx) => {
+      if (mode === 'replace') {
+        // Only delete an entity type if the backup actually has data to put
+        // back — deleting something we can't restore is how the previous
+        // version of this route destroyed a user's cards.
+        await tx.transaction.deleteMany({ where: { category: { workbookId } } })
+        await tx.category.deleteMany({ where: { workbookId } })
+        if (hasSubgroups) {
+          await tx.subgroup.deleteMany({ where: { workbookId } })
+        }
+        if (hasTopGroups) {
+          await tx.topGroup.deleteMany({ where: { workbookId } })
+        }
       }
-    }
 
-    // Import top groups (cards) — attached to the CURRENT workbook
-    if (Array.isArray(backup.topGroups)) {
-      for (const tg of backup.topGroups) {
-        await db.topGroup.upsert({
-          where: { workbookId_key: { workbookId, key: tg.key } },
+      // Config (global settings like customCurrencies — not per-workbook in
+      // this schema, so these always merge regardless of mode; never deleted)
+      if (backup.config && typeof backup.config === 'object') {
+        for (const [key, value] of Object.entries(backup.config)) {
+          await tx.config.upsert({
+            where: { key },
+            update: { value: String(value) },
+            create: { key, value: String(value) },
+          })
+        }
+      }
+
+      // Top groups (cards) — attached to the CURRENT workbook
+      if (hasTopGroups) {
+        for (const tg of backup.topGroups) {
+          await tx.topGroup.upsert({
+            where: { workbookId_key: { workbookId, key: tg.key } },
+            update: mode === 'replace' ? {
+              name: tg.name,
+              color: tg.color,
+              sortOrder: tg.sortOrder,
+              type: tg.type,
+              isDefault: tg.isDefault,
+            } : {},
+            create: {
+              workbookId,
+              key: tg.key,
+              name: tg.name,
+              color: tg.color,
+              sortOrder: tg.sortOrder ?? 0,
+              type: tg.type ?? 'EXPENSE',
+              isDefault: tg.isDefault ?? false,
+            },
+          })
+        }
+      }
+
+      // Subgroups — attached to the CURRENT workbook, using the real
+      // compound unique key (workbookId + key)
+      if (hasSubgroups) {
+        for (const sg of backup.subgroups) {
+          await tx.subgroup.upsert({
+            where: { workbookId_key: { workbookId, key: sg.key } },
+            update: mode === 'replace' ? {
+              parentKey: sg.parentKey,
+              name: sg.name,
+              sortOrder: sg.sortOrder,
+            } : {},
+            create: {
+              workbookId,
+              key: sg.key,
+              parentKey: sg.parentKey,
+              name: sg.name,
+              sortOrder: sg.sortOrder ?? 0,
+            },
+          })
+        }
+      }
+
+      // Categories — two passes so parent/child ordering in the JSON never
+      // matters. Pass 1 creates every category WITHOUT parentCategoryId
+      // (avoids a foreign-key error if a child appears before its parent).
+      // Pass 2 wires up parentCategoryId now that every row exists.
+      const oldToNewId = new Map<string, string>()
+      for (const c of backup.categories) {
+        const created = await tx.category.upsert({
+          where: { id: c.id },
           update: mode === 'replace' ? {
-            name: tg.name,
-            color: tg.color,
-            sortOrder: tg.sortOrder,
-            type: tg.type,
-            isDefault: tg.isDefault,
+            workbookId,
+            name: c.name,
+            group: c.group,
+            type: c.type,
+            currency: c.currency,
+            color: c.color,
+            note: c.note,
+            sortOrder: c.sortOrder,
+            autoConvert: c.autoConvert,
+            excludeFromTotal: c.excludeFromTotal,
+            monthlyGoal: c.monthlyGoal,
+            parentCategoryId: null,
           } : {},
           create: {
+            id: c.id,
             workbookId,
-            key: tg.key,
-            name: tg.name,
-            color: tg.color,
-            sortOrder: tg.sortOrder ?? 0,
-            type: tg.type ?? 'EXPENSE',
-            isDefault: tg.isDefault ?? false,
+            name: c.name,
+            group: c.group,
+            type: c.type,
+            currency: c.currency,
+            color: c.color,
+            note: c.note,
+            sortOrder: c.sortOrder ?? 0,
+            autoConvert: c.autoConvert ?? false,
+            excludeFromTotal: c.excludeFromTotal ?? false,
+            monthlyGoal: c.monthlyGoal ?? null,
+            parentCategoryId: null,
           },
         })
+        oldToNewId.set(c.id, created.id)
       }
-    }
-
-    // Import subgroups — attached to the CURRENT workbook. Uses the real
-    // compound unique key (workbookId + key), not "key" alone (which isn't
-    // unique on its own and was silently failing every restore before).
-    if (Array.isArray(backup.subgroups)) {
-      for (const sg of backup.subgroups) {
-        await db.subgroup.upsert({
-          where: { workbookId_key: { workbookId, key: sg.key } },
-          update: mode === 'replace' ? {
-            parentKey: sg.parentKey,
-            name: sg.name,
-            sortOrder: sg.sortOrder,
-          } : {},
-          create: {
-            workbookId,
-            key: sg.key,
-            parentKey: sg.parentKey,
-            name: sg.name,
-            sortOrder: sg.sortOrder ?? 0,
-          },
+      for (const c of backup.categories) {
+        if (!c.parentCategoryId) continue
+        const newParentId = oldToNewId.get(c.parentCategoryId)
+        if (!newParentId) continue
+        await tx.category.update({
+          where: { id: oldToNewId.get(c.id)! },
+          data: { parentCategoryId: newParentId },
         })
       }
-    }
 
-    // Import categories — two passes so parent/child ordering in the JSON
-    // never matters. Pass 1 creates every category WITHOUT parentCategoryId
-    // (avoids a foreign-key error if a child appears before its parent in the
-    // array — this was the other cause of restores failing outright). Pass 2
-    // then wires up parentCategoryId now that every row exists.
-    const oldToNewId = new Map<string, string>()
-    for (const c of backup.categories) {
-      const created = await db.category.upsert({
-        where: { id: c.id },
-        update: mode === 'replace' ? {
-          workbookId,
-          name: c.name,
-          group: c.group,
-          type: c.type,
-          currency: c.currency,
-          color: c.color,
-          note: c.note,
-          sortOrder: c.sortOrder,
-          autoConvert: c.autoConvert,
-          excludeFromTotal: c.excludeFromTotal,
-          monthlyGoal: c.monthlyGoal,
-          parentCategoryId: null,
-        } : {},
-        create: {
-          id: c.id,
-          workbookId,
-          name: c.name,
-          group: c.group,
-          type: c.type,
-          currency: c.currency,
-          color: c.color,
-          note: c.note,
-          sortOrder: c.sortOrder ?? 0,
-          autoConvert: c.autoConvert ?? false,
-          excludeFromTotal: c.excludeFromTotal ?? false,
-          monthlyGoal: c.monthlyGoal ?? null,
-          parentCategoryId: null,
-        },
-      })
-      oldToNewId.set(c.id, created.id)
-    }
-    for (const c of backup.categories) {
-      if (!c.parentCategoryId) continue
-      const newParentId = oldToNewId.get(c.parentCategoryId)
-      if (!newParentId) continue
-      await db.category.update({
-        where: { id: oldToNewId.get(c.id)! },
-        data: { parentCategoryId: newParentId },
-      })
-    }
-
-    // Import transactions
-    let txCount = 0
-    if (Array.isArray(backup.transactions)) {
+      // Transactions
+      let txCount = 0
       for (const t of backup.transactions) {
         const categoryId = oldToNewId.get(t.categoryId) ?? t.categoryId
-        await db.transaction.upsert({
+        await tx.transaction.upsert({
           where: { categoryId_year_month: { categoryId, year: t.year, month: t.month } },
           update: mode === 'replace' ? {
             value: t.value,
@@ -181,52 +194,51 @@ export async function POST(req: NextRequest) {
         })
         txCount++
       }
-    }
 
-    // Import notes (global, like config — not per-workbook in this schema)
-    if (Array.isArray(backup.notes)) {
-      for (const n of backup.notes) {
-        await db.note.upsert({
-          where: { year_month: { year: n.year, month: n.month } },
-          update: mode === 'replace' ? {
-            text: n.text,
-            user: n.user,
-            isRecurring: n.isRecurring,
-          } : {},
-          create: {
-            year: n.year,
-            month: n.month,
-            text: n.text,
-            user: n.user,
-            isRecurring: n.isRecurring ?? false,
-          },
-        })
+      // Notes (global, like config — not per-workbook in this schema; never deleted)
+      if (hasNotes) {
+        for (const n of backup.notes) {
+          await tx.note.upsert({
+            where: { year_month: { year: n.year, month: n.month } },
+            update: mode === 'replace' ? {
+              text: n.text,
+              user: n.user,
+              isRecurring: n.isRecurring,
+            } : {},
+            create: {
+              year: n.year,
+              month: n.month,
+              text: n.text,
+              user: n.user,
+              isRecurring: n.isRecurring ?? false,
+            },
+          })
+        }
       }
-    }
 
-    const wb = await db.workbook.findUnique({ where: { id: workbookId }, select: { accountName: true } })
-    await db.activityLog.create({
-      data: {
-        user, action: 'create', entity: 'config',
-        detail: `Importou backup (${mode === 'replace' ? 'substituição' : 'mescla'}) — ${txCount} transações`,
-        accountName: wb?.accountName,
-      },
-    })
+      const wb = await tx.workbook.findUnique({ where: { id: workbookId }, select: { accountName: true } })
+      await tx.activityLog.create({
+        data: {
+          user, action: 'create', entity: 'config',
+          detail: `Importou backup (${mode === 'replace' ? 'substituição' : 'mescla'}) — ${txCount} transações`,
+          accountName: wb?.accountName,
+        },
+      })
 
-    return NextResponse.json({
-      ok: true,
-      mode,
-      imported: {
-        topGroups: backup.topGroups?.length ?? 0,
-        categories: backup.categories?.length ?? 0,
+      return {
+        topGroups: hasTopGroups ? backup.topGroups.length : 0,
+        categories: backup.categories.length,
         transactions: txCount,
-        subgroups: backup.subgroups?.length ?? 0,
-        notes: backup.notes?.length ?? 0,
+        subgroups: hasSubgroups ? backup.subgroups.length : 0,
+        notes: hasNotes ? backup.notes.length : 0,
         config: Object.keys(backup.config ?? {}).length,
-      },
-    })
+      }
+    }, { timeout: 60000, maxWait: 15000 })
+
+    return NextResponse.json({ ok: true, mode, imported: result })
   } catch (e: any) {
-    console.error('Erro ao importar backup:', e)
-    return NextResponse.json({ error: e.message || 'Erro ao importar' }, { status: 500 })
+    // The transaction rolled back automatically — nothing was changed.
+    console.error('Erro ao importar backup (revertido automaticamente):', e)
+    return NextResponse.json({ error: e.message || 'Erro ao importar. Nada foi alterado.' }, { status: 500 })
   }
 }

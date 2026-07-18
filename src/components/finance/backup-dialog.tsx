@@ -37,6 +37,10 @@ export function BackupDialog({ open, onOpenChange, onExport, onImport }: Props) 
 
   async function handleImport() {
     if (!selectedFile) return
+    if (importMode === 'replace') {
+      const ok = confirm('Isso vai apagar todos os dados atuais desta planilha e substituir pelo conteúdo do backup. Esta ação não pode ser desfeita. Continuar?')
+      if (!ok) return
+    }
     setBusy(true)
     try {
       await onImport(selectedFile, importMode)

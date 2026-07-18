@@ -1315,12 +1315,18 @@ export default function Home() {
       })
       if (!r.ok) {
         const err = await r.json().catch(() => ({}))
-        throw new Error(err.error || 'Falha')
+        throw new Error(err.error || 'Falha ao importar. Nada foi alterado.')
       }
       const data = await r.json()
       toast.success(`Backup importado: ${data.imported.transactions} transações`)
-      // Reload to refresh all data
-      setTimeout(() => location.reload(), 1000)
+      // Refresh data in place — a full page reload would also reset the
+      // logged-in session, forcing the user to log in again right after
+      // restoring their data. Also let other connected devices know to
+      // refresh, since a restore can change basically everything.
+      window.dispatchEvent(new CustomEvent('finance:patch', {
+        detail: { type: 'reload', action: 'update', payload: {}, by: { name: user, color: '#16a34a' }, at: Date.now() }
+      }))
+      broadcast({ type: 'reload', action: 'update', payload: {}, detail: 'Restaurou um backup' })
     } catch (e: any) {
       toast.error(e.message || 'Erro ao importar backup')
     }
