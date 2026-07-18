@@ -1286,13 +1286,13 @@ export default function Home() {
   async function handleExportBackup() {
     try {
       toast.info('Gerando backup…')
-      const r = await fetch('/api/backup')
+      const r = await fetch(`/api/backup?workbookId=${encodeURIComponent(workbookId)}`)
       if (!r.ok) throw new Error('Falha')
       const blob = await r.blob()
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `porto-backup-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = `nofluxo-backup-${new Date().toISOString().slice(0, 10)}.json`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
@@ -1311,9 +1311,12 @@ export default function Home() {
       const r = await fetch('/api/backup/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ backup, mode, user }),
+        body: JSON.stringify({ backup, mode, workbookId, user }),
       })
-      if (!r.ok) throw new Error('Falha')
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}))
+        throw new Error(err.error || 'Falha')
+      }
       const data = await r.json()
       toast.success(`Backup importado: ${data.imported.transactions} transações`)
       // Reload to refresh all data

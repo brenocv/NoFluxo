@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// GET /api/backup -> returns a JSON file with the FULL database (all years)
-//   { categories, subgroups, transactions, config, notes, labels }
-export async function GET() {
-  const [categories, subgroups, transactions, configRows, notes, activityLogs] = await Promise.all([
-    db.category.findMany(),
-    db.subgroup.findMany(),
-    db.transaction.findMany(),
+// GET /api/backup?workbookId=xxx -> returns a JSON file with this workbook's
+// full data (all years). If workbookId is omitted, exports everything
+// (legacy/admin use only — not used by the normal in-app "Backup" button).
+export async function GET(req: NextRequest) {
+  const url = new URL(req.url)
+  const workbookId = url.searchParams.get('workbookId') ?? undefined
+
+  const [topGroups, categories, subgroups, transactions, configRows, notes, activityLogs] = await Promise.all([
+    db.topGroup.findMany({ where: workbookId ? { workbookId } : {} }),
+    db.category.findMany({ where: workbookId ? { workbookId } : {} }),
+    db.subgroup.findMany({ where: workbookId ? { workbookId } : {} }),
+    db.transaction.findMany({
+      where: workbookId ? { category: { workbookId } } : {},
+    }),
     db.config.findMany(),
     db.note.findMany(),
     db.activityLog.findMany(),
@@ -17,8 +24,10 @@ export async function GET() {
   for (const c of configRows) config[c.key] = c.value
 
   const backup = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
+    workbookId: workbookId ?? null,
+    topGroups,
     categories,
     subgroups,
     transactions,
@@ -32,7 +41,7 @@ export async function GET() {
   return new Response(json, {
     headers: {
       'Content-Type': 'application/json',
-      'Content-Disposition': `attachment; filename="porto-backup-${new Date().toISOString().slice(0, 10)}.json"`,
+      'Content-Disposition': `attachment; filename="nofluxo-backup-${new Date().toISOString().slice(0, 10)}.json"`,
     },
   })
 }

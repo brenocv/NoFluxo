@@ -16,7 +16,7 @@ import { SecondaryCurrencyInfo } from '@/lib/currencies'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
   AlertTriangle, RefreshCw, Check, FolderPlus, Move,
-  TrendingUp, TrendingDown, PiggyBank, GripVertical,
+  TrendingUp, TrendingDown, PiggyBank, GripVertical, StickyNote,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType, findClosestDropTarget } from './category-dnd'
 
@@ -622,7 +622,21 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
               )}
               {hasChildren && <span className="text-[9px] text-muted-foreground flex-shrink-0">({children.length})</span>}
             </span>
-            {category.note && category.group !== 'rendimentos.valores_a_receber' && <span className="text-xs text-muted-foreground truncate max-w-[180px]">{category.note}</span>}
+            {(tx?.note || (category.note && category.group !== 'rendimentos.valores_a_receber')) && (
+              <span className="flex flex-col gap-0.5 w-full">
+                {tx?.note && (
+                  <span className="text-xs text-muted-foreground truncate max-w-[220px] flex items-center gap-1">
+                    <StickyNote className="h-2.5 w-2.5 flex-shrink-0" />
+                    {tx.note}
+                  </span>
+                )}
+                {category.note && category.group !== 'rendimentos.valores_a_receber' && (
+                  <span className="text-xs text-muted-foreground/70 truncate max-w-[220px] italic">
+                    {category.note}
+                  </span>
+                )}
+              </span>
+            )}
           </button>
         </div>
         <div className="flex items-center gap-0.5 flex-shrink-0">
