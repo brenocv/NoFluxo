@@ -290,12 +290,15 @@ export function GroupNode(props: Props) {
               // Open the choice dialog (item com valor OU criar subgrupo)
               props.onAddToCard(node.key, node.label, node.groupType as 'EXPENSE' | 'INCOME' | 'RESERVE')
             } else {
-              props.onAddCategory(node.key, null)
+              // Same choice dialog, but scoped to this subgroup — lets the
+              // user create a subgroup NESTED inside this one, not just add
+              // an item directly.
+              props.onAddToCard(node.key, node.label, node.groupType as 'EXPENSE' | 'INCOME' | 'RESERVE')
             }
           }}
           className="p-1 sm:p-1.5 rounded-md hover:bg-black/10 dark:hover:bg-white/10 transition-colors touch-manipulation"
-          aria-label={isTopLevel ? 'Adicionar em ' + node.label : 'Novo sub-item'}
-          title={isTopLevel ? 'Adicionar item ou subgrupo' : 'Adicionar sub-item aqui'}
+          aria-label={'Adicionar em ' + node.label}
+          title="Adicionar item ou subgrupo"
           style={{ color }}
         >
           <FolderPlus className={isTopLevel ? 'h-4 w-4' : 'h-3.5 w-3.5'} />

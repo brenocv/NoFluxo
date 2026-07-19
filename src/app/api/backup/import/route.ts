@@ -221,6 +221,48 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      // Auto-heal: old backups (from before cards/TopGroups were included in
+      // the export) can restore categories/transactions just fine, but with
+      // no matching card the whole tree is invisible in the UI — the data is
+      // there, just unreachable. If this backup has no topGroups, derive the
+      // top-level group keys actually used by its categories/subgroups and
+      // make sure a card exists for each one, so nothing is ever silently
+      // orphaned after a restore.
+      if (!hasTopGroups) {
+        const KNOWN_DEFAULTS: Record<string, { name: string; color: string; type: string }> = {
+          despesas: { name: 'Despesas', color: '#dc2626', type: 'EXPENSE' },
+          rendimentos: { name: 'Receitas', color: '#16a34a', type: 'INCOME' },
+          reservas: { name: 'Reservas', color: '#d97706', type: 'RESERVE' },
+        }
+        const topKeys = new Set<string>()
+        for (const c of backup.categories) {
+          if (c.group) topKeys.add(String(c.group).split('.')[0])
+        }
+        if (hasSubgroups) {
+          for (const sg of backup.subgroups) {
+            if (sg.parentKey) topKeys.add(String(sg.parentKey).split('.')[0])
+          }
+        }
+        const existing = await tx.topGroup.findMany({ where: { workbookId }, select: { key: true } })
+        const existingKeys = new Set(existing.map((t) => t.key))
+        let order = existing.length
+        for (const key of topKeys) {
+          if (existingKeys.has(key)) continue
+          const known = KNOWN_DEFAULTS[key]
+          await tx.topGroup.create({
+            data: {
+              workbookId,
+              key,
+              name: known?.name ?? key.charAt(0).toUpperCase() + key.slice(1),
+              color: known?.color ?? '#64748b',
+              type: known?.type ?? 'EXPENSE',
+              sortOrder: order++,
+              isDefault: !!known,
+            },
+          })
+        }
+      }
+
       const wb = await tx.workbook.findUnique({ where: { id: workbookId }, select: { accountName: true } })
       await tx.activityLog.create({
         data: {
