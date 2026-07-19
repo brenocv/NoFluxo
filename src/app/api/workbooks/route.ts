@@ -3,11 +3,30 @@ import { db } from '@/lib/db'
 
 // GET /api/workbooks?accountName=xxx -> returns workbooks for that account
 // (If no accountName is provided, returns ALL workbooks — used for admin/debug.)
+//
+// Matching is case-insensitive, consistent with account login. If NO
+// workbook matches this account but there's exactly one orphaned legacy
+// workbook (accountName is null — from before the Account system existed),
+// it's automatically claimed for this account instead of silently staying
+// invisible, which was causing a fresh empty workbook to get created instead
+// of finding the user's real, pre-existing data.
 export async function GET(req: NextRequest) {
   const url = new URL(req.url)
   const accountName = url.searchParams.get('accountName')
-  const where = accountName ? { accountName } : {}
-  const workbooks = await db.workbook.findMany({ where, orderBy: { sortOrder: 'asc' } })
+  const where = accountName ? { accountName: { equals: accountName, mode: 'insensitive' as const } } : {}
+  let workbooks = await db.workbook.findMany({ where, orderBy: { sortOrder: 'asc' } })
+
+  if (accountName && workbooks.length === 0) {
+    const orphaned = await db.workbook.findMany({ where: { accountName: null } })
+    if (orphaned.length === 1) {
+      const claimed = await db.workbook.update({
+        where: { id: orphaned[0].id },
+        data: { accountName },
+      })
+      workbooks = [claimed]
+    }
+  }
+
   return NextResponse.json({ workbooks })
 }
 
