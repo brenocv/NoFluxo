@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
       where: workbookId ? { category: { workbookId } } : {},
     }),
     db.config.findMany(),
-    db.note.findMany(),
+    db.note.findMany({ where: workbookId ? { workbookId } : {} }),
     db.activityLog.findMany(),
   ])
 

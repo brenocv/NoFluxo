@@ -195,17 +195,22 @@ export async function POST(req: NextRequest) {
         txCount++
       }
 
-      // Notes (global, like config — not per-workbook in this schema; never deleted)
+      // Notes — per-workbook (has a required workbookId field + compound
+      // unique with it), unlike Config which really is global.
+      if (mode === 'replace' && hasNotes) {
+        await tx.note.deleteMany({ where: { workbookId } })
+      }
       if (hasNotes) {
         for (const n of backup.notes) {
           await tx.note.upsert({
-            where: { year_month: { year: n.year, month: n.month } },
+            where: { workbookId_year_month: { workbookId, year: n.year, month: n.month } },
             update: mode === 'replace' ? {
               text: n.text,
               user: n.user,
               isRecurring: n.isRecurring,
             } : {},
             create: {
+              workbookId,
               year: n.year,
               month: n.month,
               text: n.text,
