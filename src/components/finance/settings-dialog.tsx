@@ -17,7 +17,7 @@ interface Props {
   onOpenChange: (open: boolean) => void
   onExportExcel?: () => void
   onOpenCurrencies?: () => void
-  onDeleteAccount?: () => void
+  onDeleteAccount?: (password: string) => void
   onLogout?: () => void
   onBackup?: () => void
   onRestore?: () => void
@@ -118,9 +118,11 @@ export function SettingsDialog({
                 variant="outline"
                 className="w-full justify-start gap-2 text-rose-500 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                 onClick={() => {
-                  if (confirm(`Apagar a conta "${accountName}" e todos os seus dados? Esta ação não pode ser desfeita.`)) {
-                    onDeleteAccount()
-                  }
+                  if (!confirm(`Apagar a conta "${accountName}" e todos os seus dados (todas as planilhas, categorias, valores)? Esta ação não pode ser desfeita.`)) return
+                  const password = window.prompt('Digite a senha da conta para confirmar:')
+                  if (password === null) return
+                  if (!password) { alert('Senha é obrigatória para apagar a conta.'); return }
+                  onDeleteAccount(password)
                 }}
               >
                 <Trash2 className="h-4 w-4" />

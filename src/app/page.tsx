@@ -2056,17 +2056,26 @@ export default function Home() {
         onExportExcel={handleExportExcel}
         onOpenCurrencies={() => setCurrenciesOpen(true)}
         accountName={accountName}
-        onDeleteAccount={() => {
+        onDeleteAccount={async (password) => {
           try {
-            const stored = localStorage.getItem('nofluxo_accounts')
-            const accounts = stored ? JSON.parse(stored) : []
-            const updated = accounts.filter((a: any) => a.name !== accountName)
-            localStorage.setItem('nofluxo_accounts', JSON.stringify(updated))
-            localStorage.removeItem(`nofluxo_users_${accountName}`)
-            localStorage.removeItem(`nofluxo_wb_${accountName}`)
-            localStorage.removeItem('nofluxo_workbook')
-            localStorage.removeItem('porto_workbook_id')
-            localStorage.removeItem('porto_finance_user')
+            const r = await fetch('/api/accounts', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: accountName, password }),
+            })
+            const data = await r.json().catch(() => ({}))
+            if (!r.ok) {
+              toast.error(data.error || 'Erro ao apagar conta')
+              return
+            }
+          } catch {
+            toast.error('Erro de conexão ao apagar conta')
+            return
+          }
+          // Clear any locally-cached session data for this device too
+          try {
+            const keys = Object.keys(localStorage).filter(k => k.startsWith('nofluxo_') || k.startsWith('porto_'))
+            for (const k of keys) localStorage.removeItem(k)
           } catch {}
           setIsLoggedIn(false)
           setSettingsOpen(false)
@@ -2187,6 +2196,7 @@ export default function Home() {
         labels={labels}
         subgroups={subgroups}
         topGroups={topGroups}
+        allCategories={categories}
         onOpenChange={(o) => !o && setMoveTarget(null)}
         onMove={handleMoveCategory}
       />
