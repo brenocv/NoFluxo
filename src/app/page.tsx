@@ -469,7 +469,7 @@ export default function Home() {
   }
 
   async function handleUpdateCategory(fields: {
-    name?: string; note?: string | null; monthlyGoal?: number | null
+    name?: string; note?: string | null; monthlyGoal?: number | null; interestRate?: number | null
     currency?: 'BRL' | 'EUR'; color?: string | null; excludeFromTotal?: boolean
   }) {
     if (!editTarget) return
@@ -506,7 +506,7 @@ export default function Home() {
 
   async function handleCreateCategory(args: {
     name: string; group: CategoryGroup; type: CategoryType; currency: string
-    note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null; color?: string | null
+    note?: string; excludeFromTotal?: boolean; monthlyGoal?: number | null; interestRate?: number | null; color?: string | null
     value?: number | null
   }) {
     try {
@@ -1352,6 +1352,16 @@ export default function Home() {
     }
   }
 
+  const editTargetPreviousValue = useMemo(() => {
+    if (!editTarget) return null
+    const prevMonth = month === 1 ? 12 : month - 1
+    const prevYear = month === 1 ? year - 1 : year
+    const prevTx = transactions.find(
+      (t) => t.categoryId === editTarget.category.id && t.month === prevMonth && t.year === prevYear
+    )
+    return prevTx ? prevTx.value : null
+  }, [editTarget, transactions, month, year])
+
   // ---- Render ----
 
   // Show login screen first
@@ -2008,6 +2018,7 @@ export default function Home() {
         open={!!editTarget}
         category={editTarget?.category ?? null}
         transaction={editTarget?.tx ?? null}
+        previousMonthValue={editTargetPreviousValue}
         month={month}
         year={year}
         euroRate={euroRate}

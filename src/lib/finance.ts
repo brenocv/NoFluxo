@@ -24,6 +24,7 @@ export interface Category {
   sortOrder: number
   autoConvert: boolean
   excludeFromTotal: boolean
+  interestRate: number | null
   monthlyGoal: number | null
   color: string | null
   parentCategoryId: string | null
@@ -476,6 +477,16 @@ export const MONTHS_PT_LONG = [
 ]
 
 // ---- Formatting ----
+
+// A category is treated as a receivable ("valor a receber") either because
+// the user toggled "Valor a receber" on it (stored as excludeFromTotal, the
+// same flag the transaction editor already uses for this), or because it
+// lives in the legacy "rendimentos.valores_a_receber" subgroup. Checking
+// both keeps old data working exactly as before while letting any item,
+// anywhere, be marked as a receivable via the toggle.
+export function isCategoryReceivable(category: Pick<Category, 'excludeFromTotal' | 'group'>): boolean {
+  return !!category.excludeFromTotal || category.group === 'rendimentos.valores_a_receber' || category.group.startsWith('rendimentos.valores_a_receber.')
+}
 
 export function formatMoney(v: number, currency: string): string {
   const sign = v < 0 ? '-' : ''

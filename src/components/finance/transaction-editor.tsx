@@ -13,9 +13,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Category, formatMoney, MONTHS_PT_LONG, Transaction } from '@/lib/finance'
+import { Category, formatMoney, MONTHS_PT_LONG, Transaction, isCategoryReceivable } from '@/lib/finance'
 import { cn } from '@/lib/utils'
-import { Trash2, RefreshCw, AlertTriangle, Clock } from 'lucide-react'
+import { Trash2, RefreshCw, AlertTriangle, Clock, Percent } from 'lucide-react'
 import { PREDEFINED_CURRENCIES, SecondaryCurrencyInfo } from '@/lib/currencies'
 
 const PRESET_COLORS = [
@@ -33,6 +33,7 @@ interface Props {
   open: boolean
   category: Category | null
   transaction: Transaction | null
+  previousMonthValue?: number | null
   month: number
   year: number
   euroRate: number
@@ -51,6 +52,7 @@ interface Props {
     name?: string
     note?: string | null
     monthlyGoal?: number | null
+    interestRate?: number | null
     currency?: 'BRL' | 'EUR'
     color?: string | null
     excludeFromTotal?: boolean
@@ -58,7 +60,7 @@ interface Props {
 }
 
 export function TransactionEditor({
-  open, category, transaction, month, year, euroRate, secondaryCurrency, customCurrencies,
+  open, category, transaction, previousMonthValue, month, year, euroRate, secondaryCurrency, customCurrencies,
   onOpenChange, onSave, onClear, onStopRecurring, onUpdateCategory,
 }: Props) {
   const [raw, setRaw] = useState('')
@@ -72,6 +74,7 @@ export function TransactionEditor({
   const [catName, setCatName] = useState('')
   const [catNote, setCatNote] = useState('')
   const [goalValue, setGoalValue] = useState('')
+  const [interestValue, setInterestValue] = useState('')
   const [catCurrency, setCatCurrency] = useState<string>('BRL')
   const [catColor, setCatColor] = useState<string>('')
 
@@ -86,10 +89,11 @@ export function TransactionEditor({
       // "Valor a receber" = excludeFromTotal flag on the category.
       // If the category is already in the "valores_a_receber" subgroup,
       // it's automatically a receivable (and the toggle is shown as on).
-      setIsReceivable(category.excludeFromTotal || category.group === 'rendimentos.valores_a_receber')
+      setIsReceivable(isCategoryReceivable(category))
       setCatName(category.name)
       setCatNote(category.note ?? '')
       setGoalValue(category.monthlyGoal != null ? String(category.monthlyGoal) : '')
+      setInterestValue(category.interestRate != null ? String(category.interestRate) : '')
       setCatCurrency(category.currency)
       setCatColor(category.color ?? '')
     }
@@ -103,7 +107,7 @@ export function TransactionEditor({
   // Note: the editable "isReceivable" state (declared above) controls the
   // "Valor a receber" toggle. This derived const tells us if the category
   // is in the receivable subgroup (used only for color styling on the value input).
-  const isInReceivableGroup = category.group === 'rendimentos.valores_a_receber'
+  const isInReceivableGroup = isCategoryReceivable(category)
 
   const parsed = parseFloat(raw.replace(',', '.'))
   const valid = !isNaN(parsed) && parsed >= 0
@@ -111,6 +115,16 @@ export function TransactionEditor({
   const parsedGoal = parseFloat(goalValue.replace(',', '.'))
   const goalValid = goalValue === '' || (!isNaN(parsedGoal) && parsedGoal >= 0)
   const goalExceeded = goalValid && goalValue !== '' && valid && parsed > parsedGoal && category.type === 'EXPENSE'
+
+  const parsedInterest = interestValue.trim() === '' ? null : parseFloat(interestValue.replace(',', '.'))
+  const interestValid = interestValue.trim() === '' || (parsedInterest !== null && !isNaN(parsedInterest))
+  // Suggests this month's value by applying the (possibly just-edited)
+  // interest rate to last month's value — e.g. a savings jar earning 0.5%
+  // a.m., or a loan accruing 1.2% a.m. Never applied automatically; the
+  // user taps "Usar sugestão" to fill the value field with it.
+  const suggestedValue = (interestValid && parsedInterest != null && previousMonthValue != null)
+    ? previousMonthValue * (1 + parsedInterest / 100)
+    : null
 
   // Check if editing an existing recurring transaction
   const editingRecurring = transaction?.isRecurring === true
@@ -125,12 +139,14 @@ export function TransactionEditor({
       if (catNote !== (category!.note ?? '')) catFields.note = catNote.trim() || null
       const newGoal = goalValue === '' ? null : parsedGoal
       if (newGoal !== category!.monthlyGoal) catFields.monthlyGoal = newGoal
+      const newInterest = interestValue.trim() === '' ? null : parsedInterest
+      if (newInterest !== category!.interestRate) catFields.interestRate = newInterest
       if (catCurrency !== category!.currency) catFields.currency = catCurrency
       if (catColor !== (category!.color ?? '')) catFields.color = catColor || null
       // "Valor a receber" toggle: sync the excludeFromTotal flag.
       // The category is considered receivable if it's in the valores_a_receber
       // subgroup OR has the excludeFromTotal flag set.
-      const wasReceivable = category!.excludeFromTotal || category!.group === 'rendimentos.valores_a_receber'
+      const wasReceivable = isCategoryReceivable(category!)
       if (isReceivable !== wasReceivable) {
         catFields.excludeFromTotal = isReceivable
       }
@@ -239,6 +255,19 @@ export function TransactionEditor({
                   }
                 })()}
               </p>
+            )}
+            {suggestedValue !== null && (
+              <button
+                type="button"
+                onClick={() => setRaw(String(Math.round(suggestedValue * 100) / 100).replace('.', ','))}
+                className="w-full flex items-center justify-between gap-2 text-xs bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 rounded-lg px-3 py-2 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors touch-manipulation"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Percent className="h-3 w-3 flex-shrink-0" />
+                  Com juros de {interestValue.replace('.', ',')}%: {formatMoney(suggestedValue, category.currency)}
+                </span>
+                <span className="font-semibold flex-shrink-0">Usar</span>
+              </button>
             )}
           </div>
 
@@ -401,6 +430,24 @@ export function TransactionEditor({
                   </p>
                 )}
               </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="cat-interest" className="text-xs">
+                  Juros ao mês (%)
+                  <span className="ml-1 text-muted-foreground">(opcional)</span>
+                </Label>
+                <Input
+                  id="cat-interest"
+                  type="text"
+                  inputMode="decimal"
+                  value={interestValue}
+                  onChange={(e) => setInterestValue(e.target.value)}
+                  placeholder="Ex.: 1,5"
+                  className={cn(!interestValid && 'border-rose-400')}
+                />
+                <p className="text-[10px] text-muted-foreground leading-snug">
+                  Usado para sugerir o valor deste mês a partir do mês anterior.
+                </p>
+              </div>
 
               {/* Currency selector */}
               <div className="space-y-1.5">
@@ -474,7 +521,7 @@ export function TransactionEditor({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancelar
             </Button>
-            <Button onClick={handleSave} disabled={!valid || saving || !goalValid}>
+            <Button onClick={handleSave} disabled={!valid || saving || !goalValid || !interestValid}>
               {saving ? 'Salvando…' : 'Salvar'}
             </Button>
           </div>

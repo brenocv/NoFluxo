@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, getWorkbookAccountName } from '@/lib/db'
 
 // POST /api/categories
-//   body: { name, group, type, currency, note?, sortOrder?, excludeFromTotal?, monthlyGoal?, user }
+//   body: { name, group, type, currency, note?, sortOrder?, excludeFromTotal?, monthlyGoal?, interestRate?, user }
 // PATCH /api/categories
-//   body: { id, name?, note?, sortOrder?, excludeFromTotal?, monthlyGoal?, user }
+//   body: { id, name?, note?, sortOrder?, excludeFromTotal?, monthlyGoal?, interestRate?, user }
 // DELETE /api/categories
 //   body: { id, user }
 
@@ -37,6 +37,9 @@ export async function POST(req: NextRequest) {
       sortOrder,
       excludeFromTotal: !!body.excludeFromTotal,
       monthlyGoal: body.monthlyGoal ? Number(body.monthlyGoal) : null,
+      interestRate: body.interestRate !== undefined && body.interestRate !== null && body.interestRate !== ''
+        ? Number(body.interestRate)
+        : null,
       color: body.color ? String(body.color) : null,
       parentCategoryId: body.parentCategoryId ? String(body.parentCategoryId) : null,
     },
@@ -71,6 +74,11 @@ export async function PATCH(req: NextRequest) {
       : Number(body.monthlyGoal)
   }
   if (body.color !== undefined) data.color = body.color ? String(body.color) : null
+  if (body.interestRate !== undefined) {
+    data.interestRate = body.interestRate === null || body.interestRate === ''
+      ? null
+      : Number(body.interestRate)
+  }
   if (body.currency !== undefined) {
     const cur = String(body.currency)
     if (cur === 'BRL' || cur === 'EUR') data.currency = cur

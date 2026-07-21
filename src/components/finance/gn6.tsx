@@ -10,13 +10,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils'
 import {
   Category, formatMoney, GroupTreeNode, computeNodeTotal,
-  buildCategoryTree, computeCategoryNodeTotal, Transaction,
+  buildCategoryTree, computeCategoryNodeTotal, Transaction, isCategoryReceivable,
 } from '@/lib/finance'
 import { SecondaryCurrencyInfo } from '@/lib/currencies'
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Pencil, Clock,
   AlertTriangle, RefreshCw, Check, FolderPlus, Move,
-  TrendingUp, TrendingDown, PiggyBank, GripVertical, StickyNote,
+  TrendingUp, TrendingDown, PiggyBank, GripVertical, StickyNote, Percent,
 } from 'lucide-react'
 import { useCategoryDnd, dnd, DRAG_THRESHOLD, DnDType, findClosestDropTarget } from './category-dnd'
 
@@ -486,7 +486,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
 
   const totalWithChildren = hasChildren ? computeCategoryNodeTotal(catNode, transactionsByCat, euroRate) : null
   const displayValue = totalWithChildren !== null ? totalWithChildren : value
-  const sign = displayValue === null ? '' : category.type === 'RESERVE' || category.group === 'rendimentos.valores_a_receber' ? (displayValue < 0 ? '-' : '') : category.type === 'INCOME' ? (displayValue >= 0 ? '+' : '-') : (displayValue >= 0 ? '-' : '+')
+  const sign = displayValue === null ? '' : category.type === 'RESERVE' || isCategoryReceivable(category) ? (displayValue < 0 ? '-' : '') : category.type === 'INCOME' ? (displayValue >= 0 ? '+' : '-') : (displayValue >= 0 ? '-' : '+')
 
   const indent = 16 + depth * 20
 
@@ -604,13 +604,15 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
             className="flex flex-col items-start text-left touch-manipulation min-w-0 flex-1"
           >
             <span className="text-[13px] font-medium text-foreground flex items-start gap-1 flex-wrap min-w-0 w-full">
-              {/* Hide name for receivables — show only the "a receber" badge */}
-              {category.group !== 'rendimentos.valores_a_receber' && (
-                <div className="text-pretty leading-tight flex-1 min-w-0">{category.name}</div>
+              <div className="text-pretty leading-tight flex-1 min-w-0">{category.name}</div>
+              {isCategoryReceivable(category) && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1 py-0.5 rounded flex-shrink-0">
+                  <Clock className="h-2 w-2" />a receber
+                </span>
               )}
-              {category.group === 'rendimentos.valores_a_receber' && (
-                <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-0.5 rounded font-medium flex-shrink-0">
-                  <Clock className="h-2.5 w-2.5" />a receber
+              {category.interestRate != null && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] text-violet-700 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40 px-1 py-0.5 rounded flex-shrink-0">
+                  <Percent className="h-2 w-2" />{String(category.interestRate).replace('.', ',')}%/mês
                 </span>
               )}
               {isRecurring && (
@@ -625,7 +627,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
               )}
               {hasChildren && <span className="text-[9px] text-muted-foreground flex-shrink-0">({children.length})</span>}
             </span>
-            {(tx?.note || (category.note && category.group !== 'rendimentos.valores_a_receber')) && (
+            {(tx?.note || (category.note && !isCategoryReceivable(category))) && (
               <span className="flex flex-col gap-0.5 w-full">
                 {tx?.note && (
                   <span className="text-xs text-muted-foreground truncate max-w-[220px] flex items-center gap-1">
@@ -633,7 +635,7 @@ function CategoryNodeRow({ catNode, depth, allProps, color }: {
                     {tx.note}
                   </span>
                 )}
-                {category.note && category.group !== 'rendimentos.valores_a_receber' && (
+                {category.note && !isCategoryReceivable(category) && (
                   <span className="text-xs text-muted-foreground/70 truncate max-w-[220px] italic">
                     {category.note}
                   </span>

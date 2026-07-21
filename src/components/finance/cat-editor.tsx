@@ -55,6 +55,7 @@ interface Props {
     note?: string
     excludeFromTotal?: boolean
     monthlyGoal?: number | null
+    interestRate?: number | null
     color?: string | null
     value?: number | null
   }) => Promise<void>
@@ -68,6 +69,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
   const [currency, setCurrency] = useState<string>('BRL')
   const [value, setValue] = useState('')
   const [goal, setGoal] = useState('')
+  const [interestRate, setInterestRate] = useState('')
   const [color, setColor] = useState<string>('')
   const [saving, setSaving] = useState(false)
 
@@ -83,6 +85,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
       setNote('')
       setValue('')
       setGoal('')
+      setInterestRate('')
       setColor('')
     }
   }, [open])
@@ -111,6 +114,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
     setSaving(true)
     try {
       const parsedGoal = goal.trim() === '' ? null : parseFloat(goal.replace(',', '.'))
+      const parsedInterest = interestRate.trim() === '' ? null : parseFloat(interestRate.replace(',', '.'))
       const parsedValue = value.trim() === '' ? null : parseFloat(value.replace(',', '.'))
       await onCreate({
         name: name.trim(),
@@ -120,6 +124,7 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
         note: note.trim() || undefined,
         excludeFromTotal: groupVal === 'rendimentos.valores_a_receber',
         monthlyGoal: parsedGoal,
+        interestRate: parsedInterest,
         value: parsedValue,
         color: color || null,
       })
@@ -263,6 +268,24 @@ export function CategoryEditor({ open, group, labels, subgroups, topGroups, cust
               onChange={(e) => setGoal(e.target.value)}
               placeholder="Ex.: 250"
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="cat-interest">
+              Juros ao mês (%)
+              <span className="ml-1 text-xs text-muted-foreground">(opcional)</span>
+            </Label>
+            <Input
+              id="cat-interest"
+              type="text"
+              inputMode="decimal"
+              value={interestRate}
+              onChange={(e) => setInterestRate(e.target.value)}
+              placeholder="Ex.: 1,5"
+            />
+            <p className="text-[11px] text-muted-foreground leading-snug">
+              Se preenchido, ao lançar um novo valor o app sugere o cálculo com esse juros sobre o mês anterior.
+            </p>
           </div>
 
           {/* Color picker */}

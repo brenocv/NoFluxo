@@ -111,6 +111,7 @@ export interface SaveCategoryArgs {
   note?: string
   excludeFromTotal?: boolean
   monthlyGoal?: number | null
+  interestRate?: number | null
   color?: string | null
   parentCategoryId?: string | null
   workbookId?: string
@@ -136,6 +137,7 @@ export async function updateCategory(
     name?: string
     note?: string | null
     monthlyGoal?: number | null
+    interestRate?: number | null
     excludeFromTotal?: boolean
     currency?: 'BRL' | 'EUR'
     color?: string | null
