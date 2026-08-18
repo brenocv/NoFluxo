@@ -9,21 +9,20 @@ const HTML_FILE = path.join(__dirname, 'nofluxo.html');
 
 // Chave do Google Gemini — criar em https://aistudio.google.com/app/apikey
 // Configure como variável de ambiente GEMINI_API_KEY no Railway
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
 // Lista de modelos para tentar (em ordem de preferência). Se um falhar com "no longer available",
 // automaticamente tenta o próximo.
 const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
-let GEMINI_MODEL_PREF = process.env.GEMINI_MODEL || ''; // pode forçar um específico via env
+let GEMINI_MODEL_PREF = (process.env.GEMINI_MODEL || '').trim();
 
 // Chave do Groq (Llama 3.3 70B) — criar em https://console.groq.com/keys
 // GRATUITO e muito mais generoso que o Gemini (7000 req/dia vs 1500 do Gemini free)
 // Configure como variável de ambiente GROQ_API_KEY no Railway
-const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 const GROQ_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
 
 // Provedor preferido: 'groq' ou 'gemini'. Pode ser forçado via LLM_PROVIDER no env.
-// Padrão: tenta Groq primeiro (mais generoso), depois Gemini (tem web search).
-const PREFERRED_PROVIDER = (process.env.LLM_PROVIDER || 'groq').toLowerCase();
+const PREFERRED_PROVIDER = (process.env.LLM_PROVIDER || 'groq').toLowerCase().trim();
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -104,9 +103,8 @@ function buildSystemPrompt(context) {
 
 // Chama o Groq (API compatível com OpenAI) — não tem web search, mas é mais rápido e generoso
 async function callGroq(userMessage, context, history) {
-  if (!GROQ_API_KEY) return null; // não configurado
+  if (!GROQ_API_KEY) return { error: 'GROQ_API_KEY não configurada' };
   const systemPrompt = buildSystemPrompt(context);
-  // Monta mensagens no formato OpenAI (Groq é compatível)
   const messages = [{ role: 'system', content: systemPrompt }];
   if (history && Array.isArray(history)) {
     history.forEach(h => {
@@ -115,6 +113,7 @@ async function callGroq(userMessage, context, history) {
   }
   messages.push({ role: 'user', content: userMessage });
 
+  let lastError = '';
   for (const model of GROQ_MODELS) {
     const url = 'https://api.groq.com/openai/v1/chat/completions';
     try {
@@ -132,15 +131,25 @@ async function callGroq(userMessage, context, history) {
         })
       });
       if (resp.status === 404 || resp.status === 400) {
-        // Modelo não disponível para esta chave — tenta próximo
         const e = await resp.text();
-        console.log(`Groq modelo ${model} falhou: ${resp.status}. Tentando próximo...`);
+        let msg = e;
+        try { const j = JSON.parse(e); msg = j.error?.message || e; } catch (_) {}
+        console.log(`Groq modelo ${model} falhou (HTTP ${resp.status}): ${msg}`);
+        lastError = `${model}: ${msg}`;
         continue;
       }
-      if (resp.status === 429) {
-        // Rate limit — espera 1 seg e tenta próximo modelo
+      if (resp.status === 401) {
         const e = await resp.text();
-        console.log(`Groq modelo ${model} rate-limit. Tentando próximo...`);
+        let msg = e;
+        try { const j = JSON.parse(e); msg = j.error?.message || e; } catch (_) {}
+        return { error: `Groq API key inválida (401): ${msg}` };
+      }
+      if (resp.status === 429) {
+        const e = await resp.text();
+        let msg = e;
+        try { const j = JSON.parse(e); msg = j.error?.message || e; } catch (_) {}
+        console.log(`Groq modelo ${model} rate-limit: ${msg}`);
+        lastError = `${model} rate-limit: ${msg}`;
         continue;
       }
       if (!resp.ok) {
@@ -148,27 +157,28 @@ async function callGroq(userMessage, context, history) {
         let errMsg = `Groq API erro ${resp.status}`;
         try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
         if (/quota|exceeded|limit|insufficient/i.test(errMsg)) {
-          // Quota estourada — não adianta tentar outros modelos no Groq
-          return null; // sinaliza para tentar próximo provedor
+          return { error: `Groq quota excedida: ${errMsg}` };
         }
-        return { error: errMsg };
+        lastError = `${model}: ${errMsg}`;
+        continue;
       }
       const data = await resp.json();
       const text = data.choices?.[0]?.message?.content || '';
-      if (!text) continue;
+      if (!text) { lastError = `${model}: resposta vazia`; continue; }
       console.log(`Agente respondeu usando Groq ${model}`);
       return { response: text };
     } catch (err) {
       console.log(`Erro ao chamar Groq ${model}: ${err.message}`);
+      lastError = `${model}: ${err.message}`;
       continue;
     }
   }
-  return null; // não conseguiu com Groq
+  return { error: `Todos os modelos Groq falharam. Último erro: ${lastError}` };
 }
 
 // Chama o Gemini (tem web search nativo) — fallback do Groq
 async function callGemini(userMessage, context, history) {
-  if (!GEMINI_API_KEY) return null; // não configurado
+  if (!GEMINI_API_KEY) return { error: 'GEMINI_API_KEY não configurada' };
   const systemPrompt = buildSystemPrompt(context);
   const contents = [];
   if (history && Array.isArray(history)) {
@@ -189,18 +199,46 @@ async function callGemini(userMessage, context, history) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
     try {
       const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (resp.status === 404) { lastError = `Modelo ${model} não disponível`; continue; }
+      if (resp.status === 404 || resp.status === 400) {
+        const errText = await resp.text();
+        let msg = errText;
+        try { const j = JSON.parse(errText); msg = j.error?.message || errText; } catch (_) {}
+        console.log(`Gemini modelo ${model} falhou (HTTP ${resp.status}): ${msg}`);
+        lastError = `${model}: ${msg}`;
+        continue;
+      }
+      if (resp.status === 403 || resp.status === 401) {
+        // API key inválida OU API não habilitada no projeto
+        const errText = await resp.text();
+        let msg = errText;
+        try { const j = JSON.parse(errText); msg = j.error?.message || errText; } catch (_) {}
+        return { error: `Gemini API key inválida ou API não habilitada (${resp.status}): ${msg}. Verifique em https://console.cloud.google.com/apis/library generativelanguage.googleapis.com está habilitado.` };
+      }
+      if (resp.status === 429) {
+        const errText = await resp.text();
+        let msg = errText;
+        try { const j = JSON.parse(errText); msg = j.error?.message || errText; } catch (_) {}
+        console.log(`Gemini ${model} rate-limit: ${msg}`);
+        lastError = `${model} rate-limit: ${msg}`;
+        continue;
+      }
       if (!resp.ok) {
         const errText = await resp.text();
         let errMsg = `Gemini API erro ${resp.status}`;
         try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
-        if (/no longer available|not found|not supported|deprecated/i.test(errMsg)) { lastError = errMsg; continue; }
-        if (/quota|exceeded|limit/i.test(errMsg)) return null; // sinaliza para não tentar mais
-        return { error: errMsg };
+        if (/no longer available|not found|not supported|deprecated/i.test(errMsg)) {
+          lastError = `${model}: ${errMsg}`;
+          continue;
+        }
+        if (/quota|exceeded|limit/i.test(errMsg)) {
+          return { error: `Gemini quota excedida: ${errMsg}` };
+        }
+        lastError = `${model}: ${errMsg}`;
+        continue;
       }
       const data = await resp.json();
       const candidates = data.candidates || [];
-      if (!candidates.length) { lastError = 'Sem resposta do modelo.'; continue; }
+      if (!candidates.length) { lastError = `${model}: sem candidatos`; continue; }
       const parts = candidates[0].content?.parts || [];
       let text = parts.filter(p => p.text).map(p => p.text).join('\n');
       const grounding = candidates[0].groundingMetadata;
@@ -211,37 +249,36 @@ async function callGemini(userMessage, context, history) {
       return { response: text || 'Não consegui gerar uma resposta. Tente reformular.' };
     } catch (err) {
       console.log(`Erro ao chamar Gemini ${model}: ${err.message}`);
-      lastError = err.message;
+      lastError = `${model}: ${err.message}`;
       continue;
     }
   }
-  return null;
+  return { error: `Todos os modelos Gemini falharam. Último erro: ${lastError}` };
 }
 
-// Dispatcher principal — tenta provedores em ordem de preferência
+// Dispatcher principal — tenta provedores em ordem de preferência, COLETANDO TODOS OS ERROS
 async function callLLM(userMessage, context, history) {
-  // Se não tem nenhuma chave configurada, mostra erro amigável
   if (!GROQ_API_KEY && !GEMINI_API_KEY) {
-    return { error: 'Agente IA precisa de uma chave de API configurada. Configure GROQ_API_KEY (recomendado, gratuito em https://console.groq.com/keys) ou GEMINI_API_KEY (https://aistudio.google.com/app/apikey) nas variáveis de ambiente do Railway.' };
+    return { error: 'Nenhuma chave de API configurada. Adicione GROQ_API_KEY (https://console.groq.com/keys) ou GEMINI_API_KEY (https://aistudio.google.com/app/apikey) nas variáveis de ambiente do Railway.' };
   }
-  // Monta lista de provedores em ordem de preferência
   const providers = [];
   if (PREFERRED_PROVIDER === 'groq') {
-    if (GROQ_API_KEY) providers.push({ name: 'groq', fn: callGroq });
-    if (GEMINI_API_KEY) providers.push({ name: 'gemini', fn: callGemini });
+    if (GROQ_API_KEY) providers.push({ name: 'Groq', fn: callGroq });
+    if (GEMINI_API_KEY) providers.push({ name: 'Gemini', fn: callGemini });
   } else {
-    if (GEMINI_API_KEY) providers.push({ name: 'gemini', fn: callGemini });
-    if (GROQ_API_KEY) providers.push({ name: 'groq', fn: callGroq });
+    if (GEMINI_API_KEY) providers.push({ name: 'Gemini', fn: callGemini });
+    if (GROQ_API_KEY) providers.push({ name: 'Groq', fn: callGroq });
   }
-  let lastError = '';
+  const allErrors = [];
   for (const p of providers) {
+    console.log(`Tentando provedor: ${p.name}...`);
     const result = await p.fn(userMessage, context, history);
     if (result && result.response) return result;
-    if (result && result.error) lastError = `[${p.name}] ${result.error}`;
-    else lastError = `[${p.name}] não conseguiu responder`;
-    console.log(`Provedor ${p.name} falhou: ${lastError}. Tentando próximo...`);
+    const errMsg = result?.error || 'erro desconhecido';
+    allErrors.push(`${p.name}: ${errMsg}`);
+    console.log(`Provedor ${p.name} falhou: ${errMsg}`);
   }
-  return { error: 'Todos os provedores falharam. ' + lastError };
+  return { error: 'Todos os provedores falharam. Detalhes:\n' + allErrors.join('\n') };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -279,6 +316,27 @@ const server = http.createServer(async (req, res) => {
       groq: GROQ_API_KEY ? 'configurado' : 'não configurado',
       gemini: GEMINI_API_KEY ? 'configurado' : 'não configurado',
       provedor_preferido: PREFERRED_PROVIDER
+    });
+  }
+
+  // === Debug — mostra configuração detalhada (sem expor chaves) ===
+  if (urlPath === '/api/debug' && req.method === 'GET') {
+    return sendJSON(res, 200, {
+      groq: {
+        configurado: !!GROQ_API_KEY,
+        tamanho_chave: GROQ_API_KEY.length,
+        comeca_com: GROQ_API_KEY ? GROQ_API_KEY.slice(0, 8) + '...' : '',
+        modelos: GROQ_MODELS
+      },
+      gemini: {
+        configurado: !!GEMINI_API_KEY,
+        tamanho_chave: GEMINI_API_KEY.length,
+        comeca_com: GEMINI_API_KEY ? GEMINI_API_KEY.slice(0, 10) + '...' : '',
+        modelos: GEMINI_MODELS
+      },
+      provedor_preferido: PREFERRED_PROVIDER,
+      node_version: process.version,
+      timestamp: new Date().toISOString()
     });
   }
 
