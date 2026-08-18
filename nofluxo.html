@@ -6151,34 +6151,60 @@ function getInstallInstructions(){
   const isIOS=/iPad|iPhone|iPod/.test(ua)&&!window.MSStream;
   const isSafari=/^((?!chrome|android|crios|fxios).)*safari/i.test(ua);
   const isAndroid=/android/i.test(ua);
+  const isEdge=/edg\//i.test(ua);
+  const isChrome=/chrome\//i.test(ua)&&!isEdge;
   const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
   if(isStandalone)return '<p>Você já está usando o NoFluxo instalado! 🎉</p>';
   if(isIOS){
     return `
-      <p>O Safari do iPhone/iPad não permite instalação automática. Siga estes passos:</p>
-      <ol style="margin:8px 0;padding-left:20px;line-height:1.6">
-        <li>Toque no botão <b>Compartilhar</b> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline;vertical-align:middle"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> (ícone de caixa com seta para cima, no rodapé)</li>
-        <li>Role e toque em <b>"Adicionar à Tela de Início"</b></li>
-        <li>Toque em <b>"Adicionar"</b></li>
+      <p><b>iPhone/iPad</b> — o Safari não permite instalação automática:</p>
+      <ol style="margin:8px 0;padding-left:20px;line-height:1.7">
+        <li>Toque no botão <b>Compartilhar</b> <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline;vertical-align:middle"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg> (ícone de quadrado com seta para cima, na barra inferior do Safari)</li>
+        <li>Role o menu e toque em <b>"Adicionar à Tela de Início"</b></li>
+        <li>Confirme em <b>"Adicionar"</b></li>
       </ol>
-      <p>Pronto! O ícone do NoFluxo vai aparecer na tela inicial do seu iPhone/iPad.</p>`;
+      <p>O ícone vai aparecer na tela inicial do seu iPhone/iPad, como um app.</p>`;
   }
   if(isAndroid){
     return `
-      <p>No Android, o Chrome deve mostrar um banner de instalação automaticamente. Se não apareceu:</p>
-      <ol style="margin:8px 0;padding-left:20px;line-height:1.6">
-        <li>Toque no menu <b>⋮</b> (três pontos, no canto superior direito)</li>
-        <li>Selecione <b>"Adicionar à tela inicial"</b> ou <b>"Instalar app"</b></li>
-      </ol>`;
+      <p><b>Android</b> — para instalar o NoFluxo:</p>
+      <ol style="margin:8px 0;padding-left:20px;line-height:1.7">
+        <li>Toque no menu <b>⋮</b> (três pontos, no canto superior direito do Chrome)</li>
+        <li>Procure por <b>"Adicionar à tela inicial"</b> ou <b>"Instalar app"</b><br><span style="color:var(--c-text-3);font-size:11px">Em versões recentes, pode estar dentro de <b>"Salvar e compartilhar"</b></span></li>
+        <li>Confirme em <b>"Instalar"</b></li>
+      </ol>
+      <p>O app vai aparecer na sua lista de aplicativos, abre em tela cheia.</p>`;
   }
-  // Desktop / outros
+  if(isEdge){
+    return `
+      <p><b>Microsoft Edge</b> — para instalar no PC:</p>
+      <ol style="margin:8px 0;padding-left:20px;line-height:1.7">
+        <li>Clique no menu <b>⋯</b> (três pontos, no canto superior direito)</li>
+        <li>Vá em <b>"Aplicativos"</b> (ou "Apps")</li>
+        <li>Clique em <b>"Instalar este site como um aplicativo"</b></li>
+        <li>Confirme em <b>"Instalar"</b></li>
+      </ol>
+      <p>O NoFluxo vai abrir em janela própria, sem barra de endereço, e aparecer no Menu Iniciar do Windows.</p>`;
+  }
+  if(isChrome){
+    return `
+      <p><b>Google Chrome</b> — para instalar no PC:</p>
+      <ol style="margin:8px 0;padding-left:20px;line-height:1.7">
+        <li>Clique no menu <b>⋮</b> (três pontos, no canto superior direito)</li>
+        <li>Vá em <b>"Salvar e compartilhar"</b> (em versões antigas: "Mais ferramentas")</li>
+        <li>Clique em <b>"Instalar NoFluxo..."</b></li>
+        <li>Confirme em <b>"Instalar"</b></li>
+      </ol>
+      <p>O app vai abrir em janela própria e aparecer na sua área de trabalho / Menu Iniciar.</p>`;
+  }
+  // Outros browsers
   return `
-    <p>Para instalar no computador:</p>
-    <ol style="margin:8px 0;padding-left:20px;line-height:1.6">
-      <li>No Chrome/Edge: clique no <b>ícone de instalar</b> ⊕ na barra de endereço (próximo à estrela de favorito)</li>
-      <li> Ou abra o menu <b>⋮</b> (no Chrome) ou <b>⋯</b> (no Edge) → <b>"Instalar NoFluxo"</b></li>
+    <p>Para instalar no seu navegador:</p>
+    <ol style="margin:8px 0;padding-left:20px;line-height:1.7">
+      <li>Abra o menu do navegador (geralmente <b>⋮</b> no canto superior direito)</li>
+      <li>Procure por <b>"Instalar app"</b>, <b>"Adicionar à tela inicial"</b>, ou <b>"Instalar este site como app"</b></li>
     </ol>
-    <p>O app vai abrir em janela própria, sem barra de endereço.</p>`;
+    <p>O NoFluxo vai abrir em janela própria, sem barra de endereço.</p>`;
 }
 
 // Tenta instalação direta; se não for suportada, mostra modal com instruções
