@@ -23,11 +23,12 @@ let GEMINI_MODEL_PREF = (process.env.GEMINI_MODEL || '').trim();
 // Chave do Groq (Llama 3.3 70B) — criar em https://console.groq.com/keys
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
 // Lista de modelos Groq (atualizada 2025). Tentados em ordem.
+// NOTA: deepseek-r1-distill-llama-70b é um "reasoning model" que mostra o raciocínio
+// antes de responder — não usamos por padrão, mas pode ser forçado via GROQ_MODEL no env.
 const GROQ_MODELS = [
   'llama-3.3-70b-versatile',
   'llama-3.1-8b-instant',
   'gemma2-9b-it',
-  'deepseek-r1-distill-llama-70b',
 ];
 
 const PREFERRED_PROVIDER = (process.env.LLM_PROVIDER || 'groq').toLowerCase().trim();
@@ -101,6 +102,8 @@ function buildSystemPrompt(context) {
     txt += '== FIM DOS DADOS ==\n\n';
   }
   txt += 'INSTRUÇÕES:\n';
+  txt += '- Nunca mostre seu processo de raciocínio, pensamento passo-a-passo, ou cadeia de pensamento. Responda DIRETAMENTE com a resposta final.\n';
+  txt += '- Não inclua frases como "Vamos pensar sobre isso", "Aqui está o processo", "Passo 1", etc.\n';
   txt += '- Quando o usuário perguntar "em que mês minha dívida termina", calcule o mês exato a partir dos dados das dívidas recorrentes.\n';
   txt += '- Quando perguntar sobre saldo, reserve, metas — use os valores reais do usuário.\n';
   txt += '- Se precisar de informações externas (taxas, conceitos financeiros, notícias), use a busca do Google (já está habilitada automaticamente).\n';
@@ -109,7 +112,31 @@ function buildSystemPrompt(context) {
   return txt;
 }
 
-// Busca lista de modelos disponíveis no Groq (para fallback dinâmico)
+// Pós-processamento: remove qualquer "raciocínio" visível na resposta (caso o modelo
+// ainda mostre pensamento mesmo com a instrução no prompt)
+function cleanReasoning(text) {
+  if (!text) return text;
+  // Remove blocos <think>...</think> (usados por alguns modelos de raciocínio)
+  text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  // Remove blocos  que alguns modelos de raciocínio adicionam
+  text = text.replace(/【\d+:\d+†source】/g, '').trim();
+  // Remove prefixos comuns de "thinking" que DeepSeek e similares usam
+  const thinkingPatterns = [
+    /^Here['']?s a thinking process[\s\S]*?(?=\n(?:A |O |Para|Reserv|E |Bom|Olá))/im,
+    /^Let['']?s think about[\s\S]*?(?=\n(?:A |O |Para|Reserv|E |Bom|Olá))/im,
+    /^Thinking process[\s\S]*?(?=\n(?:A |O |Para|Reserv|E |Bom|Olá))/im,
+    /^Analisando[\s\S]*?(?=\n(?:A |O |Para|Reserv|E |Bom|Olá))/im,
+  ];
+  for (const p of thinkingPatterns) {
+    if (p.test(text)) {
+      const match = text.match(p);
+      if (match) {
+        text = text.slice(match[0].length).trim();
+      }
+    }
+  }
+  return text;
+}
 async function fetchGroqModels() {
   try {
     const resp = await fetch('https://api.groq.com/openai/v1/models', {
@@ -207,7 +234,7 @@ async function callGroq(userMessage, context, history) {
         const text = data.choices?.[0]?.message?.content || '';
         if (!text) { allErrors.push(`${model}: resposta vazia`); continue; }
         console.log(`Agente respondeu usando Groq ${model}`);
-        return { response: text };
+        return { response: cleanReasoning(text) };
       } catch (err) {
         allErrors.push(`${model}: ${err.message}`);
         continue;
@@ -275,7 +302,7 @@ async function callGemini(userMessage, context, history) {
           text += '\n\n_(resposta com base em busca web em tempo real)_';
         }
         console.log(`Agente respondeu usando Gemini ${model}`);
-        return { response: text || 'Não consegui gerar uma resposta. Tente reformular.' };
+        return { response: cleanReasoning(text) || 'Não consegui gerar uma resposta. Tente reformular.' };
       } catch (err) {
         allErrors.push(`${model}: ${err.message}`);
         continue;
