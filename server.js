@@ -10,7 +10,10 @@ const HTML_FILE = path.join(__dirname, 'nofluxo.html');
 // Chave do Google Gemini — criar em https://aistudio.google.com/app/apikey
 // Configure como variável de ambiente GEMINI_API_KEY no Railway
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
-const GEMINI_MODEL = 'gemini-2.0-flash'; // modelo gratuito com web search habilitado
+// Lista de modelos para tentar (em ordem de preferência). Se um falhar com "no longer available",
+// automaticamente tenta o próximo.
+const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+let GEMINI_MODEL_PREF = process.env.GEMINI_MODEL || ''; // pode forçar um específico via env
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -89,7 +92,7 @@ function buildSystemPrompt(context) {
   return txt;
 }
 
-// Chama a API do Google Gemini
+// Chama a API do Google Gemini — tenta múltiplos modelos automaticamente
 async function callGemini(userMessage, context, history) {
   if (!GEMINI_API_KEY) {
     return { error: 'Agente IA precisa da chave GEMINI_API_KEY configurada. Peça ao administrador para criar uma chave em https://aistudio.google.com/app/apikey e adicionar como variável de ambiente GEMINI_API_KEY no Railway.' };
@@ -97,7 +100,6 @@ async function callGemini(userMessage, context, history) {
   const systemPrompt = buildSystemPrompt(context);
   // Monta o contents (Gemini usa array de mensagens)
   const contents = [];
-  // Adiciona histórico (translate roles: user -> user, assistant -> model)
   if (history && Array.isArray(history)) {
     history.forEach(h => {
       contents.push({
@@ -106,7 +108,6 @@ async function callGemini(userMessage, context, history) {
       });
     });
   }
-  // Mensagem atual
   contents.push({ role: 'user', parts: [{ text: userMessage }] });
 
   const body = {
@@ -119,32 +120,54 @@ async function callGemini(userMessage, context, history) {
     }
   };
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!resp.ok) {
-    const errText = await resp.text();
-    let errMsg = `Gemini API erro ${resp.status}`;
-    try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
-    return { error: errMsg };
+  // Lista de modelos a tentar: o preferido do env, depois a ordem padrão
+  const modelsToTry = GEMINI_MODEL_PREF ? [GEMINI_MODEL_PREF, ...GEMINI_MODELS.filter(m => m !== GEMINI_MODEL_PREF)] : GEMINI_MODELS;
+  let lastError = '';
+
+  for (const model of modelsToTry) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+    try {
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      // Se 404 ou "no longer available", tenta próximo modelo
+      if (resp.status === 404) {
+        console.log(`Modelo ${model} não encontrado (404), tentando próximo...`);
+        lastError = `Modelo ${model} não disponível`;
+        continue;
+      }
+      if (!resp.ok) {
+        const errText = await resp.text();
+        let errMsg = `Gemini API erro ${resp.status}`;
+        try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
+        // Se a mensagem indica que o modelo não está disponível, tenta próximo
+        if (/no longer available|not found|not supported|deprecated/i.test(errMsg)) {
+          console.log(`Modelo ${model} indisponível: ${errMsg}. Tentando próximo...`);
+          lastError = errMsg;
+          continue;
+        }
+        return { error: errMsg };
+      }
+      const data = await resp.json();
+      const candidates = data.candidates || [];
+      if (!candidates.length) { lastError = 'Sem resposta do modelo.'; continue; }
+      const parts = candidates[0].content?.parts || [];
+      let text = parts.filter(p => p.text).map(p => p.text).join('\n');
+      const grounding = candidates[0].groundingMetadata;
+      if (grounding && grounding.webSearchQueries && grounding.webSearchQueries.length) {
+        text += '\n\n_(resposta com base em busca web em tempo real)_';
+      }
+      console.log(`Agente respondeu usando modelo: ${model}`);
+      return { response: text || 'Não consegui gerar uma resposta. Tente reformular.' };
+    } catch (err) {
+      console.log(`Erro ao chamar ${model}: ${err.message}`);
+      lastError = err.message;
+      continue;
+    }
   }
-  const data = await resp.json();
-  // Extrai texto da resposta
-  const candidates = data.candidates || [];
-  if (!candidates.length) return { error: 'Sem resposta do modelo.' };
-  const parts = candidates[0].content?.parts || [];
-  // Junta todas as partes de texto (pode haver múltiplas)
-  let text = parts.filter(p => p.text).map(p => p.text).join('\n');
-  // Se houve search, pode incluir groundingMetadata com fontes — adiciona no fim
-  const grounding = candidates[0].groundingMetadata;
-  if (grounding && grounding.webSearchQueries && grounding.webSearchQueries.length) {
-    // não polui muito, só menciona que usou busca
-    text += '\n\n_(resposta com base em busca web em tempo real)_';
-  }
-  return { response: text || 'Não consegui gerar uma resposta. Tente reformular.' };
+  return { error: 'Não foi possível chamar nenhum modelo Gemini disponível. Último erro: ' + lastError };
 }
 
 const server = http.createServer(async (req, res) => {
@@ -203,4 +226,5 @@ server.listen(PORT, () => {
   console.log(`NoFluxo rodando na porta ${PORT}`);
   console.log(`Acesse: http://localhost:${PORT}`);
   console.log(`Agente IA: ${GEMINI_API_KEY ? 'ativo (Gemini configurado)' : 'inativo (configure GEMINI_API_KEY)'}`);
+  if (GEMINI_API_KEY) console.log(`Modelos que serão tentados em ordem: ${GEMINI_MODELS.join(', ')}`);
 });
