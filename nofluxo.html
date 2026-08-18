@@ -11,11 +11,41 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>NoFluxo v12.0 — Seu dinheiro. No fluxo.</title>
+<!-- Favicons PNG (compatibilidade máxima, browsers antigos) -->
+<link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABmJLR0QA/wD/AP+gvaeTAAADdUlEQVRYhb2We2gUVxTGf3dmk12jO1kfUdQaJDEhilpDWiVB1JbSGqxaNbbBRytC1YJpbYpB/xC1iNRa2kpabNhqq1CNSkVQ46MiW3QRFbU1kUiMhEp8tCYmu4lxd7PZ6x/qbKPM7CMbv/++c8853zdz75m5gv+j4O3BoH4KzECShaAviYEHqEXwGxpOjh3zP1sQekr+9PkIsQOwJ0jUAOI6MjiHcyevhw08Ed/XzVDvopkuNZ/zR26Ip6+9nl5/8ucguErSozzl6Z6/XHEAyXgCKYsVEO8muneaI5Xc7EyEiLCjUn6ogMxMpPhrOVncPLCTy7+Us2PtKvNkwQRBQaE0WleEZOGwRjRLJwAnmoZQ/9B4MrW+KdTs2saIocMB8Pt92N6ca+rBYraYq3nYklOj89cdLSz5O88wv6KsRBcHCNUdYpzmpdqrGdYoZgasItSN97MEDXM/njWd4rem6rzL24j36ErsinFNRAPRYszIdL7/bHk4EArSur+YUEdzxNoeG7AlJ7NnYxkpNqseazu9nsAtd1T1pmcgGmxbtZxXR2Xo/P4NN8GzW6Ku79EbKHpjMstmF4bFWz1c2L0MQl29byB9SBoVZSU6l1KydPN3+Dz3YuoTlwGLqlL55RoGaOEv+NY9v3PEfSHmXnEZ2LziI/LHjtb5xdo61jl3x9MqdgPvTMrji+J5Ove0P+SDdV8R6DSfdyPENAVWexq/lpaiKOGfzCff/EjD3dj2PT4DQmHi4p8YPLC/Hqo4VMXeP1xxi8dkoN+Utdhzpun8WsM/lJY7eyQOUZ6BpFcmYZ+2Xue+QIAFG76mw+c3qUqQAcXmoP/7laAm6bGSb7dztb6hx+IRDbSFLGgzt6M6RuqxylN/8vPhE4Y17cHuu+oPmT+j6Rmo9mqo2e/p/Nad26zY+oNpw031OdS227EIyW1fH660pZrmq4zI+hywGSVkDB9GbnYmbR2PmLF6Iw13zEfuQWcy7paBnHkwiL+8qUjzm75XUFDoAqYaZQghmJCVQeN/Tdxv9ZiKx4ErKumjVBCzzLLuNbck5MS/AIlTIcm3C6hOfPeI8GC1lCu4XEEUUQREvj8lDhIhl+I63PRkRs5W1SG7JgO1L0Hcg5BFuI8fBFD1cOPNJrRcJ9bOfxHSAcKOyXTEiHagBokTq2URZ6ouPVt4DIW5BTGbtjDHAAAAAElFTkSuQmCC">
+<link rel="icon" type="image/png" sizes="64x64" href="data:image/png;base64,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">
+<!-- Favicon SVG (browsers modernos — vetor, nítido em qualquer tamanho) -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27112%27%20fill%3D%27%23003A49%27%2F%3E%3Crect%20x%3D%27124%27%20y%3D%27120%27%20width%3D%2764%27%20height%3D%27272%27%20rx%3D%2716%27%20fill%3D%27%23E67D00%27%2F%3E%3Crect%20x%3D%27324%27%20y%3D%27120%27%20width%3D%2764%27%20height%3D%27272%27%20rx%3D%2716%27%20fill%3D%27%23E67D00%27%2F%3E%3Cpath%20d%3D%27M%20156%20392%20L%20356%20120%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2756%27%20stroke-linecap%3D%27round%27%20fill%3D%27none%27%2F%3E%3C%2Fsvg%3E">
+<!-- Apple-touch-icon (iOS) — PNG 180x180 para máxima compatibilidade -->
+<link rel="apple-touch-icon" sizes="180x180" href="data:image/png;base64,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">
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20viewBox%3D%270%200%20512%20512%27%3E%3Crect%20width%3D%27512%27%20height%3D%27512%27%20rx%3D%27112%27%20fill%3D%27%23003A49%27%2F%3E%3Crect%20x%3D%27124%27%20y%3D%27120%27%20width%3D%2764%27%20height%3D%27272%27%20rx%3D%2716%27%20fill%3D%27%23E67D00%27%2F%3E%3Crect%20x%3D%27324%27%20y%3D%27120%27%20width%3D%2764%27%20height%3D%27272%27%20rx%3D%2716%27%20fill%3D%27%23E67D00%27%2F%3E%3Cpath%20d%3D%27M%20156%20392%20L%20356%20120%27%20stroke%3D%27%23FFFFFF%27%20stroke-width%3D%2756%27%20stroke-linecap%3D%27round%27%20fill%3D%27none%27%2F%3E%3C%2Fsvg%3E">
+<meta name="theme-color" content="#003A49">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="NoFluxo">
+<meta name="mobile-web-app-capable" content="yes">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<!-- Google Identity Services (login com Google) -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
+/* === Scrollbar estilizada nas cores do app === */
+*{scrollbar-width:thin;scrollbar-color:var(--c-primary) var(--c-surface-2)}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--c-surface-2);border-radius:99px}
+::-webkit-scrollbar-thumb{background:var(--c-primary);border-radius:99px;border:2px solid var(--c-surface-2)}
+::-webkit-scrollbar-thumb:hover{background:var(--c-accent)}
+::-webkit-scrollbar-thumb:active{background:var(--c-accent-2)}
+::-webkit-scrollbar-corner{background:var(--c-surface-2)}
+/* Firefox: botão de scroll com cantos arredondados */
+*{scrollbar-arrow-color:var(--c-primary)}
+/* Dark mode: thumb mais brilhante para ter contraste no fundo escuro */
+html[data-theme="dark"] *{scrollbar-color:var(--c-primary-bright) var(--c-surface-2)}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:var(--c-primary-bright)}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:var(--c-accent)}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:active{background:var(--c-accent-2)}
 :root {
   /* Paleta da marca (paleta.png) */
   --c-primary:#003A49;--c-primary-2:#014a5d;--c-primary-bright:#003A49;--c-despesas:#921227;--c-receitas:#1F4412;
@@ -1094,6 +1124,49 @@ html[data-theme="dark"] .hero-mini-despesas{
 .install-banner-close{width:28px;height:28px;display:grid;place-items:center;color:var(--c-text-3);flex-shrink:0}
 .install-banner-close svg{width:16px;height:16px}
 
+/* === FABs flutuantes (Instalar + Agente IA) === */
+.fab-stack{position:fixed;right:14px;bottom:calc(var(--bottom-nav-h) + 14px + var(--safe-bottom));z-index:60;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+.fab-mini{width:48px;height:48px;border-radius:50%;border:none;display:grid;place-items:center;color:#fff;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,0.22),0 2px 6px rgba(0,0,0,0.15);transition:transform .15s,box-shadow .15s}
+.fab-mini:active{transform:scale(0.92)}
+.fab-mini svg{width:22px;height:22px}
+.fab-install{background:linear-gradient(135deg,var(--c-accent) 0%,var(--c-accent-2) 100%)}
+.fab-install:active{box-shadow:0 4px 12px rgba(230,125,0,0.5)}
+.fab-agent{background:linear-gradient(135deg,var(--c-primary) 0%,var(--c-primary-2) 100%);position:relative}
+.fab-agent:active{box-shadow:0 4px 12px rgba(0,58,73,0.5)}
+.fab-agent::after{content:"";position:absolute;top:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:#4ADE80;border:2px solid var(--c-bg);box-sizing:content-box;animation:pulseDot 2s ease-in-out infinite}
+@keyframes pulseDot{0%,100%{opacity:1;transform:scale(1)}50%{opacity:0.6;transform:scale(1.15)}}
+
+/* === DRAWER do Agente IA === */
+.agent-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:100;display:none;opacity:0;transition:opacity .25s}
+.agent-overlay.open{display:block;opacity:1}
+.agent-drawer{position:fixed;top:0;right:0;bottom:0;width:100%;max-width:420px;background:var(--c-bg);box-shadow:-8px 0 30px rgba(0,0,0,0.18);z-index:101;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.22,.61,.36,1)}
+.agent-overlay.open .agent-drawer{transform:translateX(0)}
+.agent-header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--c-primary);color:#fff;flex-shrink:0}
+.agent-avatar{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--c-accent),var(--c-accent-2));display:grid;place-items:center;font-size:13px;font-weight:800;color:#fff;flex-shrink:0}
+.agent-close{width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:#fff;background:rgba(255,255,255,0.1);border:none;cursor:pointer}
+.agent-close:active{background:rgba(255,255,255,0.2)}
+.agent-close svg{width:18px;height:18px}
+.agent-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;background:var(--c-bg);-webkit-overflow-scrolling:touch}
+.agent-msg{display:flex;gap:8px;max-width:92%}
+.agent-msg.user{margin-left:auto;flex-direction:row-reverse}
+.agent-msg-bubble{padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.45;color:var(--c-text);white-space:pre-wrap;word-wrap:break-word}
+.agent-msg.bot .agent-msg-bubble{background:var(--c-surface);border:1px solid var(--c-border);border-bottom-left-radius:4px}
+.agent-msg.user .agent-msg-bubble{background:var(--c-primary);color:#fff;border-bottom-right-radius:4px}
+.agent-msg.typing .agent-msg-bubble{display:inline-flex;gap:4px;align-items:center;padding:12px 16px}
+.agent-msg.typing .agent-msg-bubble::before,.agent-msg.typing .agent-msg-bubble::after,.agent-msg.typing .agent-msg-bubble span{content:"";width:6px;height:6px;border-radius:50%;background:var(--c-text-3);animation:typing 1.2s infinite}
+.agent-msg.typing .agent-msg-bubble::after{animation-delay:.2s}
+.agent-msg.typing .agent-msg-bubble span{animation-delay:.4s;display:inline-block}
+@keyframes typing{0%,60%,100%{opacity:0.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
+.agent-suggestions{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.agent-sugg{padding:7px 12px;border-radius:99px;border:1px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s}
+.agent-sugg:active{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
+.agent-input-row{display:flex;gap:8px;padding:10px 12px calc(10px + var(--safe-bottom));background:var(--c-surface);border-top:1px solid var(--c-border);align-items:flex-end;flex-shrink:0}
+.agent-input-row input{flex:1;padding:11px 14px;border:1.5px solid var(--c-border);border-radius:99px;background:var(--c-bg);color:var(--c-text);font-size:13px;outline:none;font-family:var(--font);min-width:0}
+.agent-input-row input:focus{border-color:var(--c-primary)}
+.agent-input-row button{width:42px;height:42px;border-radius:50%;border:none;background:linear-gradient(135deg,var(--c-accent),var(--c-accent-2));color:#fff;display:grid;place-items:center;cursor:pointer;flex-shrink:0}
+.agent-input-row button:active{transform:scale(0.92)}
+.agent-input-row button svg{width:18px;height:18px}
+
 .content::-webkit-scrollbar,.modal-sheet::-webkit-scrollbar,.month-picker-list::-webkit-scrollbar,.sg-tree::-webkit-scrollbar,.menu-dropdown::-webkit-scrollbar{display:none}
 .hidden-input{position:absolute;left:-9999px;opacity:0}
 /* MONTH SELECTOR (permanente no topo) */
@@ -1571,6 +1644,47 @@ html[data-theme="dark"] .hero-mini-despesas{
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- FABs flutuantes (canto inferior direito, acima da bottom-nav) -->
+<div class="fab-stack">
+  <button class="fab-mini fab-install" id="fabInstall" aria-label="Instalar app" title="Instalar NoFluxo no PC/celular" style="display:none">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  </button>
+  <button class="fab-mini fab-agent" id="fabAgent" aria-label="Agente IA" title="Agente NoFluxo — pergunte sobre suas finanças">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+  </button>
+</div>
+
+<!-- DRAWER DO AGENTE IA -->
+<div class="agent-overlay" id="agentOverlay">
+  <div class="agent-drawer" id="agentDrawer">
+    <div class="agent-header">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="agent-avatar">NF</div>
+        <div>
+          <div style="font-size:13px;font-weight:700;color:var(--c-text)">Agente NoFluxo</div>
+          <div style="font-size:10px;color:var(--c-text-3)" id="agentStatus">Pronto para ajudar</div>
+        </div>
+      </div>
+      <button class="agent-close" id="agentClose" aria-label="Fechar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    </div>
+    <div class="agent-messages" id="agentMessages">
+      <div class="agent-msg bot">
+        <div class="agent-msg-bubble">Olá! Sou o assistente do NoFluxo. Posso te ajudar com suas finanças: calcular quando uma dívida termina, sugerir ajustes, responder perguntas sobre dinheiro, e mais. Pergunte algo 👋</div>
+      </div>
+      <div class="agent-suggestions" id="agentSuggestions">
+        <button class="agent-sugg">Em que mês minha maior dívida termina?</button>
+        <button class="agent-sugg">Quanto sobra por mês após despesas?</button>
+        <button class="agent-sugg">Como baixo o custo do supermercado?</button>
+        <button class="agent-sugg">O que é reserva de emergência?</button>
+      </div>
+    </div>
+    <div class="agent-input-row">
+      <input type="text" id="agentInput" placeholder="Pergunte sobre suas finanças..." autocomplete="off">
+      <button id="agentSend" aria-label="Enviar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg></button>
+    </div>
+  </div>
+</div>
+
 <!-- Firebase SDK (carregado condicionalmente quando USE_FIREBASE=true) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -1590,6 +1704,21 @@ html[data-theme="dark"] .hero-mini-despesas{
    Enquanto USE_FIREBASE=false, o app funciona em modo demo (código mostrado como toast).
 */
 const USE_FIREBASE = false;
+
+/* === LOGIN COM GOOGLE (Google Identity Services - GIS) ===
+   Para habilitar o login real com Google:
+   1. Acesse https://console.cloud.google.com
+   2. Crie ou selecione um projeto
+   3. Vá em "APIs e serviços" → "Tela de consentimento OAuth" → configure
+   4. Vá em "Credenciais" → "Criar credenciais" → "ID do cliente OAuth"
+      - Tipo: Aplicativo da Web
+      - Origens JavaScript autorizadas: adicione suas URLs (ex: http://localhost:3000 e https://seu-app.up.railway.app)
+      - Não precisa de URIs de redirecionamento
+   5. Copie o "ID do cliente" gerado (termina com .apps.googleusercontent.com)
+   6. Cole abaixo na constante GOOGLE_CLIENT_ID
+   7. Salve e faça deploy novamente
+*/
+const GOOGLE_CLIENT_ID = "1066413801923-ivclif569p5qp0cejp2piu6ca4nnbk76.apps.googleusercontent.com";
 const FIREBASE_CONFIG = {
   apiKey: "COLE_SUA_API_KEY",
   authDomain: "seu-projeto.firebaseapp.com",
@@ -2443,6 +2572,21 @@ function renderInicio(){
     html+=`</div></div>`;
   }
 
+  // === Card de instalação PWA (só aparece se não estiver instalado) ===
+  const isStandalone=window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;
+  if(!isStandalone){
+    html+=`<div class="card install-card" id="installCard" style="display:flex;align-items:center;gap:12px;padding:14px;background:linear-gradient(135deg,rgba(0,58,73,0.06),rgba(230,125,0,0.06));border:1.5px dashed var(--c-border)">
+      <div style="width:44px;height:44px;border-radius:11px;background:var(--c-primary);display:grid;place-items:center;flex-shrink:0">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:22px;height:22px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--c-text)">Instalar NoFluxo no PC/celular</div>
+        <div style="font-size:11px;color:var(--c-text-2);margin-top:2px">Acesso rápido pela área de trabalho, abre em tela cheia</div>
+      </div>
+      <button class="btn btn-primary" id="installCardBtn" style="padding:8px 14px;font-size:12px;flex-shrink:0">Instalar</button>
+    </div>`;
+  }
+
   screen.innerHTML=html;
   // Month selector handlers (apenas círculos de mês — ano muda pelo menu Calendário)
   screen.querySelectorAll('.month-circle').forEach(b=>{b.addEventListener('click',()=>{currentMonth=b.getAttribute('data-mk');renderAll()})});
@@ -2554,6 +2698,11 @@ function renderInicio(){
       renderAll();
       toast('Histórico limpo','success');
     });
+  }
+  // Botão de instalar no card da página Início
+  const installCardBtn=document.getElementById('installCardBtn');
+  if(installCardBtn){
+    installCardBtn.addEventListener('click',triggerInstall);
   }
 }
 
@@ -3410,8 +3559,8 @@ function renderItemRow(it,tipo,isPending){
   const editId = it.isProjected ? it.id.replace(/_v_\d{4}-\d{2}$/, '') : it.id;
   const delId = editId;
   // Botão "Recebido" para itens pending; "Desfazer recebimento" para itens wasPending
-  const receivedBtn = it.pending ? `<button class="item-btn" data-received="${editId}" data-tipo="${tipo}" aria-label="Marcar como recebido" title="Marcar como recebido"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><polyline points="6 14 10 18 21 3"/></svg></button>` : '';
-  const undoReceivedBtn = it._wasPending ? `<button class="item-btn" data-undo-received="${editId}" data-tipo="${tipo}" aria-label="Desfazer recebimento" title="Desfazer recebimento" style="color:var(--c-receitas)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" fill="rgba(31,68,18,0.1)"/><polyline points="6 14 10 18 21 3"/></svg></button>` : '';
+  const receivedBtn = it.pending ? `<button class="item-btn" data-received="${editId}" data-tipo="${tipo}" aria-label="Marcar como recebido" title="Marcar como recebido"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button>` : '';
+  const undoReceivedBtn = it._wasPending ? `<button class="item-btn" data-undo-received="${editId}" data-tipo="${tipo}" aria-label="Desfazer recebimento" title="Desfazer recebimento" style="color:var(--c-receitas)"><svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg></button>` : '';
   // Valor em cinza se for pending, cor normal se foi recebido
   const valClass = it.pending ? 'pending-display' : cfg.valClass;
   return `<div class="item"><div class="item-main"><div class="item-name">${escapeHtml(it.name)} ${badges.length?`<span class="item-badges">${badges.join('')}</span>`:''}</div><div class="item-meta">${meta.join('')}</div></div><div class="item-value-wrap" data-quick-edit="${editId}" data-tipo="${tipo}" role="button" tabindex="0" title="Clique para editar o valor" style="cursor:pointer"><div class="item-value ${valClass}">${fmtCurrency(it.value,it.currency||'BRL')}</div>${showSec&&it.currency!==secCode?`<div class="item-value-sub">${secSym} ${fmtShort(secVal)}</div>`:''}</div><div class="item-actions">${receivedBtn}${undoReceivedBtn}<button class="item-btn edit" data-edit="${editId}" data-tipo="${tipo}" aria-label="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="item-btn del" data-del="${delId}" data-tipo="${tipo}" aria-label="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg></button></div></div>`;
@@ -5691,10 +5840,9 @@ function doLogin(){
 }
 
 function doGoogleLogin(){
-  showAuthError('Conectando com Google...');
-  // Login social via Google — em modo demo, cria uma conta com e-mail do Google
-  // Em produção com Firebase: usar signInWithPopup(new GoogleAuthProvider())
+  // 1) Firebase (legado) — ainda suportado se USE_FIREBASE=true
   if(USE_FIREBASE&&firebaseAuth){
+    showAuthError('Conectando com Google...');
     const provider=new firebase.auth.GoogleAuthProvider();
     firebaseAuth.signInWithPopup(provider).then(result=>{
       const email=result.user.email;
@@ -5706,33 +5854,120 @@ function doGoogleLogin(){
     }).catch(err=>{
       showAuthError('Erro no login Google: '+err.message);
     });
-  }else{
-    // Modo demo: pede o e-mail do Google e cria/loga
-    const email=prompt('Login com Google\n\nDigite o e-mail da sua conta Google:');
-    if(!email||!email.includes('@')){showAuthError('');return}
-    const lowerEmail=email.trim().toLowerCase();
-    let u=users.find(x=>x.email===lowerEmail);
+    return;
+  }
+  // 2) Google Identity Services — OAuth2 com popup real (mais confiável que One Tap)
+  if(!GOOGLE_CLIENT_ID){
+    showAuthError('Login Google não configurado. Veja GOOGLE_CLIENT_ID no código.');
+    setTimeout(()=>{
+      const ok=confirm(
+        'Para habilitar o login com Google:\n\n'+
+        '1. Acesse https://console.cloud.google.com\n'+
+        '2. Crie ou selecione um projeto\n'+
+        '3. Vá em "APIs e serviços" → "Tela de consentimento OAuth" e configure\n'+
+        '4. Vá em "Credenciais" → "Criar credenciais" → "ID do cliente OAuth"\n'+
+        '   - Tipo: Aplicativo da Web\n'+
+        '   - Origens JS autorizadas: '+window.location.origin+'\n'+
+        '5. Copie o ID do cliente gerado\n'+
+        '6. No código do app, preencha GOOGLE_CLIENT_ID com esse valor\n'+
+        '7. Salve e faça deploy novamente\n\n'+
+        'Abrir o Google Cloud Console agora?'
+      );
+      if(ok)window.open('https://console.cloud.google.com/apis/credentials','_blank');
+    },100);
+    return;
+  }
+  // 3) Carregou o script GIS?
+  if(typeof google==='undefined'||!google.accounts||!google.accounts.oauth2){
+    showAuthError('Carregando Google... tente novamente em 2s');
+    setTimeout(doGoogleLogin,2000);
+    return;
+  }
+  showAuthError('Abrindo login do Google...');
+  try{
+    // Usa OAuth2 com popup real — abre janela onde o usuário escolhe conta ou digita e-mail/senha
+    const tokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:GOOGLE_CLIENT_ID,
+      scope:'https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile',
+      callback:(response)=>{
+        if(response.error){
+          showAuthError('Erro no login Google: '+(response.error_description||response.error));
+          return;
+        }
+        // Busca dados do usuário (email, nome, foto) usando o access_token
+        fetch('https://www.googleapis.com/oauth2/v3/userinfo',{
+          headers:{'Authorization':'Bearer '+response.access_token}
+        }).then(r=>r.json()).then(payload=>{
+          handleGoogleUserinfo(payload);
+        }).catch(err=>{
+          showAuthError('Erro ao buscar dados Google: '+err.message);
+        });
+      },
+      error_callback:(err)=>{
+        // popup fechado, bloqueado, ou erro de consentimento
+        if(err&&err.type==='popup_failed'){
+          showAuthError('Popup bloqueado. Permita popups para este site e tente de novo.');
+        }else{
+          showAuthError('');
+        }
+      }
+    });
+    // Abre o popup do Google (janela real) — prompt:'consent' mostra seleção de contas
+    tokenClient.requestAccessToken({prompt:'consent'});
+  }catch(err){
+    showAuthError('Erro ao abrir Google: '+err.message);
+  }
+}
+
+// Recebe os dados do Google (objeto userinfo com sub, email, name, picture)
+function handleGoogleUserinfo(payload){
+  try{
+    const email=(payload.email||'').toLowerCase().trim();
+    const name=payload.name||'';
+    const picture=payload.picture||'';
+    const googleId=payload.sub||'';
+    if(!email){showAuthError('Não foi possível obter seu e-mail do Google');return}
+    // Procura usuário existente (por email OU googleId)
+    let u=users.find(x=>x.email===email||(x.googleId&&x.googleId===googleId));
     if(!u){
       // Cria conta automaticamente
-      u={email:lowerEmail,passHash:'',planilhas:[]};
-      createPlanilhaForUser(u,'Minha planilha');
+      u={email,passHash:'',googleId,googleName:name,googlePicture:picture,planilhas:[]};
+      createPlanilhaForUser(u,name?(name.split(' ')[0]+"'s planilha"):'Minha planilha');
       users.push(u);
       persistUsers();
-      currentUserEmail=lowerEmail;
+      currentUserEmail=email;
       currentPlanilhaId=u.planilhas[0].id;
       saveSession();
       seedDemoIfEmpty();
       hideAuth();
       onAuthSuccess();
-      toast('Conta criada com Google! Bem-vindo','success');
+      toast('Conta criada com Google! Bem-vindo'+(name?', '+name.split(' ')[0]:''),'success');
     }else{
-      currentUserEmail=lowerEmail;
+      // Atualiza dados do Google no perfil (caso tenha mudado)
+      if(googleId&&!u.googleId)u.googleId=googleId;
+      if(name)u.googleName=name;
+      if(picture)u.googlePicture=picture;
+      persistUsers();
+      currentUserEmail=u.email;
       currentPlanilhaId=u.planilhas[0].id;
       saveSession();
       hideAuth();
       onAuthSuccess();
-      toast('Login com Google realizado','success');
+      toast('Login com Google realizado'+(name?', '+name.split(' ')[0]:''),'success');
     }
+  }catch(err){
+    showAuthError('Erro ao processar login Google: '+err.message);
+  }
+}
+
+// Mantido para compatibilidade — usa o novo handler
+function handleGoogleCredential(response){
+  // Decodifica o JWT (legado, não usado mais no fluxo OAuth2)
+  try{
+    const payload=JSON.parse(atob(response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    handleGoogleUserinfo(payload);
+  }catch(err){
+    showAuthError('Erro ao processar login Google: '+err.message);
   }
 }
 
@@ -5875,16 +6110,189 @@ function onAuthSuccess(){
   document.body.setAttribute('data-active-screen',currentScreen);
 }
 
+/* === AGENTE IA === */
+const agentOverlay=document.getElementById('agentOverlay');
+const agentMessages=document.getElementById('agentMessages');
+const agentInput=document.getElementById('agentInput');
+const agentSend=document.getElementById('agentSend');
+const agentClose=document.getElementById('agentClose');
+const fabAgent=document.getElementById('fabAgent');
+const fabInstall=document.getElementById('fabInstall');
+const agentStatus=document.getElementById('agentStatus');
+let agentHistory=[]; // histórico de mensagens para contexto
+
+function openAgent(){
+  agentOverlay.classList.add('open');
+  setTimeout(()=>agentInput.focus(),300);
+}
+function closeAgent(){agentOverlay.classList.remove('open')}
+
+if(fabAgent)fabAgent.addEventListener('click',openAgent);
+if(agentClose)agentClose.addEventListener('click',closeAgent);
+if(agentOverlay)agentOverlay.addEventListener('click',e=>{if(e.target===agentOverlay)closeAgent()});
+
+// Mostra o FAB de instalar quando o navegador oferece beforeinstallprompt
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;if(fabInstall)fabInstall.style.display='grid'});
+window.addEventListener('appinstalled',()=>{if(fabInstall)fabInstall.style.display='none'});
+
+// FAB de instalar
+if(fabInstall)fabInstall.addEventListener('click',triggerInstall);
+
+// Sugestões clicáveis
+document.querySelectorAll('.agent-sugg').forEach(b=>{
+  b.addEventListener('click',()=>{agentInput.value=b.textContent;sendAgentMessage()})
+});
+
+// Enter envia
+if(agentInput)agentInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendAgentMessage()}});
+if(agentSend)agentSend.addEventListener('click',sendAgentMessage);
+
+function agentAddMessage(role,text){
+  const div=document.createElement('div');
+  div.className='agent-msg '+(role==='user'?'user':'bot');
+  div.innerHTML=`<div class="agent-msg-bubble">${escapeHtml(text)}</div>`;
+  agentMessages.appendChild(div);
+  agentMessages.scrollTop=agentMessages.scrollHeight;
+}
+function agentAddTyping(){
+  const div=document.createElement('div');
+  div.className='agent-msg bot typing';
+  div.id='agentTyping';
+  div.innerHTML='<div class="agent-msg-bubble"><span></span></div>';
+  agentMessages.appendChild(div);
+  agentMessages.scrollTop=agentMessages.scrollHeight;
+}
+function agentRemoveTyping(){const t=document.getElementById('agentTyping');if(t)t.remove()}
+
+// Extrai resumo dos dados do usuário para enviar como contexto ao agente
+function buildAgentContext(){
+  const u=getUser();if(!u)return {};
+  const planilha=getPlanilha();if(!planilha)return {};
+  const state=planilha.state;
+  const settings=planilha.settings;
+  const resumo={
+    mes:currentMonth,
+    moedaSecundaria:settings.secondaryCurrency||'USD',
+    saldoAcumulado:calcAccumulatedBalance(currentMonth),
+    mesAtual:{
+      receitas:0,despesas:0,reservas:0,aReceber:0,aPagar:0
+    },
+    dividasRecorrentes:[], // itens parcelados em despesas
+    metasSubgrupos:[],
+    itensPendentes:[]
+  };
+  // Soma do mês atual (inclui pending)
+  ['receitas','despesas','reservas'].forEach(tipo=>{
+    itemsForMonth(tipo).forEach(it=>{
+      const v=convertToBRL(it.value,it.currency||'BRL');
+      if(tipo==='receitas'){resumo.mesAtual.receitas+=v;if(it.pending)resumo.mesAtual.aReceber+=v}
+      else if(tipo==='despesas'){resumo.mesAtual.despesas+=v;if(it.pending)resumo.mesAtual.aPagar+=v}
+      else resumo.mesAtual.reservas+=v;
+    });
+  });
+  // Dívidas parceladas em despesas
+  state.despesas.forEach(it=>{
+    if(it.recurring&&it.recurringDuration>0){
+      resumo.dividasRecorrentes.push({
+        nome:it.name,
+        valor:it.value,
+        moeda:it.currency||'BRL',
+        parcelaAtual:it.parcelaStart||1,
+        parcelaTotal:it.recurringDuration,
+        dataInicio:(it.date||'').slice(0,7),
+        jurosMensal:it.compoundRate||0,
+        frequencia:it.recurringFreq||'monthly'
+      });
+    }
+  });
+  // Metas de subgrupos
+  if(settings.subgroupGoals&&settings.subgroupGoals.despesas){
+    Object.entries(settings.subgroupGoals.despesas).forEach(([k,v])=>{
+      resumo.metasSubgrupos.push({subgrupo:k,meta:v.value,moeda:v.currency||'BRL'})
+    });
+  }
+  // Itens pendentes (a receber / a pagar)
+  state.receitas.filter(it=>it.pending).forEach(it=>{
+    resumo.itensPendentes.push({tipo:'a receber',nome:it.name,valor:it.value,moeda:it.currency||'BRL',data:(it.date||'').slice(0,10)})
+  });
+  state.despesas.filter(it=>it.pending).forEach(it=>{
+    resumo.itensPendentes.push({tipo:'a pagar',nome:it.name,valor:it.value,moeda:it.currency||'BRL',data:(it.date||'').slice(0,10)})
+  });
+  return resumo;
+}
+
+async function sendAgentMessage(){
+  const text=agentInput.value.trim();
+  if(!text)return;
+  agentInput.value='';
+  agentAddMessage('user',text);
+  agentHistory.push({role:'user',content:text});
+  agentAddTyping();
+  if(agentStatus)agentStatus.textContent='Pensando...';
+  agentInput.disabled=true;
+  agentSend.disabled=true;
+  try{
+    const ctx=buildAgentContext();
+    const r=await fetch('/api/agent',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({message:text,context:ctx,history:agentHistory.slice(-8)})
+    });
+    const data=await r.json();
+    agentRemoveTyping();
+    if(data.error){
+      agentAddMessage('bot','⚠️ '+data.error);
+    }else{
+      const reply=data.response||'Não entendi. Pode reformular?';
+      agentAddMessage('bot',reply);
+      agentHistory.push({role:'assistant',content:reply});
+    }
+  }catch(err){
+    agentRemoveTyping();
+    agentAddMessage('bot','Erro de conexão: '+err.message+'. Verifique sua internet e tente de novo.');
+  }
+  if(agentStatus)agentStatus.textContent='Pronto para ajudar';
+  agentInput.disabled=false;
+  agentSend.disabled=false;
+  agentInput.focus();
+}
+
 /* PWA */
 function setupPWA(){
-  const manifest={name:'NoFluxo — Controle Financeiro',short_name:'NoFluxo',description:'Seu dinheiro. No fluxo.',start_url:'.',display:'standalone',background_color:'#003A49',theme_color:'#003A49',icons:[{src:'data:image/svg+xml;base64,'+btoa('<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#003A49"/><rect x="120" y="120" width="272" height="272" rx="60" fill="#E67D00"/><text x="256" y="340" font-family="Arial" font-size="220" font-weight="bold" fill="white" text-anchor="middle">N</text></svg>'),sizes:'512x512',type:'image/svg+xml',purpose:'any maskable'}]};
+  // Ícone SVG embutido como data URI (N estilizado — duas barras laranjas + diagonal branca)
+  const iconSVG='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#003A49"/><rect x="124" y="120" width="64" height="272" rx="16" fill="#E67D00"/><rect x="324" y="120" width="64" height="272" rx="16" fill="#E67D00"/><path d="M 156 392 L 356 120" stroke="#FFFFFF" stroke-width="56" stroke-linecap="round" fill="none"/></svg>';
+  const iconURL='data:image/svg+xml;utf8,'+encodeURIComponent(iconSVG);
+  const manifest={
+    name:'NoFluxo — Controle Financeiro',
+    short_name:'NoFluxo',
+    description:'Seu dinheiro. No fluxo. Controle financeiro pessoal multi-moeda.',
+    start_url:'.',
+    scope:'.',
+    display:'standalone',
+    orientation:'portrait-primary',
+    background_color:'#003A49',
+    theme_color:'#003A49',
+    lang:'pt-BR',
+    categories:['finance','productivity'],
+    icons:[
+      {src:iconURL,sizes:'192x192',type:'image/svg+xml',purpose:'any'},
+      {src:iconURL,sizes:'512x512',type:'image/svg+xml',purpose:'any'},
+      {src:iconURL,sizes:'any',type:'image/svg+xml',purpose:'maskable'}
+    ]
+  };
   const manifestBlob=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});
   const manifestURL=URL.createObjectURL(manifestBlob);
+  // Remove manifest antigo se houver
+  const oldManifest=document.querySelector('link[rel="manifest"]');
+  if(oldManifest)oldManifest.remove();
   const link=document.createElement('link');
   link.rel='manifest';link.href=manifestURL;
   document.head.appendChild(link);
+  // apple-touch-icon (para iOS)
+  const oldApple=document.querySelector('link[rel="apple-touch-icon"]');
+  if(oldApple)oldApple.remove();
   const appleIcon=document.createElement('link');
-  appleIcon.rel='apple-touch-icon';appleIcon.href=manifest.icons[0].src;
+  appleIcon.rel='apple-touch-icon';appleIcon.href=iconURL;
   document.head.appendChild(appleIcon);
   if('serviceWorker' in navigator){
     const swCode=`const CACHE='nofluxo-v6';self.addEventListener('install',e=>{self.skipWaiting()});self.addEventListener('activate',e=>{e.waitUntil(self.clients.claim())});self.addEventListener('fetch',e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{if(resp&&resp.status===200&&e.request.url.startsWith(self.location.origin)){const respClone=resp.clone();caches.open(CACHE).then(c=>c.put(e.request,respClone))}return resp}).catch(()=>caches.match(e.request))))})`;
@@ -5892,8 +6300,8 @@ function setupPWA(){
     const swURL=URL.createObjectURL(swBlob);
     navigator.serviceWorker.register(swURL).catch(err=>console.warn('SW register fail:',err));
   }
-  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;document.getElementById('installBanner').classList.add('show')});
-  window.addEventListener('appinstalled',()=>{document.getElementById('installBanner').classList.remove('show');deferredInstallPrompt=null;toast('NoFluxo instalado!','success')});
+  window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;document.getElementById('installBanner').classList.add('show');const ic=document.getElementById('installCardBtn');if(ic)ic.textContent='Instalar agora'});
+  window.addEventListener('appinstalled',()=>{document.getElementById('installBanner').classList.remove('show');deferredInstallPrompt=null;toast('NoFluxo instalado!','success');const card=document.getElementById('installCard');if(card)card.style.display='none'});
 }
 
 document.getElementById('installBtn').addEventListener('click',triggerInstall);
