@@ -8,20 +8,28 @@ const PORT = process.env.PORT || 3000;
 const HTML_FILE = path.join(__dirname, 'nofluxo.html');
 
 // Chave do Google Gemini — criar em https://aistudio.google.com/app/apikey
-// Configure como variável de ambiente GEMINI_API_KEY no Railway
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
-// Lista de modelos para tentar (em ordem de preferência). Se um falhar com "no longer available",
-// automaticamente tenta o próximo.
-const GEMINI_MODELS = ['gemini-3.6-flash', 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash-latest'];
+// Lista de modelos Gemini (atualizada 2025). Tentados em ordem até um funcionar.
+const GEMINI_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-2.0-flash-lite',
+  'gemini-2.5-flash-lite',
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+];
 let GEMINI_MODEL_PREF = (process.env.GEMINI_MODEL || '').trim();
 
 // Chave do Groq (Llama 3.3 70B) — criar em https://console.groq.com/keys
-// GRATUITO e muito mais generoso que o Gemini (7000 req/dia vs 1500 do Gemini free)
-// Configure como variável de ambiente GROQ_API_KEY no Railway
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-const GROQ_MODELS = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768'];
+// Lista de modelos Groq (atualizada 2025). Tentados em ordem.
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'gemma2-9b-it',
+  'deepseek-r1-distill-llama-70b',
+];
 
-// Provedor preferido: 'groq' ou 'gemini'. Pode ser forçado via LLM_PROVIDER no env.
 const PREFERRED_PROVIDER = (process.env.LLM_PROVIDER || 'groq').toLowerCase().trim();
 
 const MIME_TYPES = {
@@ -101,7 +109,43 @@ function buildSystemPrompt(context) {
   return txt;
 }
 
-// Chama o Groq (API compatível com OpenAI) — não tem web search, mas é mais rápido e generoso
+// Busca lista de modelos disponíveis no Groq (para fallback dinâmico)
+async function fetchGroqModels() {
+  try {
+    const resp = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { 'Authorization': `Bearer ${GROQ_API_KEY}` }
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const models = (data.data || []).map(m => m.id).filter(id =>
+      /llama|gemma|deepseek|qwen/i.test(id) && !/whisper|guard|mixtral/i.test(id)
+    );
+    console.log('Modelos Groq disponíveis dinamicamente:', models.join(', '));
+    return models;
+  } catch (e) {
+    console.log('Não foi possível buscar lista dinâmica de modelos Groq:', e.message);
+    return [];
+  }
+}
+
+// Busca lista de modelos disponíveis no Gemini
+async function fetchGeminiModels() {
+  try {
+    const resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${GEMINI_API_KEY}`);
+    if (!resp.ok) return [];
+    const data = await resp.json();
+    const models = (data.models || [])
+      .map(m => m.name.replace('models/', ''))
+      .filter(id => /flash/i.test(id) && /generateContent/.test((m = (data.models.find(x => x.name.replace('models/','') === id) || {})).supportedGenerationMethods?.join(',') || ''));
+    console.log('Modelos Gemini disponíveis dinamicamente:', models.join(', '));
+    return models;
+  } catch (e) {
+    console.log('Não foi possível buscar lista dinâmica de modelos Gemini:', e.message);
+    return [];
+  }
+}
+
+// Chama o Groq — tenta a lista estática e, se todos falharem, busca dinamicamente
 async function callGroq(userMessage, context, history) {
   if (!GROQ_API_KEY) return { error: 'GROQ_API_KEY não configurada' };
   const systemPrompt = buildSystemPrompt(context);
@@ -113,70 +157,67 @@ async function callGroq(userMessage, context, history) {
   }
   messages.push({ role: 'user', content: userMessage });
 
-  let lastError = '';
-  for (const model of GROQ_MODELS) {
-    const url = 'https://api.groq.com/openai/v1/chat/completions';
-    try {
-      const resp = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${GROQ_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: messages,
-          temperature: 0.7,
-          max_tokens: 1500,
-        })
-      });
-      if (resp.status === 404 || resp.status === 400) {
-        const e = await resp.text();
-        let msg = e;
-        try { const j = JSON.parse(e); msg = j.error?.message || e; } catch (_) {}
-        console.log(`Groq modelo ${model} falhou (HTTP ${resp.status}): ${msg}`);
-        lastError = `${model}: ${msg}`;
-        continue;
-      }
-      if (resp.status === 401) {
-        const e = await resp.text();
-        let msg = e;
-        try { const j = JSON.parse(e); msg = j.error?.message || e; } catch (_) {}
-        return { error: `Groq API key inválida (401): ${msg}` };
-      }
-      if (resp.status === 429) {
-        const e = await resp.text();
-        let msg = e;
-        try { const j = JSON.parse(e); msg = j.error?.message || e; } catch (_) {}
-        console.log(`Groq modelo ${model} rate-limit: ${msg}`);
-        lastError = `${model} rate-limit: ${msg}`;
-        continue;
-      }
-      if (!resp.ok) {
-        const errText = await resp.text();
-        let errMsg = `Groq API erro ${resp.status}`;
-        try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
-        if (/quota|exceeded|limit|insufficient/i.test(errMsg)) {
-          return { error: `Groq quota excedida: ${errMsg}` };
+  // Primeiro tenta a lista estática, depois busca dinâmica
+  const allErrors = [];
+  for (const pass of [1, 2]) {
+    let modelsToTry;
+    if (pass === 1) {
+      modelsToTry = GROQ_MODELS;
+    } else {
+      // Passada 2: busca dinâmica
+      const dynamic = await fetchGroqModels();
+      // Remove duplicatas dos que já tentamos
+      modelsToTry = dynamic.filter(m => !GROQ_MODELS.includes(m));
+      if (!modelsToTry.length) break;
+    }
+    for (const model of modelsToTry) {
+      const url = 'https://api.groq.com/openai/v1/chat/completions';
+      try {
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${GROQ_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messages,
+            temperature: 0.7,
+            max_tokens: 1500,
+          })
+        });
+        if (resp.status === 401) {
+          const e = await resp.text();
+          let msg = e;
+          try { const j = JSON.parse(e); msg = j.error?.message || e; } catch (_) {}
+          return { error: `Groq API key inválida (401): ${msg}` };
         }
-        lastError = `${model}: ${errMsg}`;
+        if (!resp.ok) {
+          const errText = await resp.text();
+          let errMsg = `HTTP ${resp.status}`;
+          try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
+          allErrors.push(`${model}: ${errMsg}`);
+          if (resp.status === 429) {
+            // Rate limit no Groq — para tudo e retorna erro (não adianta tentar outro modelo)
+            return { error: `Groq rate-limitado (429). Aguarde 1 minuto. Detalhes: ${errMsg}` };
+          }
+          continue;
+        }
+        const data = await resp.json();
+        const text = data.choices?.[0]?.message?.content || '';
+        if (!text) { allErrors.push(`${model}: resposta vazia`); continue; }
+        console.log(`Agente respondeu usando Groq ${model}`);
+        return { response: text };
+      } catch (err) {
+        allErrors.push(`${model}: ${err.message}`);
         continue;
       }
-      const data = await resp.json();
-      const text = data.choices?.[0]?.message?.content || '';
-      if (!text) { lastError = `${model}: resposta vazia`; continue; }
-      console.log(`Agente respondeu usando Groq ${model}`);
-      return { response: text };
-    } catch (err) {
-      console.log(`Erro ao chamar Groq ${model}: ${err.message}`);
-      lastError = `${model}: ${err.message}`;
-      continue;
     }
   }
-  return { error: `Todos os modelos Groq falharam. Último erro: ${lastError}` };
+  return { error: `Todos os modelos Groq falharam:\n${allErrors.join('\n')}` };
 }
 
-// Chama o Gemini (tem web search nativo) — fallback do Groq
+// Chama o Gemini — tenta a lista estática e, se todos falharem, busca dinâmica
 async function callGemini(userMessage, context, history) {
   if (!GEMINI_API_KEY) return { error: 'GEMINI_API_KEY não configurada' };
   const systemPrompt = buildSystemPrompt(context);
@@ -193,67 +234,55 @@ async function callGemini(userMessage, context, history) {
     tools: [{ google_search: {} }],
     generationConfig: { temperature: 0.7, maxOutputTokens: 1500 }
   };
-  const modelsToTry = GEMINI_MODEL_PREF ? [GEMINI_MODEL_PREF, ...GEMINI_MODELS.filter(m => m !== GEMINI_MODEL_PREF)] : GEMINI_MODELS;
-  let lastError = '';
-  for (const model of modelsToTry) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-    try {
-      const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (resp.status === 404 || resp.status === 400) {
-        const errText = await resp.text();
-        let msg = errText;
-        try { const j = JSON.parse(errText); msg = j.error?.message || errText; } catch (_) {}
-        console.log(`Gemini modelo ${model} falhou (HTTP ${resp.status}): ${msg}`);
-        lastError = `${model}: ${msg}`;
-        continue;
-      }
-      if (resp.status === 403 || resp.status === 401) {
-        // API key inválida OU API não habilitada no projeto
-        const errText = await resp.text();
-        let msg = errText;
-        try { const j = JSON.parse(errText); msg = j.error?.message || errText; } catch (_) {}
-        return { error: `Gemini API key inválida ou API não habilitada (${resp.status}): ${msg}. Verifique em https://console.cloud.google.com/apis/library generativelanguage.googleapis.com está habilitado.` };
-      }
-      if (resp.status === 429) {
-        const errText = await resp.text();
-        let msg = errText;
-        try { const j = JSON.parse(errText); msg = j.error?.message || errText; } catch (_) {}
-        console.log(`Gemini ${model} rate-limit: ${msg}`);
-        lastError = `${model} rate-limit: ${msg}`;
-        continue;
-      }
-      if (!resp.ok) {
-        const errText = await resp.text();
-        let errMsg = `Gemini API erro ${resp.status}`;
-        try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
-        if (/no longer available|not found|not supported|deprecated/i.test(errMsg)) {
-          lastError = `${model}: ${errMsg}`;
+  const modelsToTryStatic = GEMINI_MODEL_PREF ? [GEMINI_MODEL_PREF, ...GEMINI_MODELS.filter(m => m !== GEMINI_MODEL_PREF)] : GEMINI_MODELS;
+  const allErrors = [];
+  for (const pass of [1, 2]) {
+    let modelsToTry;
+    if (pass === 1) {
+      modelsToTry = modelsToTryStatic;
+    } else {
+      const dynamic = await fetchGeminiModels();
+      modelsToTry = dynamic.filter(m => !modelsToTryStatic.includes(m));
+      if (!modelsToTry.length) break;
+    }
+    for (const model of modelsToTry) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+      try {
+        const resp = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+        if (resp.status === 401 || resp.status === 403) {
+          const errText = await resp.text();
+          let msg = errText;
+          try { const j = JSON.parse(errText); msg = j.error?.message || errText; } catch (_) {}
+          return { error: `Gemini API key inválida ou API não habilitada (HTTP ${resp.status}): ${msg}. Verifique se a API "Generative Language API" está habilitada em https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com` };
+        }
+        if (!resp.ok) {
+          const errText = await resp.text();
+          let errMsg = `HTTP ${resp.status}`;
+          try { const j = JSON.parse(errText); errMsg = j.error?.message || errMsg; } catch (_) {}
+          allErrors.push(`${model}: ${errMsg}`);
+          if (resp.status === 429) {
+            return { error: `Gemini rate-limitado (429): ${errMsg}` };
+          }
           continue;
         }
-        if (/quota|exceeded|limit/i.test(errMsg)) {
-          return { error: `Gemini quota excedida: ${errMsg}` };
+        const data = await resp.json();
+        const candidates = data.candidates || [];
+        if (!candidates.length) { allErrors.push(`${model}: sem candidatos`); continue; }
+        const parts = candidates[0].content?.parts || [];
+        let text = parts.filter(p => p.text).map(p => p.text).join('\n');
+        const grounding = candidates[0].groundingMetadata;
+        if (grounding && grounding.webSearchQueries && grounding.webSearchQueries.length) {
+          text += '\n\n_(resposta com base em busca web em tempo real)_';
         }
-        lastError = `${model}: ${errMsg}`;
+        console.log(`Agente respondeu usando Gemini ${model}`);
+        return { response: text || 'Não consegui gerar uma resposta. Tente reformular.' };
+      } catch (err) {
+        allErrors.push(`${model}: ${err.message}`);
         continue;
       }
-      const data = await resp.json();
-      const candidates = data.candidates || [];
-      if (!candidates.length) { lastError = `${model}: sem candidatos`; continue; }
-      const parts = candidates[0].content?.parts || [];
-      let text = parts.filter(p => p.text).map(p => p.text).join('\n');
-      const grounding = candidates[0].groundingMetadata;
-      if (grounding && grounding.webSearchQueries && grounding.webSearchQueries.length) {
-        text += '\n\n_(resposta com base em busca web em tempo real)_';
-      }
-      console.log(`Agente respondeu usando Gemini ${model}`);
-      return { response: text || 'Não consegui gerar uma resposta. Tente reformular.' };
-    } catch (err) {
-      console.log(`Erro ao chamar Gemini ${model}: ${err.message}`);
-      lastError = `${model}: ${err.message}`;
-      continue;
     }
   }
-  return { error: `Todos os modelos Gemini falharam. Último erro: ${lastError}` };
+  return { error: `Todos os modelos Gemini falharam:\n${allErrors.join('\n')}` };
 }
 
 // Dispatcher principal — tenta provedores em ordem de preferência, COLETANDO TODOS OS ERROS
