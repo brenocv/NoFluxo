@@ -27,10 +27,27 @@ Acesse: http://localhost:3000
 
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
-| `GEMINI_API_KEY` | Sim (para o agente IA) | Chave do Google Gemini AI Studio |
-| `GOOGLE_CLIENT_ID` | Não (já no código) | Já configurado no nofluxo.html |
+| `GROQ_API_KEY` | **Recomendada** (gratuita, mais generosa) | Chave do Groq (Llama 3.3 70B) — 7000 req/dia grátis |
+| `GEMINI_API_KEY` | Opcional (gratuita, menos generosa) | Chave do Google Gemini — 1500 req/dia grátis, com web search |
+| `LLM_PROVIDER` | Opcional | `groq` (padrão) ou `gemini` — qual usar primeiro |
 
-### Como obter a `GEMINI_API_KEY` (gratuito, ~15 req/min grátis)
+> **Dica**: configure as duas! Se uma cair por rate limit, a outra assume automaticamente.
+
+### Como obter a `GROQ_API_KEY` (recomendado, mais gratuito)
+
+1. Acesse https://console.groq.com/keys
+2. Faça login com **GitHub** ou **Google** (1 clique)
+3. Clique em **Create API Key** → dê um nome (ex: "nofluxo")
+4. Copie a chave (formato: `gsk_...`)
+5. No Railway: Settings → Variables → Add → Name: `GROQ_API_KEY`, Value: cole a chave
+6. Salve → Railway redeployar automaticamente
+
+**Limites gratuitos do Groq:**
+- Llama 3.3 70B: 1000 req/dia, 30 req/min
+- Llama 3.1 8B: 7000 req/dia, 30 req/min
+- Mixtral 8x7B: 2000 req/dia
+
+### Como obter a `GEMINI_API_KEY` (opcional, com web search)
 
 1. Acesse https://aistudio.google.com/app/apikey
 2. Faça login com sua conta Google (pode ser a mesma do deploy)
@@ -38,10 +55,14 @@ Acesse: http://localhost:3000
 4. Selecione um projeto (pode ser o mesmo do login Google)
 5. Copie a chave (formato: `AIzaSy...`)
 6. No Railway: Settings → Variables → Add → Name: `GEMINI_API_KEY`, Value: cole a chave
-7. Salve → o Railway vai redeployar automaticamente
+7. Salve → Railway vai redeployar automaticamente
 
-Sem essa chave, o agente IA mostra uma mensagem explicando como configurar.
-O resto do app (login, finanças, importação, etc.) funciona sem a chave.
+**Limites gratuitos do Gemini** (mais baixos, mas tem web search):
+- gemini-3.6-flash: 1500 req/dia, 15 req/min
+- Tem busca na web nativa (responde perguntas sobre taxas atuais, notícias, etc.)
+
+Sem nenhuma chave, o agente mostra uma mensagem explicando como configurar.
+O resto do app (login, finanças, importação, etc.) funciona sem chaves.
 
 ## Estrutura do projeto
 
@@ -78,10 +99,14 @@ Botão flutuante no canto inferior direito (azul) abre um chat com o assistente.
 
 - Calcula em que mês suas dívidas parceladas terminam
 - Mostra saldo, metas, valores pendentes
-- Busca informações na web em tempo real (taxas, conceitos financeiros)
+- Busca informações na web em tempo real (taxas, conceitos financeiros) — apenas com Gemini
 - Sugere ajustes no seu orçamento
 
-Usa o **Google Gemini 2.0 Flash** com web search habilitado. Tier gratuito: ~15 requisições/minuto.
+Usa **dois provedores** com fallback automático:
+1. **Groq** (Llama 3.3 70B) — mais rápido, 1000 req/dia grátis, login com GitHub/Google
+2. **Google Gemini 2.0/3.6 Flash** — com web search nativo, 1500 req/dia grátis
+
+Se um cair por rate limit, automaticamente tenta o outro. Configure as duas chaves para ter máxima disponibilidade.
 
 ## Backup dos dados
 
