@@ -1,8 +1,43 @@
-// NoFluxo — servidor Node.js simples para servir o app + API do agente IA
-// Usa apenas módulos nativos do Node (sem dependências externas)
+// NoFluxo — servidor Node.js com PostgreSQL + IA Gemini/Groq
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+
+// === PostgreSQL ===
+// Variável de ambiente DATABASE_URL no Railway: postgres://user:pass@host:port/dbname
+let pg = null;
+let pgPool = null;
+try {
+  pg = require('pg');
+} catch (e) {
+  console.log('pg module not installed — sync entre dispositivos desativado');
+}
+
+const DATABASE_URL = process.env.DATABASE_URL || '';
+const SYNC_ENABLED = !!(pg && DATABASE_URL);
+
+if (SYNC_ENABLED) {
+  pgPool = new pg.Pool({
+    connectionString: DATABASE_URL,
+    ssl: process.env.PGSSL === 'false' ? false : { rejectUnauthorized: false },
+    max: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000,
+  });
+  // Inicializa a tabela de usuários
+  pgPool.query(`
+    CREATE TABLE IF NOT EXISTS nofluxo_users (
+      email VARCHAR(255) PRIMARY KEY,
+      google_id VARCHAR(255) UNIQUE,
+      google_name VARCHAR(255),
+      google_picture TEXT,
+      data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      client_updated_at BIGINT NOT NULL DEFAULT 0,
+      server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).then(() => console.log('✓ Tabela nofluxo_users pronta'))
+    .catch(e => console.error('Erro ao criar tabela:', e.message));
+}
 
 const PORT = process.env.PORT || 3000;
 const HTML_FILE = path.join(__dirname, 'nofluxo.html');
@@ -364,6 +399,93 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // === API de sincronização (Postgres) — POST sobe, GET baixa ===
+  if (urlPath === '/api/sync' && req.method === 'POST') {
+    if (!SYNC_ENABLED) {
+      return sendJSON(res, 503, { error: 'Sync não configurado. Defina DATABASE_URL no Railway.' });
+    }
+    try {
+      const body = await readBody(req);
+      const { email, googleId, googleName, googlePicture, data, clientUpdatedAt } = body;
+      if (!email || typeof email !== 'string') {
+        return sendJSON(res, 400, { error: 'Email é obrigatório' });
+      }
+      const clientTs = Number(clientUpdatedAt) || Date.now();
+      // Busca versão atual do servidor
+      const sel = await pgPool.query('SELECT data, client_updated_at FROM nofluxo_users WHERE email=$1', [email]);
+      const serverRow = sel.rows[0];
+      const serverClientTs = serverRow ? Number(serverRow.client_updated_at) : 0;
+
+      let mergedData = data;
+      let shouldReturnServer = false;
+
+      if (serverRow && serverClientTs > clientTs) {
+        // Servidor tem versão mais recente — retorna ela, não sobrescreve
+        mergedData = serverRow.data;
+        shouldReturnServer = true;
+      } else {
+        // Cliente tem versão mais recente (ou é novo) — sobrescreve servidor
+        // Tira o passHash do objeto data por segurança (não sincroniza senhas locais)
+        let dataToStore = data;
+        if (dataToStore && typeof dataToStore === 'object' && 'passHash' in dataToStore) {
+          dataToStore = { ...dataToStore, passHash: undefined };
+        }
+        // UPSERT
+        await pgPool.query(`
+          INSERT INTO nofluxo_users (email, google_id, google_name, google_picture, data, client_updated_at, server_updated_at)
+          VALUES ($1, $2, $3, $4, $5, $6, NOW())
+          ON CONFLICT (email) DO UPDATE SET
+            google_id = COALESCE(EXCLUDED.google_id, nofluxo_users.google_id),
+            google_name = COALESCE(EXCLUDED.google_name, nofluxo_users.google_name),
+            google_picture = COALESCE(EXCLUDED.google_picture, nofluxo_users.google_picture),
+            data = EXCLUDED.data,
+            client_updated_at = EXCLUDED.client_updated_at,
+            server_updated_at = NOW()
+        `, [email.toLowerCase(), googleId || null, googleName || null, googlePicture || null, JSON.stringify(dataToStore || {}), clientTs]);
+      }
+
+      return sendJSON(res, 200, {
+        ok: true,
+        serverHasNewer: shouldReturnServer,
+        data: mergedData,
+        serverUpdatedAt: serverRow ? serverRow.server_updated_at : new Date().toISOString(),
+      });
+    } catch (err) {
+      console.error('Sync POST error:', err);
+      return sendJSON(res, 500, { error: 'Erro no sync: ' + err.message });
+    }
+  }
+
+  if (urlPath === '/api/sync' && req.method === 'GET') {
+    if (!SYNC_ENABLED) {
+      return sendJSON(res, 503, { error: 'Sync não configurado' });
+    }
+    try {
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email) {
+        return sendJSON(res, 400, { error: 'Email é obrigatório (query param email)' });
+      }
+      const sel = await pgPool.query('SELECT data, client_updated_at, server_updated_at, google_name, google_picture FROM nofluxo_users WHERE email=$1', [email]);
+      if (!sel.rows.length) {
+        return sendJSON(res, 200, { ok: true, exists: false, data: null });
+      }
+      const row = sel.rows[0];
+      return sendJSON(res, 200, {
+        ok: true,
+        exists: true,
+        data: row.data,
+        clientUpdatedAt: Number(row.client_updated_at),
+        serverUpdatedAt: row.server_updated_at,
+        googleName: row.google_name,
+        googlePicture: row.google_picture,
+      });
+    } catch (err) {
+      console.error('Sync GET error:', err);
+      return sendJSON(res, 500, { error: 'Erro no sync: ' + err.message });
+    }
+  }
+
   // === Health check ===
   if (urlPath === '/health' || urlPath === '/ping') {
     return sendJSON(res, 200, {
@@ -371,7 +493,9 @@ const server = http.createServer(async (req, res) => {
       timestamp: new Date().toISOString(),
       groq: GROQ_API_KEY ? 'configurado' : 'não configurado',
       gemini: GEMINI_API_KEY ? 'configurado' : 'não configurado',
-      provedor_preferido: PREFERRED_PROVIDER
+      provedor_preferido: PREFERRED_PROVIDER,
+      postgres: SYNC_ENABLED ? 'configurado' : 'não configurado (defina DATABASE_URL)',
+      sync_ativo: SYNC_ENABLED
     });
   }
 
@@ -421,4 +545,5 @@ server.listen(PORT, () => {
   console.log(`  Provedor preferido: ${PREFERRED_PROVIDER}`);
   if (GROQ_API_KEY) console.log(`  Modelos Groq que serão tentados: ${GROQ_MODELS.join(', ')}`);
   if (GEMINI_API_KEY) console.log(`  Modelos Gemini que serão tentados: ${GEMINI_MODELS.join(', ')}`);
+  console.log(`Sync PostgreSQL: ${SYNC_ENABLED ? '✓ ativo (DATABASE_URL configurado)' : '✗ inativo (defina DATABASE_URL no Railway)'}`);
 });

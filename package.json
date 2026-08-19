@@ -1,19 +1,24 @@
 {
   "name": "nofluxo",
-  "version": "1.0.0",
-  "description": "NoFluxo — Controle financeiro pessoal multi-usuário",
+  "version": "1.1.0",
+  "description": "NoFluxo — Controle financeiro pessoal multi-usuário com sync PostgreSQL",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "postinstall": "node -e \"try{require('pg')}catch(e){console.log('pg not installed yet, ok for first deploy')}\""
   },
   "engines": {
     "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
   },
   "keywords": [
     "financas",
     "orcamento",
     "controle-financeiro",
-    "pwa"
+    "pwa",
+    "postgres"
   ],
   "author": "",
   "license": "MIT"

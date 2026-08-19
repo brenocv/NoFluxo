@@ -27,11 +27,34 @@ Acesse: http://localhost:3000
 
 | Variável | Obrigatória | Descrição |
 |----------|-------------|-----------|
-| `GROQ_API_KEY` | **Recomendada** (gratuita, mais generosa) | Chave do Groq (Llama 3.3 70B) — 7000 req/dia grátis |
-| `GEMINI_API_KEY` | Opcional (gratuita, menos generosa) | Chave do Google Gemini — 1500 req/dia grátis, com web search |
+| `DATABASE_URL` | **Recomendada** (sync entre dispositivos) | String de conexão do PostgreSQL |
+| `GROQ_API_KEY` | Recomendada (IA gratuita) | Chave do Groq — 7000 req/dia grátis |
+| `GEMINI_API_KEY` | Opcional (IA com web search) | Chave do Google Gemini — 1500 req/dia grátis |
 | `LLM_PROVIDER` | Opcional | `groq` (padrão) ou `gemini` — qual usar primeiro |
+| `PGSSL` | Opcional | `false` se o Postgres não exigir SSL |
 
-> **Dica**: configure as duas! Se uma cair por rate limit, a outra assume automaticamente.
+### Como configurar o `DATABASE_URL` (PostgreSQL no Railway)
+
+Você já tem o PostgreSQL no Railway (Postgres 14.24). Para obter a string de conexão:
+
+1. No Railway, abra seu serviço PostgreSQL
+2. Vá em **Connect** (ou Settings → Networking)
+3. Copie a **"Postgres Connection URL"** (formato: `postgresql://postgres:SENHA@HOST.railway.app:PORT/railway`)
+4. No serviço do NoFluxo: Settings → Variables → Add
+5. Name: `DATABASE_URL`, Value: cole a string
+6. Salve → Railway vai redeployar
+
+Na primeira execução, o servidor cria automaticamente a tabela `nofluxo_users` no PostgreSQL.
+
+### Como funciona o sync entre dispositivos
+
+1. **Login** (e-mail/senha ou Google) → app puxa a versão mais recente do servidor
+2. **Edição** → debounce de 2s + salva no localStorage + envia ao servidor (POST `/api/sync`)
+3. **Muda de aba e volta** → app puxa versão mais recente do servidor (pull)
+4. **A cada 60s** → sync periódico silencioso
+5. **Fecha a aba** → `navigator.sendBeacon` envia dados pendentes antes de fechar
+
+**Resolução de conflitos** (last-write-wins): cada edição recebe um timestamp (`_updatedAt`). Se o servidor tem versão mais recente, o cliente recebe ela. Se o cliente tem versão mais recente, sobe ao servidor. Senhas (`passHash`) **não são sincronizadas** — ficam só no localStorage do navegador.
 
 ### Como obter a `GROQ_API_KEY` (recomendado, mais gratuito)
 
@@ -81,7 +104,7 @@ nofluxo/
 ## Características
 
 - **Single-file HTML** — todo o app em um único arquivo `nofluxo.html`
-- **localStorage** — dados persistem no navegador do usuário
+- **localStorage + PostgreSQL sync** — dados persistem no navegador E sincronizam entre dispositivos
 - **Multi-usuário** — login com e-mail/senha OU login com Google (OAuth2)
 - **Multi-planilha** — cada usuário pode ter várias planilhas independentes
 - **Importação** — extrato bancário (CSV/OFX), fatura de cartão (Nubank, etc.), planilhas (Excel/Google Sheets)
@@ -89,7 +112,7 @@ nofluxo/
 - **Moedas** — suporte a múltiplas moedas com conversão (bandeiras via flagcdn.com)
 - **Metas** — defina metas mensais por subgrupo OU por item individual, com barra de progresso
 - **Valores a receber** — itens pendentes aparecem em todos os meses até serem recebidos
-- **Agente IA** — assistente com Gemini (calcula prazos de dívida, responde perguntas, busca na web)
+- **Agente IA** — assistente com Gemini/Groq (calcula prazos de dívida, responde perguntas, busca na web)
 - **PWA** — instalável no PC e celular, com ícone próprio
 - **Undo/Redo** — histórico completo de ações
 

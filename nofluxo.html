@@ -2063,7 +2063,157 @@ function patchState(m){
   m(p.state);
   persistUsers();
 }
-function persistUsers(){try{localStorage.setItem(USERS_KEY,JSON.stringify(users))}catch(e){}}
+function persistUsers(){try{localStorage.setItem(USERS_KEY,JSON.stringify(users));markUserDirty(currentUserEmail)}catch(e){}}
+
+// ===== Sync com PostgreSQL (Railway) =====
+// Cada usuário tem um timestamp local (updatedAt) no seu objeto.
+// Sempre que persistUsers é chamado, marcamos o usuário como "dirty" (precisa sync).
+// syncWithServer faz debounce (não faz fetch a cada clique) e envia para o servidor.
+let _syncTimer=null;
+const SYNC_DEBOUNCE_MS=2000; // 2 segundos após última mudança
+const SYNC_INTERVAL_MS=60000; // sync periódico a cada 60s
+let _lastSyncAt={}; // por email: timestamp do último sync bem-sucedido
+let _isSyncing=false;
+
+function markUserDirty(email){
+  if(!email)return;
+  const u=users.find(x=>x.email===email);
+  if(u)u._updatedAt=Date.now();
+  // Debounce: agenda sync daqui 2s se não houver mais mudanças
+  if(_syncTimer)clearTimeout(_syncTimer);
+  _syncTimer=setTimeout(()=>syncWithServer({silent:true}),SYNC_DEBOUNCE_MS);
+}
+
+async function syncWithServer({silent=false,force=false}={}){
+  if(_isSyncing)return;
+  if(!currentUserEmail){return}
+  const u=getUser();if(!u)return;
+  _isSyncing=true;
+  const clientTs=u._updatedAt||0;
+  // Evita sync redundante se nada mudou desde último sync
+  const last=_lastSyncAt[currentUserEmail]||0;
+  if(!force && clientTs<=last){
+    _isSyncing=false;
+    return;
+  }
+  try{
+    // Envia dados do cliente (sem syncronizar senhas locais - o servidor tira passHash)
+    const payload={
+      email:currentUserEmail,
+      googleId:u.googleId||null,
+      googleName:u.googleName||null,
+      googlePicture:u.googlePicture||null,
+      data:u, // o objeto usuário inteiro (planilhas, settings, etc)
+      clientUpdatedAt:clientTs
+    };
+    const r=await fetch('/api/sync',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(!r.ok){
+      const err=await r.json().catch(()=>({}));
+      if(!silent)toast('Erro no sync: '+(err.error||r.status),'error');
+      _isSyncing=false;
+      return;
+    }
+    const data=await r.json();
+    if(data.serverHasNewer && data.data){
+      // Servidor tem versão mais recente — atualiza localStorage
+      const serverUser=data.data;
+      // Preserva passHash local (não syncronizado por segurança)
+      serverUser.passHash=u.passHash;
+      const idx=users.findIndex(x=>x.email===currentUserEmail);
+      if(idx>=0){
+        users[idx]={...users[idx],...serverUser};
+        // Mantém passHash local
+        if(u.passHash)users[idx].passHash=u.passHash;
+      }
+      localStorage.setItem(USERS_KEY,JSON.stringify(users));
+      _lastSyncAt[currentUserEmail]=Number(serverUser._updatedAt)||clientTs;
+      if(!silent)toast('Dados sincronizados do servidor','success');
+      // Re-renderiza com os novos dados
+      if(typeof renderAll==='function')renderAll();
+    }else{
+      _lastSyncAt[currentUserEmail]=clientTs;
+      if(!silent)toast('Dados salvos no servidor','success');
+    }
+  }catch(err){
+    if(!silent)toast('Erro de conexão no sync: '+err.message,'error');
+  }
+  _isSyncing=false;
+}
+
+// Puxa dados do servidor (usado após login, antes de renderizar a tela)
+async function pullFromServer(email){
+  if(!email)return null;
+  try{
+    const r=await fetch('/api/sync?email='+encodeURIComponent(email),{method:'GET'});
+    if(!r.ok)return null;
+    const data=await r.json();
+    if(data.ok && data.exists && data.data){
+      return data.data; // objeto usuário do servidor
+    }
+    return null;
+  }catch(e){
+    console.warn('pullFromServer error:',e);
+    return null;
+  }
+}
+
+// Aplica dados puxados do servidor, se mais recentes que local
+async function applyServerDataIfNewer(email){
+  const serverUser=await pullFromServer(email);
+  if(!serverUser)return false;
+  const localIdx=users.findIndex(u=>u.email===email);
+  const localUser=localIdx>=0?users[localIdx]:null;
+  const localTs=localUser?(localUser._updatedAt||0):0;
+  const serverTs=Number(serverUser._updatedAt)||0;
+  if(serverTs<=localTs && localUser){
+    // Local é mais recente ou igual — não faz nada, sync vai enviar local
+    return false;
+  }
+  // Servidor é mais recente — aplica
+  if(localIdx>=0){
+    // Preserva passHash local (servidor não tem)
+    serverUser.passHash=localUser.passHash;
+    users[localIdx]=serverUser;
+  }else{
+    users.push(serverUser);
+  }
+  localStorage.setItem(USERS_KEY,JSON.stringify(users));
+  _lastSyncAt[email]=serverTs;
+  return true;
+}
+
+// Sincroniza ao voltar para a aba / quando a página volta a ter foco
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible' && currentUserEmail){
+    // Faz pull primeiro, depois push se necessário
+    applyServerDataIfNewer(currentUserEmail).then(changed=>{
+      if(changed)renderAll();
+      else syncWithServer({silent:true});
+    });
+  }
+});
+// Sync periódico enquanto logado
+setInterval(()=>{
+  if(currentUserEmail && document.visibilityState==='visible'){
+    syncWithServer({silent:true});
+  }
+},SYNC_INTERVAL_MS);
+// Push final antes de fechar a página
+window.addEventListener('beforeunload',()=>{
+  if(currentUserEmail){
+    // Usa sendBeacon para garantir envio mesmo com página fechando
+    const u=getUser();
+    if(u){
+      const payload={email:currentUserEmail,googleId:u.googleId||null,googleName:u.googleName||null,googlePicture:u.googlePicture||null,data:u,clientUpdatedAt:u._updatedAt||Date.now()};
+      const blob=new Blob([JSON.stringify(payload)],{type:'application/json'});
+      navigator.sendBeacon('/api/sync',blob);
+    }
+  }
+});
 function loadUsers(){try{users=JSON.parse(localStorage.getItem(USERS_KEY)||'[]')}catch(e){users=[]}}
 function loadSession(){try{const s=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');if(s&&s.email&&users.find(u=>u.email===s.email)){currentUserEmail=s.email;const u=getUser();if(u&&u.planilhas.length>0){currentPlanilhaId=s.planilhaId&&u.planilhas.find(p=>p.id===s.planilhaId)?s.planilhaId:u.planilhas[0].id}return true}}catch(e){}return false}
 function saveSession(){try{localStorage.setItem(SESSION_KEY,JSON.stringify({email:currentUserEmail,planilhaId:currentPlanilhaId}))}catch(e){}}
@@ -6106,6 +6256,21 @@ function onAuthSuccess(){
   renderAll();
   // Garante que o data-active-screen está setado
   document.body.setAttribute('data-active-screen',currentScreen);
+  // === SYNC pós-login ===
+  // 1) Pull: se servidor tem versão mais recente, atualiza local
+  applyServerDataIfNewer(currentUserEmail).then(changed=>{
+    if(changed){
+      // Reaplica tema/currency após sincronizar (settings podem ter mudado)
+      applyTheme();
+      fillCurrencySelect();
+      showPendingToggle=getSettings().showPendingInBalance;
+      syncPrivacyIcon();
+      renderAll();
+      toast('Dados sincronizados do servidor','success');
+    }
+    // 2) Push: envia dados locais para o servidor (se mais recentes)
+    syncWithServer({silent:!changed});
+  });
 }
 
 /* === AGENTE IA === */
