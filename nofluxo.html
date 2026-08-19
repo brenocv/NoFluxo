@@ -116,6 +116,22 @@ svg{display:block}
 .icon-btn{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;color:#fff;transition:background .18s;flex-shrink:0}
 .icon-btn:active{background:rgba(255,255,255,0.18)}
 .icon-btn svg{width:19px;height:19px}
+
+/* === Badge de status do sync === */
+.sync-badge{width:30px;height:30px;border-radius:50%;border:none;display:grid;place-items:center;background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;position:relative;flex-shrink:0;transition:background .2s}
+.sync-badge:hover{background:rgba(255,255,255,0.16)}
+.sync-badge:active{transform:scale(0.94)}
+.sync-badge svg{width:16px;height:16px}
+.sync-badge .sync-icon-ok{color:#4ADE80}
+.sync-badge .sync-icon-pending{color:#ff9d3d;animation:spinPending 2s linear infinite}
+.sync-badge .sync-icon-syncing{color:#60A5FA;animation:spinSync .9s linear infinite}
+.sync-badge .sync-icon-error{color:#FF5C7A}
+.sync-badge.has-error{background:rgba(255,92,122,0.18)}
+.sync-badge.is-syncing{background:rgba(96,165,250,0.18)}
+.sync-badge.is-pending{background:rgba(230,125,0,0.16)}
+.sync-badge.is-ok{background:rgba(74,222,128,0.14)}
+@keyframes spinSync{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+@keyframes spinPending{0%,100%{transform:rotate(0deg);opacity:1}50%{transform:rotate(180deg);opacity:0.6}}
 .month-selector{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.14);color:#fff;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:600;transition:background .2s;flex-shrink:0}
 .month-selector:active{background:rgba(255,255,255,0.24)}
 .month-selector svg{width:11px;height:11px}
@@ -1292,6 +1308,12 @@ html[data-theme="dark"] .hero-mini-despesas{
     <button class="icon-btn" id="redoBtn" aria-label="Refazer" style="opacity:0.4">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
+    <button class="sync-badge" id="syncBadge" aria-label="Status do sync" title="Status do sync" style="display:none">
+      <svg class="sync-icon-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <svg class="sync-icon-pending" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 4 21 10 15 10"/></svg>
+      <svg class="sync-icon-syncing" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>
+      <svg class="sync-icon-error" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </button>
     <button class="icon-btn" id="menuBtn" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
     </button>
@@ -1313,6 +1335,7 @@ html[data-theme="dark"] .hero-mini-despesas{
   <div class="menu-section-label">Configurações</div>
   <button class="menu-item" data-action="currencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Moedas e taxas</button>
   <button class="menu-item" data-action="toggle-theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span id="themeLabel">Modo escuro</span></button>
+  <button class="menu-item" data-action="sync-now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 4 21 10 15 10"/></svg>Sincronizar agora</button>
   <button class="menu-item" data-action="install-pwa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Instalar no PC/celular</button>
   <div class="menu-divider"></div>
   <div class="menu-section-label">Dados</div>
@@ -2079,9 +2102,49 @@ function markUserDirty(email){
   if(!email)return;
   const u=users.find(x=>x.email===email);
   if(u)u._updatedAt=Date.now();
+  updateSyncBadge('pending');
   // Debounce: agenda sync daqui 2s se não houver mais mudanças
   if(_syncTimer)clearTimeout(_syncTimer);
   _syncTimer=setTimeout(()=>syncWithServer({silent:true}),SYNC_DEBOUNCE_MS);
+}
+
+// === Atualiza badge visual de sync ===
+// Estados: ok (verde ✓), pending (laranja ⟳), syncing (azul ⟳ girando), error (vermelho ⚠)
+let _syncError=false;
+function updateSyncBadge(state){
+  const badge=document.getElementById('syncBadge');
+  if(!badge)return;
+  // Esconde o badge se não tem usuário logado
+  if(!currentUserEmail){badge.style.display='none';return}
+  badge.style.display='grid';
+  // Remove classes de estado
+  badge.classList.remove('is-ok','is-pending','is-syncing','has-error');
+  // Esconde todos os ícones
+  badge.querySelectorAll('svg').forEach(s=>s.style.display='none');
+  switch(state){
+    case 'ok':
+      badge.classList.add('is-ok');
+      badge.querySelector('.sync-icon-ok').style.display='';
+      badge.title=_syncError?'Sincronizado (após erro)':'Tudo sincronizado';
+      break;
+    case 'pending':
+      badge.classList.add('is-pending');
+      badge.querySelector('.sync-icon-pending').style.display='';
+      badge.title='Alterações pendentes — aguarde...';
+      break;
+    case 'syncing':
+      badge.classList.add('is-syncing');
+      badge.querySelector('.sync-icon-syncing').style.display='';
+      badge.title='Sincronizando...';
+      break;
+    case 'error':
+      badge.classList.add('has-error');
+      badge.querySelector('.sync-icon-error').style.display='';
+      badge.title='Erro ao sincronizar — toque para tentar de novo';
+      _syncError=true;
+      break;
+  }
+  if(state!=='error')_syncError=false;
 }
 
 async function syncWithServer({silent=false,force=false}={}){
@@ -2089,11 +2152,13 @@ async function syncWithServer({silent=false,force=false}={}){
   if(!currentUserEmail){return}
   const u=getUser();if(!u)return;
   _isSyncing=true;
+  updateSyncBadge('syncing');
   const clientTs=u._updatedAt||0;
   // Evita sync redundante se nada mudou desde último sync
   const last=_lastSyncAt[currentUserEmail]||0;
   if(!force && clientTs<=last){
     _isSyncing=false;
+    updateSyncBadge('ok');
     return;
   }
   try{
@@ -2114,6 +2179,7 @@ async function syncWithServer({silent=false,force=false}={}){
     if(!r.ok){
       const err=await r.json().catch(()=>({}));
       if(!silent)toast('Erro no sync: '+(err.error||r.status),'error');
+      updateSyncBadge('error');
       _isSyncing=false;
       return;
     }
@@ -2138,11 +2204,22 @@ async function syncWithServer({silent=false,force=false}={}){
       _lastSyncAt[currentUserEmail]=clientTs;
       if(!silent)toast('Dados salvos no servidor','success');
     }
+    updateSyncBadge('ok');
   }catch(err){
     if(!silent)toast('Erro de conexão no sync: '+err.message,'error');
+    updateSyncBadge('error');
   }
   _isSyncing=false;
 }
+
+// Click no badge → forçar sync manual
+document.addEventListener('DOMContentLoaded',()=>{
+  const badge=document.getElementById('syncBadge');
+  if(badge)badge.addEventListener('click',()=>{
+    if(!currentUserEmail)return;
+    syncWithServer({force:true,silent:false});
+  });
+});
 
 // Puxa dados do servidor (usado após login, antes de renderizar a tela)
 async function pullFromServer(email){
@@ -2183,6 +2260,8 @@ async function applyServerDataIfNewer(email){
   }
   localStorage.setItem(USERS_KEY,JSON.stringify(users));
   _lastSyncAt[email]=serverTs;
+  // Marca badge como ok (servidor já está sincronizado com cliente)
+  updateSyncBadge && updateSyncBadge('ok');
   return true;
 }
 
@@ -4354,6 +4433,7 @@ function handleMenuAction(action){
     case 'settings':openSettingsModal();break;
     case 'install-pwa':triggerInstall();break;
     case 'toggle-theme':toggleTheme();break;
+    case 'sync-now':syncWithServer({force:true,silent:false});break;
     case 'reset-factory':openResetFactoryModal();break;
     case 'logout':logout();break;
   }
@@ -6238,11 +6318,14 @@ function loadUsersForFirebaseUser(email){
 }
 
 function logout(){
-  if(!confirm('Sair da conta? Seus dados ficam salvos neste dispositivo.'))return;
+  if(!confirm('Sair da conta? Seus dados ficam salvos neste dispositivo e sincronizados no servidor.'))return;
+  // Força sync final antes de sair
+  syncWithServer({force:true,silent:true});
   if(USE_FIREBASE && firebaseAuth){firebaseAuth.signOut()}
   currentUserEmail=null;
   currentPlanilhaId=null;
   localStorage.removeItem(SESSION_KEY);
+  updateSyncBadge && updateSyncBadge('ok'); // esconde badge (currentUserEmail=null)
   showAuth();
 }
 
