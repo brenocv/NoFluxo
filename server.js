@@ -36,7 +36,36 @@ if (SYNC_ENABLED) {
       server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `).then(() => console.log('✓ Tabela nofluxo_users pronta'))
-    .catch(e => console.error('Erro ao criar tabela:', e.message));
+    .catch(e => console.error('Erro ao criar tabela users:', e.message));
+
+  // Tabela de planilhas (entidade separada para permitir compartilhamento)
+  pgPool.query(`
+    CREATE TABLE IF NOT EXISTS nofluxo_planilhas (
+      id VARCHAR(64) PRIMARY KEY,
+      owner_email VARCHAR(255) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      data JSONB NOT NULL DEFAULT '{}'::jsonb,
+      updated_at BIGINT NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `).then(() => console.log('✓ Tabela nofluxo_planilhas pronta'))
+    .catch(e => console.error('Erro ao criar tabela planilhas:', e.message));
+
+  // Tabela de compartilhamento (quem tem acesso a cada planilha)
+  pgPool.query(`
+    CREATE TABLE IF NOT EXISTS nofluxo_shares (
+      planilha_id VARCHAR(64) NOT NULL REFERENCES nofluxo_planilhas(id) ON DELETE CASCADE,
+      shared_with_email VARCHAR(255) NOT NULL,
+      permission VARCHAR(20) NOT NULL DEFAULT 'editor',
+      shared_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (planilha_id, shared_with_email)
+    )
+  `).then(() => console.log('✓ Tabela nofluxo_shares pronta'))
+    .catch(e => console.error('Erro ao criar tabela shares:', e.message));
+
+  // Índices para performance
+  pgPool.query(`CREATE INDEX IF NOT EXISTS idx_shares_user ON nofluxo_shares(shared_with_email)`).catch(()=>{});
+  pgPool.query(`CREATE INDEX IF NOT EXISTS idx_planilhas_owner ON nofluxo_planilhas(owner_email)`).catch(()=>{});
 }
 
 const PORT = process.env.PORT || 3000;
@@ -483,6 +512,274 @@ const server = http.createServer(async (req, res) => {
     } catch (err) {
       console.error('Sync GET error:', err);
       return sendJSON(res, 500, { error: 'Erro no sync: ' + err.message });
+    }
+  }
+
+  // === API de planilhas (entidade separada para compartilhamento) ===
+
+  // Lista todas as planilhas que o usuário tem acesso (próprias + compartilhadas)
+  if (urlPath === '/api/planilhas' && req.method === 'GET') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+
+      // Planilhas próprias
+      const ownQ = await pgPool.query(
+        'SELECT id, name, owner_email, updated_at, created_at FROM nofluxo_planilhas WHERE owner_email=$1 ORDER BY created_at DESC',
+        [email]
+      );
+      // Planilhas compartilhadas comigo
+      const sharedQ = await pgPool.query(
+        `SELECT p.id, p.name, p.owner_email, p.updated_at, p.created_at, s.permission
+         FROM nofluxo_planilhas p
+         JOIN nofluxo_shares s ON s.planilha_id = p.id
+         WHERE s.shared_with_email = $1
+         ORDER BY s.shared_at DESC`,
+        [email]
+      );
+      const result = [
+        ...ownQ.rows.map(r => ({ id: r.id, name: r.name, ownerEmail: r.owner_email, updatedAt: Number(r.updated_at), createdAt: r.created_at, role: 'owner' })),
+        ...sharedQ.rows.map(r => ({ id: r.id, name: r.name, ownerEmail: r.owner_email, updatedAt: Number(r.updated_at), createdAt: r.created_at, role: r.permission }))
+      ];
+      return sendJSON(res, 200, { ok: true, planilhas: result });
+    } catch (err) {
+      console.error('List planilhas error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
+    }
+  }
+
+  // Migra planilhas do user.data para a tabela separada (chamado uma vez na primeira vez)
+  if (urlPath === '/api/migrate-planilhas' && req.method === 'POST') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const body = await readBody(req);
+      const { email, planilhas } = body;
+      if (!email || !Array.isArray(planilhas)) return sendJSON(res, 400, { error: 'email e planilhas[] obrigatórios' });
+      const migrated = [];
+      for (const p of planilhas) {
+        if (!p.id) continue;
+        // Tenta inserir — se já existe (mesmo ID), não sobrescreve
+        try {
+          await pgPool.query(`
+            INSERT INTO nofluxo_planilhas (id, owner_email, name, data, updated_at)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (id) DO NOTHING
+          `, [p.id, email.toLowerCase(), p.name || 'Minha planilha', JSON.stringify(p), Number(p._updatedAt) || Date.now()]);
+          migrated.push(p.id);
+        } catch (e) { console.error('Migrate planilha erro:', e.message); }
+      }
+      return sendJSON(res, 200, { ok: true, migrated: migrated.length, ids: migrated });
+    } catch (err) {
+      console.error('Migrate error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
+    }
+  }
+
+  // Pegar planilha completa por ID
+  if (urlPath.startsWith('/api/planilha/') && req.method === 'GET' && !urlPath.includes('/share')) {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const id = urlPath.replace('/api/planilha/', '');
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+
+      // Verifica acesso: dono OU compartilhada
+      const q = await pgPool.query(`
+        SELECT p.*, s.permission AS role
+        FROM nofluxo_planilhas p
+        LEFT JOIN nofluxo_shares s ON s.planilha_id = p.id AND s.shared_with_email = $2
+        WHERE p.id = $1 AND (p.owner_email = $2 OR s.shared_with_email IS NOT NULL)
+      `, [id, email]);
+      if (!q.rows.length) return sendJSON(res, 404, { error: 'Planilha não encontrada ou sem acesso' });
+
+      const row = q.rows[0];
+      const role = row.role || 'owner';
+      return sendJSON(res, 200, {
+        ok: true,
+        planilha: row.data,
+        id: row.id,
+        name: row.name,
+        ownerEmail: row.owner_email,
+        role: role,
+        updatedAt: Number(row.updated_at),
+      });
+    } catch (err) {
+      console.error('Get planilha error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
+    }
+  }
+
+  // Salvar planilha (criar nova ou atualizar existente)
+  if (urlPath.startsWith('/api/planilha/') && req.method === 'POST' && !urlPath.includes('/share')) {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const id = urlPath.replace('/api/planilha/', '');
+      const body = await readBody(req);
+      const { email, name, data, updatedAt, ownerEmail, create } = body;
+      const requesterEmail = (email || '').toLowerCase().trim();
+      if (!requesterEmail) return sendJSON(res, 400, { error: 'Email obrigatório' });
+
+      const clientTs = Number(updatedAt) || Date.now();
+
+      if (create) {
+        // Criar nova planilha — usuário é o dono
+        await pgPool.query(`
+          INSERT INTO nofluxo_planilhas (id, owner_email, name, data, updated_at)
+          VALUES ($1, $2, $3, $4, $5)
+          ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            data = EXCLUDED.data,
+            updated_at = EXCLUDED.updated_at
+        `, [id, requesterEmail, name || 'Minha planilha', JSON.stringify(data || {}), clientTs]);
+        return sendJSON(res, 200, { ok: true, role: 'owner' });
+      }
+
+      // Atualizar planilha existente — verifica acesso
+      const existing = await pgPool.query(`
+        SELECT p.owner_email, s.permission
+        FROM nofluxo_planilhas p
+        LEFT JOIN nofluxo_shares s ON s.planilha_id = p.id AND s.shared_with_email = $2
+        WHERE p.id = $1
+      `, [id, requesterEmail]);
+      if (!existing.rows.length) return sendJSON(res, 404, { error: 'Planilha não encontrada' });
+      const row = existing.rows[0];
+      const isOwner = row.owner_email === requesterEmail;
+      const role = row.permission || (isOwner ? 'owner' : null);
+      if (!isOwner && role !== 'editor') {
+        return sendJSON(res, 403, { error: 'Sem permissão de edição' });
+      }
+      // Verifica conflito — só atualiza se cliente for mais recente
+      const cur = await pgPool.query('SELECT updated_at FROM nofluxo_planilhas WHERE id=$1', [id]);
+      const serverTs = Number(cur.rows[0]?.updated_at) || 0;
+      if (serverTs > clientTs) {
+        // Servidor é mais recente — retorna versão do servidor
+        const serverRow = await pgPool.query('SELECT data, name FROM nofluxo_planilhas WHERE id=$1', [id]);
+        return sendJSON(res, 200, {
+          ok: true,
+          serverHasNewer: true,
+          data: serverRow.rows[0]?.data,
+          serverUpdatedAt: serverTs,
+        });
+      }
+      // Atualiza
+      await pgPool.query(`
+        UPDATE nofluxo_planilhas SET name=$1, data=$2, updated_at=$3 WHERE id=$4
+      `, [name || 'Minha planilha', JSON.stringify(data || {}), clientTs, id]);
+      return sendJSON(res, 200, { ok: true, role: role || 'owner', updatedAt: clientTs });
+    } catch (err) {
+      console.error('Save planilha error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
+    }
+  }
+
+  // Excluir planilha (só dono)
+  if (urlPath.startsWith('/api/planilha/') && req.method === 'DELETE' && !urlPath.includes('/share')) {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const id = urlPath.replace('/api/planilha/', '');
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+      // Verifica se é dono
+      const cur = await pgPool.query('SELECT owner_email FROM nofluxo_planilhas WHERE id=$1', [id]);
+      if (!cur.rows.length) return sendJSON(res, 404, { error: 'Planilha não encontrada' });
+      if (cur.rows[0].owner_email !== email) return sendJSON(res, 403, { error: 'Só o dono pode excluir' });
+      // Deleta (CASCADE remove as shares)
+      await pgPool.query('DELETE FROM nofluxo_planilhas WHERE id=$1', [id]);
+      return sendJSON(res, 200, { ok: true });
+    } catch (err) {
+      console.error('Delete planilha error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
+    }
+  }
+
+  // Compartilhar planilha com outro email
+  if (urlPath.endsWith('/share') && req.method === 'POST') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const parts = urlPath.split('/');
+      const id = parts[parts.length - 2]; // /api/planilha/ID/share
+      const body = await readBody(req);
+      const { ownerEmail, shareWithEmail, permission } = body;
+      const owner = (ownerEmail || '').toLowerCase().trim();
+      const shareEmail = (shareWithEmail || '').toLowerCase().trim();
+      if (!owner || !shareEmail) return sendJSON(res, 400, { error: 'ownerEmail e shareWithEmail obrigatórios' });
+      if (owner === shareEmail) return sendJSON(res, 400, { error: 'Não dá pra compartilhar consigo mesmo' });
+
+      // Verifica se é dono
+      const cur = await pgPool.query('SELECT owner_email, name FROM nofluxo_planilhas WHERE id=$1', [id]);
+      if (!cur.rows.length) return sendJSON(res, 404, { error: 'Planilha não encontrada' });
+      if (cur.rows[0].owner_email !== owner) return sendJSON(res, 403, { error: 'Só o dono pode compartilhar' });
+
+      // Insere share (ou atualiza permissão se já existe)
+      await pgPool.query(`
+        INSERT INTO nofluxo_shares (planilha_id, shared_with_email, permission)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (planilha_id, shared_with_email) DO UPDATE SET
+          permission = EXCLUDED.permission,
+          shared_at = NOW()
+      `, [id, shareEmail, permission || 'editor']);
+      return sendJSON(res, 200, { ok: true, planilhaName: cur.rows[0].name });
+    } catch (err) {
+      console.error('Share error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
+    }
+  }
+
+  // Listar com quem a planilha foi compartilhada (só dono ou compartilhado)
+  if (urlPath.endsWith('/share') && req.method === 'GET') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const parts = urlPath.split('/');
+      const id = parts[parts.length - 2];
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+
+      // Verifica acesso
+      const cur = await pgPool.query('SELECT owner_email FROM nofluxo_planilhas WHERE id=$1', [id]);
+      if (!cur.rows.length) return sendJSON(res, 404, { error: 'Planilha não encontrada' });
+      const isOwner = cur.rows[0].owner_email === email;
+      if (!isOwner) {
+        const share = await pgPool.query('SELECT 1 FROM nofluxo_shares WHERE planilha_id=$1 AND shared_with_email=$2', [id, email]);
+        if (!share.rows.length) return sendJSON(res, 403, { error: 'Sem acesso' });
+      }
+      const shares = await pgPool.query('SELECT shared_with_email, permission, shared_at FROM nofluxo_shares WHERE planilha_id=$1 ORDER BY shared_at DESC', [id]);
+      return sendJSON(res, 200, {
+        ok: true,
+        ownerEmail: cur.rows[0].owner_email,
+        isOwner: isOwner,
+        shares: shares.rows.map(r => ({ email: r.shared_with_email, permission: r.permission, sharedAt: r.shared_at }))
+      });
+    } catch (err) {
+      console.error('List shares error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
+    }
+  }
+
+  // Revogar compartilhamento (só dono)
+  if (urlPath.endsWith('/share') && req.method === 'DELETE') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const parts = urlPath.split('/');
+      const id = parts[parts.length - 2];
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const ownerEmail = (params.get('ownerEmail') || '').toLowerCase().trim();
+      const shareWithEmail = (params.get('shareWithEmail') || '').toLowerCase().trim();
+      if (!ownerEmail || !shareWithEmail) return sendJSON(res, 400, { error: 'ownerEmail e shareWithEmail obrigatórios' });
+
+      const cur = await pgPool.query('SELECT owner_email FROM nofluxo_planilhas WHERE id=$1', [id]);
+      if (!cur.rows.length) return sendJSON(res, 404, { error: 'Planilha não encontrada' });
+      if (cur.rows[0].owner_email !== ownerEmail) return sendJSON(res, 403, { error: 'Só o dono pode revogar' });
+
+      await pgPool.query('DELETE FROM nofluxo_shares WHERE planilha_id=$1 AND shared_with_email=$2', [id, shareWithEmail]);
+      return sendJSON(res, 200, { ok: true });
+    } catch (err) {
+      console.error('Unshare error:', err);
+      return sendJSON(res, 500, { error: 'Erro: ' + err.message });
     }
   }
 
