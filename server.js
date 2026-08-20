@@ -24,52 +24,195 @@ if (SYNC_ENABLED) {
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 10000,
   });
-  // Inicializa a tabela de usuários
-  pgPool.query(`
-    CREATE TABLE IF NOT EXISTS nofluxo_users (
-      email VARCHAR(255) PRIMARY KEY,
-      google_id VARCHAR(255) UNIQUE,
-      google_name VARCHAR(255),
-      google_picture TEXT,
-      data JSONB NOT NULL DEFAULT '{}'::jsonb,
-      client_updated_at BIGINT NOT NULL DEFAULT 0,
-      server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `).then(() => console.log('✓ Tabela nofluxo_users pronta'))
-    .catch(e => console.error('Erro ao criar tabela users:', e.message));
+  // Cria tabelas SEQUENCIALMENTE (evita erro de FK)
+  (async () => {
+    try {
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS nofluxo_users (
+          email VARCHAR(255) PRIMARY KEY,
+          google_id VARCHAR(255) UNIQUE,
+          google_name VARCHAR(255),
+          google_picture TEXT,
+          data JSONB NOT NULL DEFAULT '{}'::jsonb,
+          client_updated_at BIGINT NOT NULL DEFAULT 0,
+          server_updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      console.log('✓ Tabela nofluxo_users pronta');
 
-  // Tabela de planilhas (entidade separada para permitir compartilhamento)
-  pgPool.query(`
-    CREATE TABLE IF NOT EXISTS nofluxo_planilhas (
-      id VARCHAR(64) PRIMARY KEY,
-      owner_email VARCHAR(255) NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      data JSONB NOT NULL DEFAULT '{}'::jsonb,
-      updated_at BIGINT NOT NULL DEFAULT 0,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    )
-  `).then(() => console.log('✓ Tabela nofluxo_planilhas pronta'))
-    .catch(e => console.error('Erro ao criar tabela planilhas:', e.message));
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS nofluxo_planilhas (
+          id VARCHAR(64) PRIMARY KEY,
+          owner_email VARCHAR(255) NOT NULL,
+          name VARCHAR(255) NOT NULL,
+          data JSONB NOT NULL DEFAULT '{}'::jsonb,
+          updated_at BIGINT NOT NULL DEFAULT 0,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      console.log('✓ Tabela nofluxo_planilhas pronta');
 
-  // Tabela de compartilhamento (quem tem acesso a cada planilha)
-  pgPool.query(`
-    CREATE TABLE IF NOT EXISTS nofluxo_shares (
-      planilha_id VARCHAR(64) NOT NULL REFERENCES nofluxo_planilhas(id) ON DELETE CASCADE,
-      shared_with_email VARCHAR(255) NOT NULL,
-      permission VARCHAR(20) NOT NULL DEFAULT 'editor',
-      shared_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY (planilha_id, shared_with_email)
-    )
-  `).then(() => console.log('✓ Tabela nofluxo_shares pronta'))
-    .catch(e => console.error('Erro ao criar tabela shares:', e.message));
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS nofluxo_shares (
+          planilha_id VARCHAR(64) NOT NULL REFERENCES nofluxo_planilhas(id) ON DELETE CASCADE,
+          shared_with_email VARCHAR(255) NOT NULL,
+          permission VARCHAR(20) NOT NULL DEFAULT 'editor',
+          shared_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (planilha_id, shared_with_email)
+        )
+      `);
+      console.log('✓ Tabela nofluxo_shares pronta');
 
-  // Índices para performance
-  pgPool.query(`CREATE INDEX IF NOT EXISTS idx_shares_user ON nofluxo_shares(shared_with_email)`).catch(()=>{});
-  pgPool.query(`CREATE INDEX IF NOT EXISTS idx_planilhas_owner ON nofluxo_planilhas(owner_email)`).catch(()=>{});
+      // Notificações in-app (também usado como fallback se email não configurado)
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS nofluxo_notifications (
+          id SERIAL PRIMARY KEY,
+          user_email VARCHAR(255) NOT NULL,
+          type VARCHAR(50) NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          message TEXT,
+          planilha_id VARCHAR(64),
+          read BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+      console.log('✓ Tabela nofluxo_notifications pronta');
+
+      // Presença de usuários (quem está online em cada planilha)
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS nofluxo_presence (
+          planilha_id VARCHAR(64) NOT NULL,
+          user_email VARCHAR(255) NOT NULL,
+          user_name VARCHAR(255),
+          last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY (planilha_id, user_email)
+        )
+      `);
+      console.log('✓ Tabela nofluxo_presence pronta');
+
+      // Histórico de versões das planilhas
+      await pgPool.query(`
+        CREATE TABLE IF NOT EXISTS nofluxo_planilha_versions (
+          id SERIAL PRIMARY KEY,
+          planilha_id VARCHAR(64) NOT NULL REFERENCES nofluxo_planilhas(id) ON DELETE CASCADE,
+          data JSONB NOT NULL,
+          saved_by_email VARCHAR(255) NOT NULL,
+          saved_by_name VARCHAR(255),
+          saved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          size_bytes BIGINT NOT NULL DEFAULT 0
+        )
+      `);
+      console.log('✓ Tabela nofluxo_planilha_versions pronta');
+
+      // Índices para performance
+      await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_shares_user ON nofluxo_shares(shared_with_email)`);
+      await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_planilhas_owner ON nofluxo_planilhas(owner_email)`);
+      await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user ON nofluxo_notifications(user_email, read)`);
+      await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_notifications_created ON nofluxo_notifications(created_at DESC)`);
+      await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_presence_planilha ON nofluxo_presence(planilha_id, last_seen_at)`);
+      await pgPool.query(`CREATE INDEX IF NOT EXISTS idx_versions_planilha ON nofluxo_planilha_versions(planilha_id, saved_at DESC)`);
+      console.log('✓ Todos os índices criados');
+    } catch (e) {
+      console.error('Erro ao criar tabelas:', e.message);
+    }
+  })();
 }
 
 const PORT = process.env.PORT || 3000;
 const HTML_FILE = path.join(__dirname, 'nofluxo.html');
+
+// === Resend (envio de email) — opcional ===
+// Para habilitar notificações por email:
+// 1. Crie conta em https://resend.com (gratuito até 100 emails/dia)
+// 2. Crie uma API key e copie (re_...)
+// 3. Verifique um domínio próprio em https://resend.com/domains (ou use onboarding@resend.dev para testes)
+// 4. No Railway, adicione as variáveis:
+//    RESEND_API_KEY=re_xxx
+//    RESEND_FROM_EMAIL=nofluxo@seudominio.com (ou onboarding@resend.dev)
+// 5. Pronto! Emails são enviados quando compartilha planilha, etc.
+const RESEND_API_KEY = (process.env.RESEND_API_KEY || '').trim();
+const RESEND_FROM_EMAIL = (process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
+const APP_URL = process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : (process.env.APP_URL || 'http://localhost:'+PORT);
+
+// Envia email via Resend (sem dependências externas — usa fetch)
+async function sendEmail(to, subject, htmlBody) {
+  if (!RESEND_API_KEY) return { skipped: true, reason: 'RESEND_API_KEY não configurado' };
+  try {
+    const resp = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer ' + RESEND_API_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        from: 'NoFluxo <' + RESEND_FROM_EMAIL + '>',
+        to: to,
+        subject: subject,
+        html: htmlBody
+      })
+    });
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error('Resend erro:', resp.status, errText);
+      return { error: errText };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error('sendEmail error:', e.message);
+    return { error: e.message };
+  }
+}
+
+// Cria notificação in-app + envia email (se configurado)
+async function notifyUser(userEmail, type, title, message, planilhaId, planilhaName, shareOwnerEmail) {
+  if (!SYNC_ENABLED) return;
+  const email = (userEmail || '').toLowerCase().trim();
+  if (!email) return;
+  // 1) Cria notificação in-app (sempre)
+  try {
+    await pgPool.query(`
+      INSERT INTO nofluxo_notifications (user_email, type, title, message, planilha_id)
+      VALUES ($1, $2, $3, $4, $5)
+    `, [email, type, title, message || null, planilhaId || null]);
+  } catch (e) { console.error('notifyUser insert error:', e.message); }
+
+  // 2) Envia email (se configurado)
+  if (RESEND_API_KEY) {
+    const planilhaNome = planilhaName || 'planilha';
+    const donoEmail = shareOwnerEmail || '';
+    let subject, html;
+    if (type === 'share_invited') {
+      subject = `${donoEmail} compartilhou "${planilhaNome}" com você no NoFluxo`;
+      html = `
+        <div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;background:#F5F7FA;padding:24px 16px;border-radius:12px">
+          <div style="text-align:center;margin-bottom:20px">
+            <div style="display:inline-block;width:44px;height:44px;border-radius:11px;background:#003A49;display:grid;place-items:center;color:#fff;font-weight:800;font-size:18px">N</div>
+          </div>
+          <h1 style="font-size:18px;color:#003A49;text-align:center;margin:0 0 12px">${escapeHtml(donoEmail)} compartilhou uma planilha com você</h1>
+          <div style="background:#fff;border-radius:10px;padding:16px;margin-bottom:16px">
+            <div style="font-size:13px;color:#5A6B72;margin-bottom:4px">Planilha:</div>
+            <div style="font-size:16px;font-weight:700;color:#0F1B20">${escapeHtml(planilhaNome)}</div>
+          </div>
+          <p style="font-size:14px;color:#5A6B72;line-height:1.5">Você agora tem acesso a esta planilha no NoFluxo. Faça login com o email <b>${escapeHtml(email)}</b> para ver e editar junto com ${escapeHtml(donoEmail)}.</p>
+          <div style="text-align:center;margin-top:24px">
+            <a href="${APP_URL}" style="display:inline-block;padding:12px 24px;background:#E67D00;color:#fff;border-radius:99px;font-weight:700;text-decoration:none;font-size:14px">Abrir NoFluxo</a>
+          </div>
+          <p style="font-size:11px;color:#94A3A8;text-align:center;margin-top:24px">Se você não esperava este convite, pode ignorar este email.</p>
+        </div>
+      `;
+    } else {
+      subject = title;
+      html = `<div style="font-family:Inter,Arial,sans-serif;padding:24px"><h2 style="color:#003A49">${escapeHtml(title)}</h2><p style="color:#5A6B72">${escapeHtml(message||'')}</p></div>`;
+    }
+    await sendEmail(email, subject, html);
+  }
+}
+
+// Helper simples de escape para HTML dos emails
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
 // Chave do Google Gemini — criar em https://aistudio.google.com/app/apikey
 const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
@@ -668,6 +811,19 @@ const server = http.createServer(async (req, res) => {
       await pgPool.query(`
         UPDATE nofluxo_planilhas SET name=$1, data=$2, updated_at=$3 WHERE id=$4
       `, [name || 'Minha planilha', JSON.stringify(data || {}), clientTs, id]);
+      // Salva versão (auto-versionamento a cada save — limita a 50)
+      const dataStr = JSON.stringify(data || {});
+      await pgPool.query(`
+        INSERT INTO nofluxo_planilha_versions (planilha_id, data, saved_by_email, saved_by_name, size_bytes)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [id, dataStr, requesterEmail, requesterEmail, dataStr.length]);
+      // Limpa versões antigas (mantém só últimas 50)
+      await pgPool.query(`
+        DELETE FROM nofluxo_planilha_versions
+        WHERE planilha_id=$1 AND id NOT IN (
+          SELECT id FROM nofluxo_planilha_versions WHERE planilha_id=$1 ORDER BY saved_at DESC LIMIT 50
+        )
+      `, [id]);
       return sendJSON(res, 200, { ok: true, role: role || 'owner', updatedAt: clientTs });
     } catch (err) {
       console.error('Save planilha error:', err);
@@ -722,7 +878,12 @@ const server = http.createServer(async (req, res) => {
           permission = EXCLUDED.permission,
           shared_at = NOW()
       `, [id, shareEmail, permission || 'editor']);
-      return sendJSON(res, 200, { ok: true, planilhaName: cur.rows[0].name });
+      // Notifica (in-app + email se configurado)
+      await notifyUser(shareEmail, 'share_invited',
+        'Nova planilha compartilhada com você',
+        `${owner} compartilhou a planilha "${cur.rows[0].name}" com você.`,
+        id, cur.rows[0].name, owner);
+      return sendJSON(res, 200, { ok: true, planilhaName: cur.rows[0].name, notified: true });
     } catch (err) {
       console.error('Share error:', err);
       return sendJSON(res, 500, { error: 'Erro: ' + err.message });
@@ -781,6 +942,210 @@ const server = http.createServer(async (req, res) => {
       console.error('Unshare error:', err);
       return sendJSON(res, 500, { error: 'Erro: ' + err.message });
     }
+  }
+
+  // === API de notificações (in-app) ===
+  // Lista notificações do usuário
+  if (urlPath === '/api/notifications' && req.method === 'GET') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+      const q = await pgPool.query(
+        'SELECT id, type, title, message, planilha_id, read, created_at FROM nofluxo_notifications WHERE user_email=$1 ORDER BY created_at DESC LIMIT 50',
+        [email]
+      );
+      const unreadQ = await pgPool.query('SELECT COUNT(*) AS c FROM nofluxo_notifications WHERE user_email=$1 AND read=FALSE', [email]);
+      return sendJSON(res, 200, {
+        ok: true,
+        notifications: q.rows.map(r => ({ id: r.id, type: r.type, title: r.title, message: r.message, planilhaId: r.planilha_id, read: r.read, createdAt: r.created_at })),
+        unread: Number(unreadQ.rows[0].c) || 0,
+      });
+    } catch (err) { return sendJSON(res, 500, { error: 'Erro: ' + err.message }); }
+  }
+
+  // Marca todas como lidas
+  if (urlPath === '/api/notifications/read-all' && req.method === 'POST') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const body = await readBody(req);
+      const email = (body.email || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+      await pgPool.query('UPDATE nofluxo_notifications SET read=TRUE WHERE user_email=$1', [email]);
+      return sendJSON(res, 200, { ok: true });
+    } catch (err) { return sendJSON(res, 500, { error: 'Erro: ' + err.message }); }
+  }
+
+  // === API de presença (quem está online agora) ===
+  if (urlPath === '/api/presence' && req.method === 'POST') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const body = await readBody(req);
+      const { email, planilhaId, userName } = body;
+      const e = (email || '').toLowerCase().trim();
+      if (!e || !planilhaId) return sendJSON(res, 400, { error: 'email e planilhaId obrigatórios' });
+      await pgPool.query(`
+        INSERT INTO nofluxo_presence (planilha_id, user_email, user_name, last_seen_at)
+        VALUES ($1, $2, $3, NOW())
+        ON CONFLICT (planilha_id, user_email) DO UPDATE SET
+          user_name = EXCLUDED.user_name,
+          last_seen_at = NOW()
+      `, [planilhaId, e, userName || e]);
+      // Limpa presenças antigas (> 30s sem atualização)
+      await pgPool.query("DELETE FROM nofluxo_presence WHERE last_seen_at < NOW() - INTERVAL '30 seconds'");
+      return sendJSON(res, 200, { ok: true });
+    } catch (err) { return sendJSON(res, 500, { error: 'Erro: ' + err.message }); }
+  }
+
+  // Lista quem está online em uma planilha
+  if (urlPath.startsWith('/api/presence/') && req.method === 'GET') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const planilhaId = urlPath.replace('/api/presence/', '');
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email || !planilhaId) return sendJSON(res, 400, { error: 'email e planilhaId obrigatórios' });
+      // Verifica acesso
+      const acc = await pgPool.query(`
+        SELECT 1 FROM nofluxo_planilhas p
+        LEFT JOIN nofluxo_shares s ON s.planilha_id = p.id AND s.shared_with_email = $2
+        WHERE p.id = $1 AND (p.owner_email = $2 OR s.shared_with_email IS NOT NULL)
+      `, [planilhaId, email]);
+      if (!acc.rows.length) return sendJSON(res, 403, { error: 'Sem acesso' });
+      // Lista quem esteve ativo nos últimos 30s
+      const q = await pgPool.query(`
+        SELECT user_email, user_name, last_seen_at,
+          EXTRACT(EPOCH FROM (NOW() - last_seen_at)) AS secs_ago
+        FROM nofluxo_presence
+        WHERE planilha_id = $1 AND last_seen_at > NOW() - INTERVAL '30 seconds'
+        ORDER BY last_seen_at DESC
+      `, [planilhaId]);
+      return sendJSON(res, 200, {
+        ok: true,
+        online: q.rows.map(r => ({
+          email: r.user_email,
+          name: r.user_name || r.user_email,
+          isMe: r.user_email === email,
+          secsAgo: Math.round(Number(r.secs_ago) || 0),
+        })),
+      });
+    } catch (err) { return sendJSON(res, 500, { error: 'Erro: ' + err.message }); }
+  }
+
+  // === API de histórico de versões ===
+  // Lista versões (mais recentes primeiro)
+  if (urlPath.includes('/versions') && urlPath.endsWith('/versions') && req.method === 'GET') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const parts = urlPath.split('/');
+      const planilhaId = parts[parts.length - 2]; // /api/planilha/ID/versions
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email || !planilhaId) return sendJSON(res, 400, { error: 'email e planilhaId obrigatórios' });
+      // Verifica acesso
+      const acc = await pgPool.query(`
+        SELECT 1 FROM nofluxo_planilhas p
+        LEFT JOIN nofluxo_shares s ON s.planilha_id = p.id AND s.shared_with_email = $2
+        WHERE p.id = $1 AND (p.owner_email = $2 OR s.shared_with_email IS NOT NULL)
+      `, [planilhaId, email]);
+      if (!acc.rows.length) return sendJSON(res, 403, { error: 'Sem acesso' });
+      const q = await pgPool.query(`
+        SELECT id, saved_by_email, saved_by_name, saved_at, size_bytes
+        FROM nofluxo_planilha_versions
+        WHERE planilha_id = $1
+        ORDER BY saved_at DESC
+        LIMIT 50
+      `, [planilhaId]);
+      return sendJSON(res, 200, {
+        ok: true,
+        versions: q.rows.map(r => ({ id: r.id, savedByEmail: r.saved_by_email, savedByName: r.saved_by_name, savedAt: r.saved_at, sizeBytes: Number(r.size_bytes) })),
+      });
+    } catch (err) { return sendJSON(res, 500, { error: 'Erro: ' + err.message }); }
+  }
+
+  // Pega versão específica (para preview)
+  if (urlPath.match(/\/versions\/\d+$/) && req.method === 'GET') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const parts = urlPath.split('/');
+      const versionId = parts[parts.length - 1];
+      const planilhaId = parts[parts.length - 3];
+      const params = new URL(req.url, 'http://localhost').searchParams;
+      const email = (params.get('email') || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+      // Verifica acesso à planilha
+      const acc = await pgPool.query(`
+        SELECT 1 FROM nofluxo_planilhas p
+        LEFT JOIN nofluxo_shares s ON s.planilha_id = p.id AND s.shared_with_email = $2
+        WHERE p.id = $1 AND (p.owner_email = $2 OR s.shared_with_email IS NOT NULL)
+      `, [planilhaId, email]);
+      if (!acc.rows.length) return sendJSON(res, 403, { error: 'Sem acesso' });
+      const v = await pgPool.query('SELECT data, saved_by_email, saved_by_name, saved_at FROM nofluxo_planilha_versions WHERE id=$1 AND planilha_id=$2', [versionId, planilhaId]);
+      if (!v.rows.length) return sendJSON(res, 404, { error: 'Versão não encontrada' });
+      return sendJSON(res, 200, {
+        ok: true,
+        data: v.rows[0].data,
+        savedByEmail: v.rows[0].saved_by_email,
+        savedByName: v.rows[0].saved_by_name,
+        savedAt: v.rows[0].saved_at,
+      });
+    } catch (err) { return sendJSON(res, 500, { error: 'Erro: ' + err.message }); }
+  }
+
+  // Restaura versão (cria nova versão com dados antigos + atualiza planilha)
+  if (urlPath.match(/\/versions\/\d+\/restore$/) && req.method === 'POST') {
+    if (!SYNC_ENABLED) return sendJSON(res, 503, { error: 'Sync não configurado' });
+    try {
+      const parts = urlPath.split('/');
+      const versionId = parts[parts.length - 3]; // .../versions/ID/restore
+      const planilhaId = parts[parts.length - 4]; // .../planilha/ID/versions/ID/restore
+      const body = await readBody(req);
+      const email = (body.email || '').toLowerCase().trim();
+      if (!email) return sendJSON(res, 400, { error: 'Email obrigatório' });
+      // Verifica permissão de edição
+      const existing = await pgPool.query(`
+        SELECT p.owner_email, s.permission
+        FROM nofluxo_planilhas p
+        LEFT JOIN nofluxo_shares s ON s.planilha_id = p.id AND s.shared_with_email = $2
+        WHERE p.id = $1
+      `, [planilhaId, email]);
+      if (!existing.rows.length) return sendJSON(res, 404, { error: 'Planilha não encontrada' });
+      const row = existing.rows[0];
+      const isOwner = row.owner_email === email;
+      const role = row.permission || (isOwner ? 'owner' : null);
+      if (!isOwner && role !== 'editor') return sendJSON(res, 403, { error: 'Sem permissão' });
+
+      // Pega versão antiga
+      const v = await pgPool.query('SELECT data FROM nofluxo_planilha_versions WHERE id=$1 AND planilha_id=$2', [versionId, planilhaId]);
+      if (!v.rows.length) return sendJSON(res, 404, { error: 'Versão não encontrada' });
+      const oldData = v.rows[0].data;
+      const ts = Date.now();
+      // Salva versão ATUAL como nova versão (antes de sobrescrever) — pra poder desfazer o restore
+      const cur = await pgPool.query('SELECT data, name FROM nofluxo_planilhas WHERE id=$1', [planilhaId]);
+      if (cur.rows.length) {
+        const curData = JSON.stringify(cur.rows[0].data);
+        await pgPool.query(`
+          INSERT INTO nofluxo_planilha_versions (planilha_id, data, saved_by_email, saved_by_name, size_bytes)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [planilhaId, curData, email, body.userName || email, curData.length]);
+      }
+      // Atualiza planilha com dados antigos
+      await pgPool.query(`UPDATE nofluxo_planilhas SET data=$1, updated_at=$2 WHERE id=$3`, [JSON.stringify(oldData), ts, planilhaId]);
+      // Cria versão para o restore também
+      await pgPool.query(`
+        INSERT INTO nofluxo_planilha_versions (planilha_id, data, saved_by_email, saved_by_name, size_bytes)
+        VALUES ($1, $2, $3, $4, $5)
+      `, [planilhaId, JSON.stringify(oldData), email, body.userName || email + ' (restaurou)', JSON.stringify(oldData).length]);
+      // Limpa versões antigas (mantém só últimas 50 por planilha)
+      await pgPool.query(`
+        DELETE FROM nofluxo_planilha_versions
+        WHERE planilha_id=$1 AND id NOT IN (
+          SELECT id FROM nofluxo_planilha_versions WHERE planilha_id=$1 ORDER BY saved_at DESC LIMIT 50
+        )
+      `, [planilhaId]);
+      return sendJSON(res, 200, { ok: true, data: oldData, updatedAt: ts });
+    } catch (err) { return sendJSON(res, 500, { error: 'Erro: ' + err.message }); }
   }
 
   // === Health check ===
@@ -843,4 +1208,6 @@ server.listen(PORT, () => {
   if (GROQ_API_KEY) console.log(`  Modelos Groq que serão tentados: ${GROQ_MODELS.join(', ')}`);
   if (GEMINI_API_KEY) console.log(`  Modelos Gemini que serão tentados: ${GEMINI_MODELS.join(', ')}`);
   console.log(`Sync PostgreSQL: ${SYNC_ENABLED ? '✓ ativo (DATABASE_URL configurado)' : '✗ inativo (defina DATABASE_URL no Railway)'}`);
+  console.log(`Notificações por email (Resend): ${RESEND_API_KEY ? '✓ ativo (RESEND_API_KEY configurado)' : '✗ inativo — só in-app (defina RESEND_API_KEY + RESEND_FROM_EMAIL)'}`);
+  console.log(`Compartilhamento, presença e versões: ${SYNC_ENABLED ? '✓ disponíveis' : '✗ precisam de DATABASE_URL'}`);
 });

@@ -132,6 +132,31 @@ svg{display:block}
 .sync-badge.is-ok{background:rgba(74,222,128,0.14)}
 @keyframes spinSync{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 @keyframes spinPending{0%,100%{transform:rotate(0deg);opacity:1}50%{transform:rotate(180deg);opacity:0.6}}
+
+/* === Presença (quem está online na planilha) === */
+.presence-avatars{display:flex;align-items:center;margin-right:4px}
+.presence-avatars .presence-avatar{
+  width:26px;height:26px;border-radius:50%;
+  background:linear-gradient(135deg,var(--c-accent),var(--c-accent-2));
+  color:#fff;display:grid;place-items:center;
+  font-size:10px;font-weight:800;text-transform:uppercase;
+  border:2px solid var(--c-primary);
+  margin-left:-6px;
+  cursor:default;
+  position:relative;
+  animation:popIn .2s ease-out;
+}
+.presence-avatars .presence-avatar.me{background:linear-gradient(135deg,#4ADE80,#22C55E)}
+.presence-avatars .presence-avatar::after{
+  content:"";position:absolute;bottom:0;right:0;
+  width:8px;height:8px;border-radius:50%;
+  background:#4ADE80;border:1.5px solid var(--c-primary);
+}
+.presence-avatars .presence-more{
+  background:rgba(255,255,255,0.12);
+  font-size:10px;font-weight:700;color:#fff;
+}
+@keyframes popIn{from{transform:scale(0)}to{transform:scale(1)}}
 .month-selector{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,0.14);color:#fff;padding:6px 10px;border-radius:999px;font-size:11px;font-weight:600;transition:background .2s;flex-shrink:0}
 .month-selector:active{background:rgba(255,255,255,0.24)}
 .month-selector svg{width:11px;height:11px}
@@ -1308,11 +1333,19 @@ html[data-theme="dark"] .hero-mini-despesas{
     <button class="icon-btn" id="redoBtn" aria-label="Refazer" style="opacity:0.4">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
     </button>
+    <button class="icon-btn" id="notifBtn" aria-label="Notificações" title="Notificações" style="position:relative">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span id="notifBadge" style="position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;border-radius:99px;background:#ff5C7A;color:#fff;font-size:9px;font-weight:800;display:none;align-items:center;justify-content:center;padding:0 4px;border:1.5px solid var(--c-primary)">0</span>
+    </button>
     <button class="sync-badge" id="syncBadge" aria-label="Status do sync" title="Status do sync" style="display:none">
       <svg class="sync-icon-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       <svg class="sync-icon-pending" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 4 21 10 15 10"/></svg>
       <svg class="sync-icon-syncing" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9"/><polyline points="21 3 21 9 15 9"/></svg>
       <svg class="sync-icon-error" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </button>
+    <div id="presenceAvatars" class="presence-avatars" style="display:none"></div>
+    <button class="icon-btn" id="historyBtn" aria-label="Histórico de versões" title="Histórico de versões" style="display:none">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
     </button>
     <button class="icon-btn" id="menuBtn" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
@@ -6614,6 +6647,10 @@ function logout(){
   currentPlanilhaId=null;
   localStorage.removeItem(SESSION_KEY);
   updateSyncBadge && updateSyncBadge('ok'); // esconde badge (currentUserEmail=null)
+  if(historyBtn)historyBtn.style.display='none';
+  if(presenceAvatars)presenceAvatars.style.display='none';
+  if(notifBadge)notifBadge.style.display='none';
+  _lastNotifCount=0;
   showAuth();
 }
 
@@ -6627,6 +6664,8 @@ function onAuthSuccess(){
   renderAll();
   // Garante que o data-active-screen está setado
   document.body.setAttribute('data-active-screen',currentScreen);
+  // Mostra o botão de histórico (só quando logado)
+  if(historyBtn)historyBtn.style.display='grid';
   // === SYNC pós-login ===
   applyServerDataIfNewer(currentUserEmail).then(async changed=>{
     if(changed){
@@ -6650,6 +6689,11 @@ function onAuthSuccess(){
       const p=getPlanilha();
       if(p && p._updatedAt)_lastPlanilhaSeenAt[currentPlanilhaId]=p._updatedAt;
     }
+    // Puxa notificações
+    fetchNotifications();
+    // Inicia heartbeat de presença
+    sendHeartbeat();
+    fetchPresence();
   });
 }
 
@@ -6958,6 +7002,219 @@ function showToast(msg,type=''){
   toastTimer=type==='code'?setTimeout(()=>toastEl.classList.remove('show'),8000):setTimeout(()=>toastEl.classList.remove('show'),2600);
 }
 const toast=showToast;
+
+/* ============================================================
+   NOTIFICAÇÕES, PRESENÇA, HISTÓRICO DE VERSÕES
+============================================================ */
+const notifBtn=document.getElementById('notifBtn');
+const notifBadge=document.getElementById('notifBadge');
+const presenceAvatars=document.getElementById('presenceAvatars');
+const historyBtn=document.getElementById('historyBtn');
+
+// === Notificações ===
+let _lastNotifCount=0;
+async function fetchNotifications(){
+  if(!currentUserEmail)return;
+  try{
+    const r=await fetch('/api/notifications?email='+encodeURIComponent(currentUserEmail));
+    if(!r.ok)return;
+    const data=await r.json();
+    if(!data.ok)return;
+    const unread=data.unread||0;
+    notifBadge.style.display=unread>0?'flex':'none';
+    notifBadge.textContent=unread>9?'9+':unread;
+    if(unread>_lastNotifCount && _lastNotifCount>=0){
+      // Novas notificações desde última verificação
+      const novinhas=data.notifications.slice(0, unread-_lastNotifCount);
+      novinhas.forEach(n=>{
+        if(n.title)toast('🔔 '+n.title,'success');
+      });
+    }
+    _lastNotifCount=unread;
+    window._notificationsCache=data.notifications||[];
+  }catch(e){/* ignora */}
+}
+function openNotifModal(){
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay open';
+  overlay.style.zIndex='1001';
+  const notifs=window._notificationsCache||[];
+  const list=notifs.length?notifs.map(n=>`
+    <div class="notif-row" style="padding:10px 12px;background:${n.read?'var(--c-surface)':'var(--c-surface-2)'};border-radius:8px;margin-bottom:6px;border-left:3px solid ${n.read?'var(--c-border)':'var(--c-accent)'}">
+      <div style="font-size:12px;font-weight:700;color:var(--c-text)">${escapeHtml(n.title||'')}</div>
+      ${n.message?`<div style="font-size:11px;color:var(--c-text-2);margin-top:2px">${escapeHtml(n.message)}</div>`:''}
+      <div style="font-size:10px;color:var(--c-text-3);margin-top:4px">${formatRelativeTime(new Date(n.createdAt).getTime())}</div>
+    </div>
+  `).join(''):'<div style="text-align:center;color:var(--c-text-3);font-size:12px;padding:24px">Sem notificações</div>';
+  overlay.innerHTML=`<div class="modal-sheet" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">Notificações</h2>
+    <p class="modal-sub">${notifs.length} notificações</p>
+    <div style="max-height:60vh;overflow-y:auto;margin-bottom:12px">${list}</div>
+    <div class="modal-actions">
+      ${notifs.some(n=>!n.read)?'<button class="btn btn-secondary" id="notifReadAll">Marcar todas como lidas</button>':''}
+      <button class="btn btn-primary" id="notifClose">Fechar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('#notifClose').addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
+  const raBtn=overlay.querySelector('#notifReadAll');
+  if(raBtn)raBtn.addEventListener('click',async()=>{
+    raBtn.disabled=true;raBtn.textContent='Marcando...';
+    try{
+      await fetch('/api/notifications/read-all',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:currentUserEmail})});
+      _lastNotifCount=0;
+      notifBadge.style.display='none';
+      toast('Notificações marcadas como lidas','success');
+      close();
+    }catch(e){
+      toast('Erro: '+e.message,'error');
+      raBtn.disabled=false;raBtn.textContent='Marcar todas como lidas';
+    }
+  });
+}
+if(notifBtn)notifBtn.addEventListener('click',openNotifModal);
+
+// === Presença (quem está online agora) ===
+async function sendHeartbeat(){
+  if(!currentUserEmail||!currentPlanilhaId)return;
+  try{
+    const u=getUser();
+    await fetch('/api/presence',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        email:currentUserEmail,
+        planilhaId:currentPlanilhaId,
+        userName:u?(u.googleName||currentUserEmail):currentUserEmail
+      })
+    });
+  }catch(e){/* ignora */}
+}
+async function fetchPresence(){
+  if(!currentUserEmail||!currentPlanilhaId)return;
+  try{
+    const r=await fetch('/api/presence/'+encodeURIComponent(currentPlanilhaId)+'?email='+encodeURIComponent(currentUserEmail));
+    if(!r.ok){presenceAvatars.style.display='none';return}
+    const data=await r.json();
+    if(!data.ok||!Array.isArray(data.online)){presenceAvatars.style.display='none';return}
+    const others=data.online.filter(p=>!p.isMe); // não mostra eu mesmo
+    if(others.length===0){
+      presenceAvatars.style.display='none';
+      return;
+    }
+    presenceAvatars.style.display='flex';
+    const maxShow=3;
+    const showOthers=others.slice(0,maxShow);
+    const extra=others.length-showOthers.length;
+    let html=showOthers.map(p=>{
+      const initial=(p.name||p.email||'?').charAt(0).toUpperCase();
+      return `<div class="presence-avatar" title="${escapeHtml(p.name||p.email)}">${escapeHtml(initial)}</div>`;
+    }).join('');
+    if(extra>0){
+      html+=`<div class="presence-avatar presence-more" title="mais ${extra} pessoas">+${extra}</div>`;
+    }
+    presenceAvatars.innerHTML=html;
+  }catch(e){/* ignora */}
+}
+setInterval(()=>{
+  if(currentUserEmail && currentPlanilhaId && document.visibilityState==='visible'){
+    sendHeartbeat();
+    fetchPresence();
+  }
+},10000); // a cada 10s
+
+// === Histórico de versões ===
+async function openHistoryModal(){
+  if(!currentUserEmail||!currentPlanilhaId){
+    toast('Selecione uma planilha primeiro','error');
+    return;
+  }
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay open';
+  overlay.style.zIndex='1001';
+  overlay.innerHTML=`<div class="modal-sheet" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">Histórico de versões</h2>
+    <p class="modal-sub">Últimas 50 versões salvas automaticamente</p>
+    <div id="historyContent" style="min-height:100px"><div style="text-align:center;color:var(--c-text-3);padding:20px;font-size:12px">Carregando...</div></div>
+    <div class="modal-actions"><button class="btn btn-secondary" id="historyClose">Fechar</button></div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('#historyClose').addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
+
+  try{
+    const r=await fetch('/api/planilha/'+encodeURIComponent(currentPlanilhaId)+'/versions?email='+encodeURIComponent(currentUserEmail));
+    const data=await r.json();
+    if(!data.ok){
+      document.getElementById('historyContent').innerHTML='<p style="color:var(--c-despesas);font-size:12px">'+escapeHtml(data.error||'Erro')+'</p>';
+      return;
+    }
+    if(!data.versions.length){
+      document.getElementById('historyContent').innerHTML='<p style="color:var(--c-text-3);font-size:12px;text-align:center;padding:20px">Sem versões salvas ainda</p>';
+      return;
+    }
+    const list=data.versions.map(v=>`
+      <div class="version-row" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--c-surface-2);border-radius:8px;margin-bottom:6px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="var(--c-text-3)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--c-text)">${formatRelativeTime(new Date(v.savedAt).getTime())}</div>
+          <div style="font-size:10px;color:var(--c-text-3);margin-top:2px">por ${escapeHtml(v.savedByEmail)} · ${(v.sizeBytes/1024).toFixed(1)} KB</div>
+        </div>
+        <button class="btn btn-secondary" data-restore="${v.id}" style="padding:6px 12px;font-size:11px">Restaurar</button>
+      </div>
+    `).join('');
+    document.getElementById('historyContent').innerHTML=list;
+    overlay.querySelectorAll('[data-restore]').forEach(btn=>{
+      btn.addEventListener('click',async()=>{
+        const versionId=btn.getAttribute('data-restore');
+        if(!confirm('Restaurar esta versão? A versão atual também será salva no histórico (você pode desfazer depois).'))return;
+        btn.disabled=true;btn.textContent='Restaurando...';
+        try{
+          const r=await fetch('/api/planilha/'+encodeURIComponent(currentPlanilhaId)+'/versions/'+versionId+'/restore',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({email:currentUserEmail,userName:getUser()?.googleName||currentUserEmail})
+          });
+          const data=await r.json();
+          if(r.ok){
+            // Atualiza planilha local com dados restaurados
+            const u=getUser();
+            const idx=u.planilhas.findIndex(p=>p.id===currentPlanilhaId);
+            if(idx>=0){
+              u.planilhas[idx]={...u.planilhas[idx],...data.data};
+              u.planilhas[idx]._updatedAt=data.updatedAt;
+            }
+            persistUsers();
+            renderAll();
+            toast('Versão restaurada com sucesso','success');
+            close();
+          }else{
+            toast('Erro: '+(data.error||''),'error');
+            btn.disabled=false;btn.textContent='Restaurar';
+          }
+        }catch(e){
+          toast('Erro: '+e.message,'error');
+          btn.disabled=false;btn.textContent='Restaurar';
+        }
+      });
+    });
+  }catch(err){
+    document.getElementById('historyContent').innerHTML='<p style="color:var(--c-despesas);font-size:12px">Erro de conexão: '+escapeHtml(err.message)+'</p>';
+  }
+}
+if(historyBtn)historyBtn.addEventListener('click',openHistoryModal);
+
+// Polling de notificações a cada 30s
+setInterval(()=>{
+  if(currentUserEmail && document.visibilityState==='visible'){
+    fetchNotifications();
+  }
+},30000);
 
 /* INIT */
 function init(){
