@@ -117,6 +117,32 @@ svg{display:block}
 .icon-btn:active{background:rgba(255,255,255,0.18)}
 .icon-btn svg{width:19px;height:19px}
 
+/* Otimização mobile: priorizar menu (⋮) e notificações, esconder extras em telas pequenas */
+#menuBtn{flex-shrink:0!important;order:99} /* sempre visível, sempre por último */
+#notifBtn{flex-shrink:0!important;order:98} /* sempre visível */
+#syncBadge{flex-shrink:0!important;order:97} /* sempre visível */
+.brand{order:1;flex-shrink:1}
+.planilha-selector{order:2;flex-shrink:1}
+.month-selector{order:3;flex-shrink:1}
+#togglePrivacyBtn{order:5}
+#undoBtn{order:6}
+#redoBtn{order:7}
+.presence-avatars{order:96;flex-shrink:1;max-width:80px;overflow:hidden}
+/* Em telas pequenas, esconde undo/redo e "NoFluxo" (deixa só o logo) */
+@media(max-width:420px){
+  .brand-name{display:none}
+  #undoBtn,#redoBtn{display:none}
+  .month-selector{font-size:10px;padding:5px 8px}
+  .brand-logo{width:26px;height:26px;border-radius:7px;font-size:13px}
+  .icon-btn{width:32px;height:32px}
+  .icon-btn svg{width:17px;height:17px}
+  .planilha-selector{padding:5px 8px;font-size:11px;max-width:110px}
+}
+@media(max-width:340px){
+  #togglePrivacyBtn{display:none}
+  .presence-avatars{display:none!important}
+}
+
 /* === Badge de status do sync === */
 .sync-badge{width:30px;height:30px;border-radius:50%;border:none;display:grid;place-items:center;background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;position:relative;flex-shrink:0;transition:background .2s}
 .sync-badge:hover{background:rgba(255,255,255,0.16)}
@@ -1344,9 +1370,6 @@ html[data-theme="dark"] .hero-mini-despesas{
       <svg class="sync-icon-error" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
     </button>
     <div id="presenceAvatars" class="presence-avatars" style="display:none"></div>
-    <button class="icon-btn" id="historyBtn" aria-label="Histórico de versões" title="Histórico de versões" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
-    </button>
     <button class="icon-btn" id="menuBtn" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
     </button>
@@ -1369,6 +1392,7 @@ html[data-theme="dark"] .hero-mini-despesas{
   <button class="menu-item" data-action="currencies"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Moedas e taxas</button>
   <button class="menu-item" data-action="toggle-theme"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg><span id="themeLabel">Modo escuro</span></button>
   <button class="menu-item" data-action="sync-now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/><polyline points="21 4 21 10 15 10"/></svg>Sincronizar agora</button>
+  <button class="menu-item" data-action="history"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>Histórico de versões</button>
   <button class="menu-item" data-action="install-pwa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Instalar no PC/celular</button>
   <div class="menu-divider"></div>
   <div class="menu-section-label">Dados</div>
@@ -4618,6 +4642,7 @@ function handleMenuAction(action){
     case 'install-pwa':triggerInstall();break;
     case 'toggle-theme':toggleTheme();break;
     case 'sync-now':syncWithServer({force:true,silent:false});break;
+    case 'history':openHistoryModal();break;
     case 'reset-factory':openResetFactoryModal();break;
     case 'logout':logout();break;
   }
@@ -6647,7 +6672,6 @@ function logout(){
   currentPlanilhaId=null;
   localStorage.removeItem(SESSION_KEY);
   updateSyncBadge && updateSyncBadge('ok'); // esconde badge (currentUserEmail=null)
-  if(historyBtn)historyBtn.style.display='none';
   if(presenceAvatars)presenceAvatars.style.display='none';
   if(notifBadge)notifBadge.style.display='none';
   _lastNotifCount=0;
@@ -6664,8 +6688,6 @@ function onAuthSuccess(){
   renderAll();
   // Garante que o data-active-screen está setado
   document.body.setAttribute('data-active-screen',currentScreen);
-  // Mostra o botão de histórico (só quando logado)
-  if(historyBtn)historyBtn.style.display='grid';
   // === SYNC pós-login ===
   applyServerDataIfNewer(currentUserEmail).then(async changed=>{
     if(changed){
@@ -7009,7 +7031,6 @@ const toast=showToast;
 const notifBtn=document.getElementById('notifBtn');
 const notifBadge=document.getElementById('notifBadge');
 const presenceAvatars=document.getElementById('presenceAvatars');
-const historyBtn=document.getElementById('historyBtn');
 
 // === Notificações ===
 let _lastNotifCount=0;
@@ -7207,8 +7228,6 @@ async function openHistoryModal(){
     document.getElementById('historyContent').innerHTML='<p style="color:var(--c-despesas);font-size:12px">Erro de conexão: '+escapeHtml(err.message)+'</p>';
   }
 }
-if(historyBtn)historyBtn.addEventListener('click',openHistoryModal);
-
 // Polling de notificações a cada 30s
 setInterval(()=>{
   if(currentUserEmail && document.visibilityState==='visible'){
