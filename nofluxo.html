@@ -1257,7 +1257,8 @@ html[data-theme="dark"] .hero-mini-despesas{
 .month-bar .mb-year button:active{background:var(--c-border)}
 .month-bar .mb-year span{min-width:38px;text-align:center;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
 .month-bar .mb-divider{width:1px;height:24px;background:var(--c-border);flex-shrink:0}
-.month-bar .mb-months{display:flex;gap:4px;flex:1;min-width:0}
+.month-bar .mb-months{display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 4px}
+.month-bar .mb-months::-webkit-scrollbar{display:none}
 .month-bar .mb-month{padding:6px 8px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.02em;flex-shrink:0;transition:all .15s}
 .month-bar .mb-month:active{transform:scale(0.94)}
 .month-bar .mb-month.active{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
@@ -4060,30 +4061,57 @@ const monthBar=document.getElementById('monthBar');
 function renderMonthBar(){
   if(!currentUserEmail||!monthBar){monthBar&&(monthBar.style.display='none');return}
   monthBar.style.display='flex';
-  const [yr,mo]=currentMonth.split('-').map(Number);
+  const [curYr,curMo]=currentMonth.split('-').map(Number);
   const monthInitials=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  // Gera 12 meses antes + atual + 12 depois = 25 meses (roleta horizontal)
+  let months=[];
+  for(let i=-12;i<=12;i++){
+    const d=new Date(curYr,curMo-1+i,1);
+    const y=d.getFullYear();
+    const m=d.getMonth()+1;
+    const mKey=y+'-'+String(m).padStart(2,'0');
+    months.push({key:mKey,label:monthInitials[m-1],year:y,active:mKey===currentMonth});
+  }
   let html=`<div class="mb-year">
-    <button id="mbPrevYear" aria-label="Ano anterior">‹</button>
-    <span id="mbYearDisplay" title="Ir para mês/ano específico">${yr}</span>
-    <button id="mbNextYear" aria-label="Próximo ano">›</button>
+    <button id="mbPrevMonth" aria-label="Mês anterior" title="Mês anterior">‹</button>
+    <span id="mbYearDisplay" title="Ir para mês/ano específico">${curYr}</span>
+    <button id="mbNextMonth" aria-label="Próximo mês" title="Próximo mês">›</button>
   </div>
   <div class="mb-divider"></div>
-  <div class="mb-months">`;
-  for(let i=0;i<12;i++){
-    const mKey=yr+'-'+String(i+1).padStart(2,'0');
-    html+=`<button class="mb-month ${mKey===currentMonth?'active':''}" data-mk="${mKey}">${monthInitials[i]}</button>`;
-  }
+  <div class="mb-months" id="mbMonthsScroll">`;
+  months.forEach(m=>{
+    html+=`<button class="mb-month ${m.active?'active':''}" data-mk="${m.key}">${m.label}</button>`;
+  });
   html+=`</div>`;
   monthBar.innerHTML=html;
-  // Handlers
+  // Auto-scroll para centralizar o mês ativo
+  const scrollContainer=monthBar.querySelector('#mbMonthsScroll');
+  const activeBtn=monthBar.querySelector('.mb-month.active');
+  if(scrollContainer&&activeBtn){
+    setTimeout(()=>{
+      scrollContainer.scrollLeft=activeBtn.offsetLeft-scrollContainer.offsetWidth/2+activeBtn.offsetWidth/2;
+    },50);
+  }
+  // Handlers dos meses
   monthBar.querySelectorAll('.mb-month').forEach(b=>{
     b.addEventListener('click',()=>{currentMonth=b.getAttribute('data-mk');renderAll()});
   });
-  const prevBtn=monthBar.querySelector('#mbPrevYear');
-  const nextBtn=monthBar.querySelector('#mbNextYear');
+  // Setas ‹ › mudam de MÊS (não de ano) — a roleta se move
+  const prevBtn=monthBar.querySelector('#mbPrevMonth');
+  const nextBtn=monthBar.querySelector('#mbNextMonth');
   const yearDisp=monthBar.querySelector('#mbYearDisplay');
-  if(prevBtn)prevBtn.addEventListener('click',()=>{const[y]=currentMonth.split('-').map(Number);currentMonth=(y-1)+'-'+currentMonth.split('-')[1];renderAll()});
-  if(nextBtn)nextBtn.addEventListener('click',()=>{const[y]=currentMonth.split('-').map(Number);currentMonth=(y+1)+'-'+currentMonth.split('-')[1];renderAll()});
+  if(prevBtn)prevBtn.addEventListener('click',()=>{
+    const[y,m]=currentMonth.split('-').map(Number);
+    const d=new Date(y,m-2,1);
+    currentMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    renderAll();
+  });
+  if(nextBtn)nextBtn.addEventListener('click',()=>{
+    const[y,m]=currentMonth.split('-').map(Number);
+    const d=new Date(y,m,1);
+    currentMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    renderAll();
+  });
   if(yearDisp)yearDisp.addEventListener('click',()=>openCalendarPicker());
 }
 
