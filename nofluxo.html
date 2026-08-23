@@ -81,55 +81,6 @@ html[data-theme="dark"] {
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{font-family:var(--font);background:var(--c-bg);color:var(--c-text);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;transition:background-color .25s,color .25s}
 body{min-height:100vh;min-height:100dvh;overflow-x:hidden;max-width:480px;margin:0 auto;position:relative;box-shadow:0 0 40px rgba(0,0,0,0.08)}
-/* Desktop: layout mais largo, aproveitando espaço horizontal */
-@media(min-width:768px){
-  body{max-width:100%;box-shadow:none}
-  /* App-bar mais largo */
-  .app-bar{max-width:100%}
-  .app-bar .search-wrap{max-width:400px}
-  /* Content centraliza com mais largura */
-  .content{max-width:900px;margin:0 auto}
-  /* Cards em grid de 2 colunas */
-  .screen .card:not(.savings-goal-card){max-width:420px}
-  /* Hero balance: ocupa largura total */
-  .hero-balance{max-width:900px}
-  .hero-reservas-block{max-width:420px}
-  /* Subgrutos: lado a lado */
-  .subgroup{max-width:420px}
-  /* Month bar centralizado */
-  .month-bar{max-width:900px;margin:0 auto}
-  /* Bottom nav centralizada */
-  .bottom-nav{max-width:900px}
-  /* Modal sheets mais largas */
-  .modal-sheet{max-width:600px!important;margin:0 auto}
-}
-@media(min-width:1024px){
-  .content{max-width:1100px}
-  .month-bar{max-width:1100px}
-  .bottom-nav{max-width:1100px}
-  .hero-balance{max-width:1100px;flex-direction:row;flex-wrap:wrap}
-  .hero-card{flex:1;min-width:300px}
-  .hero-reservas-block{flex:1;min-width:280px}
-}
-/* Grid de donuts (2 colunas no desktop) */
-.donut-grid{display:flex;flex-direction:column;gap:14px;margin-bottom:14px}
-@media(min-width:768px){
-  .donut-grid{flex-direction:row;flex-wrap:wrap}
-  .donut-grid>*{flex:1;min-width:300px;max-width:420px}
-}
-/* Screens de despesas/receitas/reservas: subgrupos em grid no desktop */
-@media(min-width:768px){
-  .screen[data-screen="despesas"] .content>div:not(.month-bar):not(.notebook-card),
-  .screen[data-screen="receitas"] .content>div:not(.month-bar):not(.notebook-card),
-  .screen[data-screen="reservas"] .content>div:not(.month-bar):not(.notebook-card){
-    display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start
-  }
-  .screen[data-screen="despesas"] .subgroup,
-  .screen[data-screen="receitas"] .subgroup,
-  .screen[data-screen="reservas"] .subgroup{
-    flex:1;min-width:320px;max-width:420px
-  }
-}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;font-size:16px;color:var(--c-text)}
 svg{display:block}
@@ -250,6 +201,48 @@ html[data-theme="dark"] body[data-active-screen="reservas"] .content{background:
 .screen{display:none;animation:fadeIn .25s ease}
 .screen.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* === DESKTOP: todas as 4 telas visíveis ao mesmo tempo === */
+@media(min-width:1024px){
+  body{max-width:100%;box-shadow:none}
+  .app-bar{max-width:100%}
+  .app-bar .search-wrap{max-width:400px}
+  .month-bar{max-width:100%}
+  .content{max-width:100%;padding:14px 20px 32px;padding-bottom:calc(var(--bottom-nav-h) + 56px + var(--safe-bottom))}
+  /* Todas as telas visíveis — empilhadas verticalmente */
+  .screen{display:block!important;animation:none;margin-bottom:28px;padding-bottom:14px;border-bottom:2px solid var(--c-border-2)}
+  .screen:last-child{border-bottom:none}
+  /* Cada tela com um título no topo */
+  .screen[data-screen="despesas"]::before,
+  .screen[data-screen="receitas"]::before,
+  .screen[data-screen="reservas"]::before{
+    content:attr(data-screen);
+    display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;
+    color:var(--c-text-3);margin-bottom:8px;padding:0 4px
+  }
+  .screen[data-screen="inicio"]::before{
+    content:'Início';display:block;font-size:11px;font-weight:800;text-transform:uppercase;
+    letter-spacing:0.08em;color:var(--c-text-3);margin-bottom:8px;padding:0 4px
+  }
+  .screen[data-screen="despesas"]::before{content:'Despesas';color:var(--c-despesas)}
+  .screen[data-screen="receitas"]::before{content:'Receitas';color:var(--c-receitas)}
+  .screen[data-screen="reservas"]::before{content:'Reservas';color:var(--c-reservas)}
+  /* Hide bottom nav on desktop — no need to switch screens */
+  .bottom-nav{display:none!important}
+  /* Show brand name on desktop */
+  .brand-name{display:inline!important}
+  /* Show undo/redo on desktop */
+  #undoBtn,#redoBtn{display:grid!important}
+  /* Modal sheets wider on desktop */
+  .modal-sheet{max-width:560px!important}
+  /* No desktop, não muda cor de fundo por tela ativa */
+  html[data-theme="dark"] body[data-active-screen="despesas"] .content,
+  html[data-theme="dark"] body[data-active-screen="receitas"] .content,
+  html[data-theme="dark"] body[data-active-screen="reservas"] .content{background:var(--c-bg)}
+}
+@media(min-width:1200px){
+  .content{padding:14px 40px 32px}
+}
 
 /* CARDS */
 .card{background:var(--c-surface);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);border:1px solid var(--c-border-2);transition:background-color .25s,border-color .25s}
@@ -2969,12 +2962,8 @@ function renderInicio(){
   // === Gráfico de entradas x saídas ANUAL ===
   html += renderAnnualChart(yr);
 
-  // Donuts lado a lado no desktop
-  const donuts=[];
-  if(despGroupArr.length>0){const t=despGroupArr.reduce((s,[,v])=>s+v,0);donuts.push(renderDonutCard('despesas',despGroupArr,t,'Distribuição de gastos'))}
-  if(recGroupArr.length>0){const t=recGroupArr.reduce((s,[,v])=>s+v,0);donuts.push(renderDonutCard('receitas',recGroupArr,t,'Origem das receitas'))}
-  if(donuts.length>1)html+=`<div class="donut-grid">${donuts.join('')}</div>`;
-  else if(donuts.length===1)html+=donuts[0];
+  if(despGroupArr.length>0){const t=despGroupArr.reduce((s,[,v])=>s+v,0);html+=renderDonutCard('despesas',despGroupArr,t,'Distribuição de gastos')}
+  if(recGroupArr.length>0){const t=recGroupArr.reduce((s,[,v])=>s+v,0);html+=renderDonutCard('receitas',recGroupArr,t,'Origem das receitas')}
 
   // (Card "Valores a receber / a pagar" removido — agora os itens pendentes aparecem no próprio subgrupo com badge "pendente")
 
@@ -3271,34 +3260,39 @@ function renderPendingRow(it,tipo){
 // basta consultar o mês imediatamente anterior para ter a referência de "acumulado".
 // Saldo do mês ANTERIOR — NUNCA inclui pending (são valores a receber, não realizados)
 function calcAccumulatedBalance(targetMonth){
-  // Soma o saldo de TODOS os meses anteriores ao targetMonth (não só o imediatamente anterior)
-  // Ex: se targetMonth=2026-11, soma Jan+Fev+...+Out de 2026 (e anos anteriores se houver)
-  const u=getUser();if(!u)return 0;
-  const p=getPlanilha();if(!p)return 0;
-  // Encontra o mês mais antigo com dados
-  let earliestMonth=null;
-  ['receitas','despesas'].forEach(tipo=>{
-    (p.state[tipo]||[]).forEach(it=>{
-      const m=(it.date||'').slice(0,7);
-      if(m && m<targetMonth && (!earliestMonth||m<earliestMonth))earliestMonth=m;
-    });
-  });
-  if(!earliestMonth)return 0;
-  // Itera do mês mais antigo até o mês anterior ao target
-  let saldo=0;
-  let cur=earliestMonth;
-  let safety=0;
-  while(cur<targetMonth && safety++<240){ // máx 20 anos
+  // Soma o saldo de TODOS os meses anteriores ao targetMonth
+  try{
+    const u=getUser();if(!u)return 0;
+    const p=getPlanilha();if(!p)return 0;
+    // Encontra o mês mais antigo com dados
+    let earliestMonth=null;
     ['receitas','despesas'].forEach(tipo=>{
-      itemsForMonth(tipo,cur).forEach(it=>{
-        if(it.pending)return; // pending nunca entra no saldo acumulado
-        const v=convertToBRL(it.value,it.currency||'BRL');
-        saldo+=tipo==='receitas'?v:-v;
+      (p.state[tipo]||[]).forEach(it=>{
+        const m=(it.date||'').slice(0,7);
+        if(m && m<targetMonth && (!earliestMonth||m<earliestMonth))earliestMonth=m;
       });
     });
-    cur=addMonths(cur,1);
+    if(!earliestMonth)return 0;
+    let saldo=0;
+    let cur=earliestMonth;
+    let safety=0;
+    while(cur<targetMonth && safety++<120){
+      ['receitas','despesas'].forEach(tipo=>{
+        try{
+          itemsForMonth(tipo,cur).forEach(it=>{
+            if(it.pending)return;
+            const v=convertToBRL(it.value,it.currency||'BRL');
+            saldo+=tipo==='receitas'?v:-v;
+          });
+        }catch(e){/* ignora erro em mês específico */}
+      });
+      cur=addMonths(cur,1);
+    }
+    return saldo;
+  }catch(e){
+    console.warn('calcAccumulatedBalance error:',e);
+    return 0;
   }
-  return saldo;
 }
 
 function renderEvolutionChart(){
