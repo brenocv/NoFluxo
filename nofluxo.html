@@ -81,6 +81,55 @@ html[data-theme="dark"] {
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{font-family:var(--font);background:var(--c-bg);color:var(--c-text);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;transition:background-color .25s,color .25s}
 body{min-height:100vh;min-height:100dvh;overflow-x:hidden;max-width:480px;margin:0 auto;position:relative;box-shadow:0 0 40px rgba(0,0,0,0.08)}
+/* Desktop: layout mais largo, aproveitando espaço horizontal */
+@media(min-width:768px){
+  body{max-width:100%;box-shadow:none}
+  /* App-bar mais largo */
+  .app-bar{max-width:100%}
+  .app-bar .search-wrap{max-width:400px}
+  /* Content centraliza com mais largura */
+  .content{max-width:900px;margin:0 auto}
+  /* Cards em grid de 2 colunas */
+  .screen .card:not(.savings-goal-card){max-width:420px}
+  /* Hero balance: ocupa largura total */
+  .hero-balance{max-width:900px}
+  .hero-reservas-block{max-width:420px}
+  /* Subgrutos: lado a lado */
+  .subgroup{max-width:420px}
+  /* Month bar centralizado */
+  .month-bar{max-width:900px;margin:0 auto}
+  /* Bottom nav centralizada */
+  .bottom-nav{max-width:900px}
+  /* Modal sheets mais largas */
+  .modal-sheet{max-width:600px!important;margin:0 auto}
+}
+@media(min-width:1024px){
+  .content{max-width:1100px}
+  .month-bar{max-width:1100px}
+  .bottom-nav{max-width:1100px}
+  .hero-balance{max-width:1100px;flex-direction:row;flex-wrap:wrap}
+  .hero-card{flex:1;min-width:300px}
+  .hero-reservas-block{flex:1;min-width:280px}
+}
+/* Grid de donuts (2 colunas no desktop) */
+.donut-grid{display:flex;flex-direction:column;gap:14px;margin-bottom:14px}
+@media(min-width:768px){
+  .donut-grid{flex-direction:row;flex-wrap:wrap}
+  .donut-grid>*{flex:1;min-width:300px;max-width:420px}
+}
+/* Screens de despesas/receitas/reservas: subgrupos em grid no desktop */
+@media(min-width:768px){
+  .screen[data-screen="despesas"] .content>div:not(.month-bar):not(.notebook-card),
+  .screen[data-screen="receitas"] .content>div:not(.month-bar):not(.notebook-card),
+  .screen[data-screen="reservas"] .content>div:not(.month-bar):not(.notebook-card){
+    display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start
+  }
+  .screen[data-screen="despesas"] .subgroup,
+  .screen[data-screen="receitas"] .subgroup,
+  .screen[data-screen="reservas"] .subgroup{
+    flex:1;min-width:320px;max-width:420px
+  }
+}
 button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
 input,select,textarea{font-family:inherit;font-size:16px;color:var(--c-text)}
 svg{display:block}
@@ -1248,6 +1297,24 @@ html[data-theme="dark"] .hero-mini-despesas{
 .month-circle:active{transform:scale(0.92)}
 .month-circle.active{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
 
+/* === Month Bar fixo (visível em todas as páginas) === */
+.month-bar{position:sticky;top:calc(var(--app-bar-h) + var(--safe-top));z-index:49;background:var(--c-surface-2);border-bottom:1px solid var(--c-border-2);padding:8px 10px;display:flex;align-items:center;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.month-bar::-webkit-scrollbar{display:none}
+.month-bar .mb-year{display:flex;align-items:center;gap:4px;flex-shrink:0;font-size:13px;font-weight:800;color:var(--c-text)}
+.month-bar .mb-year button{padding:4px 6px;border:none;background:none;cursor:pointer;color:var(--c-text-2);font-size:16px;font-weight:700;border-radius:6px}
+.month-bar .mb-year button:active{background:var(--c-border)}
+.month-bar .mb-year span{min-width:38px;text-align:center;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.month-bar .mb-divider{width:1px;height:24px;background:var(--c-border);flex-shrink:0}
+.month-bar .mb-months{display:flex;gap:4px;flex:1;min-width:0}
+.month-bar .mb-month{padding:6px 8px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.02em;flex-shrink:0;transition:all .15s}
+.month-bar .mb-month:active{transform:scale(0.94)}
+.month-bar .mb-month.active{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
+@media(max-width:380px){
+  .month-bar{padding:6px 8px;gap:6px}
+  .month-bar .mb-month{padding:5px 6px;font-size:9px}
+  .month-bar .mb-year span{font-size:12px;min-width:34px}
+}
+
 /* BLOCO DE NOTAS (simples) */
 .notebook-card{background:var(--c-surface);border-radius:var(--radius-lg);margin-bottom:14px;overflow:hidden;border:1px solid var(--c-border-2);box-shadow:0 1px 3px var(--c-shadow)}
 .notebook-header{padding:10px 16px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--c-border-2)}
@@ -1375,6 +1442,9 @@ html[data-theme="dark"] .hero-mini-despesas{
     </button>
   </div>
 </header>
+
+<!-- MONTH BAR — fixo abaixo do app-bar, visível em todas as páginas -->
+<div class="month-bar" id="monthBar" style="display:none"></div>
 
 <!-- MENU DROPDOWN -->
 <div class="menu-dropdown" id="menuDropdown">
@@ -2347,19 +2417,28 @@ const PLANILHA_POLL_MS=5000; // polling a cada 5s para mudanças remotas
 let _lastPlanilhaSeenAt={}; // {planilhaId: timestamp do último pull}
 
 // Migra planilhas do user.planilhas para o servidor (uma vez)
+// IMPORTANTE: só marca como migrada se o servidor confirmar. Nunca apaga dados locais.
 async function migratePlanilhasToServer(email){
   const u=getUser();if(!u||!u.planilhas||u.planilhas.length===0)return;
+  // Só migra planilhas que ainda não foram migradas
+  const toMigrate=u.planilhas.filter(p=>!p._migratedToServer);
+  if(toMigrate.length===0)return;
   try{
     const r=await fetch('/api/migrate-planilhas',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:email,planilhas:u.planilhas})
+      body:JSON.stringify({email:email,planilhas:toMigrate})
     });
     if(r.ok){
       const data=await r.json();
       console.log('Migração de planilhas:',data.migrated,'migradas');
-      // Marca planilhas como migradas
-      u.planilhas.forEach(p=>{p._migratedToServer=true});
+      // Marca APENAS as planilhas que foram migradas com sucesso
+      // NÃO remove de user.planilhas — elas continuam no localStorage como fonte local
+      toMigrate.forEach(p=>{
+        if(data.ids && data.ids.includes(p.id)){
+          p._migratedToServer=true;
+        }
+      });
       persistUsers();
     }
   }catch(e){console.warn('Migrate error:',e);}
@@ -2399,12 +2478,9 @@ async function syncPlanilhaList(email){
         exists.name=sp.name;
       }
     });
-    // Remove planilhas locais que o usuário perdeu acesso
-    u.planilhas=u.planilhas.filter(p=>{
-      const sp=data.planilhas.find(x=>x.id===p.id);
-      // Mantém se está na lista do servidor, ou se ainda não migrei (pode ser local antigo)
-      return sp || !p._migratedToServer;
-    });
+    // NÃO remove planilhas locais — só adiciona compartilhadas e atualiza metadados
+    // Remover planilhas só via ação explícita do usuário (excluir/sair)
+    // Isso garante que deploys não causem perda de dados
     persistUsers();
   }catch(e){console.warn('syncPlanilhaList error:',e);}
 }
@@ -2735,17 +2811,8 @@ function renderInicio(){
   const showSec=settings.showSecondary&&secCode!=='BRL';
   const fmtSec=(vBRL)=>{if(!showSec)return'';const c=getCurrency(secCode);return c.symbol+' '+fmtShort(convertFromBRL(vBRL,secCode))};
 
-  // === Seletor de mês permanente (ano com setas + 12 círculos) ===
-  const [yr,mo]=currentMonth.split('-').map(Number);
-  const monthNames=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
-  const monthInitials=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-  let html=`<div class="month-circles">`;
-  for(let i=0;i<12;i++){
-    const mKey=yr+'-'+String(i+1).padStart(2,'0');
-    html+=`<button class="month-circle ${mKey===currentMonth?'active':''}" data-mk="${mKey}">${monthInitials[i]}</button>`;
-  }
-  html+=`</div>`;
-
+  // === Seletor de mês permanente — agora é fixo no app-bar (renderMonthBar)
+  // Renderizado em todas as páginas, não só na inicial
   // === HERO BALANCE UNIFICADO (saldo + receitas + despesas + toggle, tudo num bloco só) ===
   const saldoSemPend=totalRec-totalDesp;
   const totalRecAll=recAll.reduce((s,it)=>s+convertToBRL(it.value,it.currency||'BRL'),0);
@@ -2902,8 +2969,12 @@ function renderInicio(){
   // === Gráfico de entradas x saídas ANUAL ===
   html += renderAnnualChart(yr);
 
-  if(despGroupArr.length>0){const t=despGroupArr.reduce((s,[,v])=>s+v,0);html+=renderDonutCard('despesas',despGroupArr,t,'Distribuição de gastos')}
-  if(recGroupArr.length>0){const t=recGroupArr.reduce((s,[,v])=>s+v,0);html+=renderDonutCard('receitas',recGroupArr,t,'Origem das receitas')}
+  // Donuts lado a lado no desktop
+  const donuts=[];
+  if(despGroupArr.length>0){const t=despGroupArr.reduce((s,[,v])=>s+v,0);donuts.push(renderDonutCard('despesas',despGroupArr,t,'Distribuição de gastos'))}
+  if(recGroupArr.length>0){const t=recGroupArr.reduce((s,[,v])=>s+v,0);donuts.push(renderDonutCard('receitas',recGroupArr,t,'Origem das receitas'))}
+  if(donuts.length>1)html+=`<div class="donut-grid">${donuts.join('')}</div>`;
+  else if(donuts.length===1)html+=donuts[0];
 
   // (Card "Valores a receber / a pagar" removido — agora os itens pendentes aparecem no próprio subgrupo com badge "pendente")
 
@@ -3028,8 +3099,7 @@ function renderInicio(){
   }
 
   screen.innerHTML=html;
-  // Month selector handlers (apenas círculos de mês — ano muda pelo menu Calendário)
-  screen.querySelectorAll('.month-circle').forEach(b=>{b.addEventListener('click',()=>{currentMonth=b.getAttribute('data-mk');renderAll()})});
+  // Month selector agora é fixo (renderMonthBar) — handlers estão lá
 
   // Hero toggle: incluir valores a receber no saldo (afeta saldo do mês e acumulado)
   const heroTogglePend=document.getElementById('heroTogglePend');
@@ -3201,15 +3271,33 @@ function renderPendingRow(it,tipo){
 // basta consultar o mês imediatamente anterior para ter a referência de "acumulado".
 // Saldo do mês ANTERIOR — NUNCA inclui pending (são valores a receber, não realizados)
 function calcAccumulatedBalance(targetMonth){
-  const prevMonth=addMonths(targetMonth,-1);
-  let saldo=0;
+  // Soma o saldo de TODOS os meses anteriores ao targetMonth (não só o imediatamente anterior)
+  // Ex: se targetMonth=2026-11, soma Jan+Fev+...+Out de 2026 (e anos anteriores se houver)
+  const u=getUser();if(!u)return 0;
+  const p=getPlanilha();if(!p)return 0;
+  // Encontra o mês mais antigo com dados
+  let earliestMonth=null;
   ['receitas','despesas'].forEach(tipo=>{
-    itemsForMonth(tipo,prevMonth).forEach(it=>{
-      if(it.pending)return; // pending nunca entra no saldo do mês anterior
-      const v=convertToBRL(it.value,it.currency||'BRL');
-      saldo+=tipo==='receitas'?v:-v;
+    (p.state[tipo]||[]).forEach(it=>{
+      const m=(it.date||'').slice(0,7);
+      if(m && m<targetMonth && (!earliestMonth||m<earliestMonth))earliestMonth=m;
     });
   });
+  if(!earliestMonth)return 0;
+  // Itera do mês mais antigo até o mês anterior ao target
+  let saldo=0;
+  let cur=earliestMonth;
+  let safety=0;
+  while(cur<targetMonth && safety++<240){ // máx 20 anos
+    ['receitas','despesas'].forEach(tipo=>{
+      itemsForMonth(tipo,cur).forEach(it=>{
+        if(it.pending)return; // pending nunca entra no saldo acumulado
+        const v=convertToBRL(it.value,it.currency||'BRL');
+        saldo+=tipo==='receitas'?v:-v;
+      });
+    });
+    cur=addMonths(cur,1);
+  }
   return saldo;
 }
 
@@ -4002,11 +4090,44 @@ function renderItemRow(it,tipo,isPending){
 }
 
 function renderAll(){
+  renderMonthBar();
   renderInicio();
   ['despesas','receitas','reservas'].forEach(renderScreen);
   renderMonthPicker();
   updatePlanilhaName();
   updateMenuCurrentPlan();
+}
+
+// === Month Bar fixo (visível em todas as páginas) ===
+const monthBar=document.getElementById('monthBar');
+function renderMonthBar(){
+  if(!currentUserEmail||!monthBar){monthBar&&(monthBar.style.display='none');return}
+  monthBar.style.display='flex';
+  const [yr,mo]=currentMonth.split('-').map(Number);
+  const monthInitials=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  let html=`<div class="mb-year">
+    <button id="mbPrevYear" aria-label="Ano anterior">‹</button>
+    <span id="mbYearDisplay" title="Ir para mês/ano específico">${yr}</span>
+    <button id="mbNextYear" aria-label="Próximo ano">›</button>
+  </div>
+  <div class="mb-divider"></div>
+  <div class="mb-months">`;
+  for(let i=0;i<12;i++){
+    const mKey=yr+'-'+String(i+1).padStart(2,'0');
+    html+=`<button class="mb-month ${mKey===currentMonth?'active':''}" data-mk="${mKey}">${monthInitials[i]}</button>`;
+  }
+  html+=`</div>`;
+  monthBar.innerHTML=html;
+  // Handlers
+  monthBar.querySelectorAll('.mb-month').forEach(b=>{
+    b.addEventListener('click',()=>{currentMonth=b.getAttribute('data-mk');renderAll()});
+  });
+  const prevBtn=monthBar.querySelector('#mbPrevYear');
+  const nextBtn=monthBar.querySelector('#mbNextYear');
+  const yearDisp=monthBar.querySelector('#mbYearDisplay');
+  if(prevBtn)prevBtn.addEventListener('click',()=>{const[y]=currentMonth.split('-').map(Number);currentMonth=(y-1)+'-'+currentMonth.split('-')[1];renderAll()});
+  if(nextBtn)nextBtn.addEventListener('click',()=>{const[y]=currentMonth.split('-').map(Number);currentMonth=(y+1)+'-'+currentMonth.split('-')[1];renderAll()});
+  if(yearDisp)yearDisp.addEventListener('click',()=>openCalendarPicker());
 }
 
 function switchScreen(tipo){
@@ -4526,11 +4647,18 @@ menuBtn.addEventListener('click',e=>{
           <button class="btn" id="calPickClose" style="background:var(--c-surface-2);border:1px solid var(--c-border);color:var(--c-text-2)">Fechar</button>
         </div>
       </div>`;
-      // Bind anos
+      // Bind anos — ao clicar num ano, muda para esse ano mantendo o mês atual
       overlay.querySelectorAll('.cal-pick-year').forEach(btn=>{
         btn.addEventListener('click',()=>{
           const y=parseInt(btn.getAttribute('data-year'));
           centerYear=y;
+          // Muda para o ano clicado mantendo o mês atualmente selecionado
+          const [,mo]=currentMonth.split('-').map(Number);
+          currentMonth=y+'-'+String(mo).padStart(2,'0');
+          renderAll();
+          // Atualiza o display do ano no menu
+          if(yearDisplay)yearDisplay.textContent=String(y);
+          // Re-renderiza o picker para mostrar o mês ativo no novo ano
           renderPicker();
         });
       });
@@ -6049,20 +6177,47 @@ function renderPlanilhaList(){
     return `<div class="planilha-row ${p.id===currentPlanilhaId?'active':''}" data-id="${p.id}"><div class="planilha-row-icon" style="${isShared?'color:var(--c-accent)':''}">${iconHTML}</div><div class="planilha-row-info"><div class="planilha-row-name">${escapeHtml(p.name)} ${shareBadge}</div><div class="planilha-row-meta">${metaText}</div></div><div class="planilha-row-actions">${shareBtn}<button class="item-btn edit" data-rename="${p.id}" aria-label="Renomear" ${isShared?'disabled style="opacity:0.3"':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button><button class="item-btn del" data-del-plan="${p.id}" aria-label="${isShared?'Sair da planilha':'Excluir'}" ${u.planilhas.length<=1&&!isShared?'disabled':''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/></svg></button></div></div>`;
   }).join('');
   planilhaList.querySelectorAll('.planilha-row').forEach(row=>{
-    row.addEventListener('click',e=>{
+    row.addEventListener('click',async e=>{
       if(e.target.closest('button'))return;
       const id=row.getAttribute('data-id');
       currentPlanilhaId=id;
       saveSession();
       planilhaModal.classList.remove('open');
+      // Se é planilha compartilhada (ou tem estado vazio), busca dados do servidor
+      const u=getUser();
+      const p=u.planilhas.find(x=>x.id===id);
+      if(p && (p._sharedWithMe || (p.state && p.state.despesas.length===0 && p.state.receitas.length===0 && p.state.reservas.length===0))){
+        toast('Carregando planilha...','info');
+        try{
+          const r=await fetch('/api/planilha/'+encodeURIComponent(id)+'?email='+encodeURIComponent(currentUserEmail));
+          if(r.ok){
+            const data=await r.json();
+            if(data.ok && data.planilha){
+              // Aplica dados do servidor, preservando metadados locais
+              const idx=u.planilhas.findIndex(x=>x.id===id);
+              if(idx>=0){
+                const oldRole=u.planilhas[idx]._role;
+                const oldOwner=u.planilhas[idx]._ownerEmail;
+                const oldShared=u.planilhas[idx]._sharedWithMe;
+                u.planilhas[idx]={...u.planilhas[idx],...data.planilha};
+                u.planilhas[idx]._role=data.role||oldRole||'owner';
+                u.planilhas[idx]._ownerEmail=data.ownerEmail||oldOwner;
+                u.planilhas[idx]._sharedWithMe=oldShared;
+                u.planilhas[idx]._updatedAt=data.updatedAt;
+                _lastPlanilhaSeenAt[id]=data.updatedAt||0;
+              }
+              persistUsers();
+            }
+          }
+        }catch(err){console.warn('Erro ao buscar planilha compartilhada:',err)}
+      }
       seedDemoIfEmpty();
       renderAll();
       fillCurrencySelect();
       applyTheme();
       toast('Planilha alterada','success');
-      // Define timestamp "visto agora" para a planilha atual
-      const p=getPlanilha();
-      if(p&&p._updatedAt)_lastPlanilhaSeenAt[id]=p._updatedAt;
+      const p2=getPlanilha();
+      if(p2&&p2._updatedAt)_lastPlanilhaSeenAt[id]=p2._updatedAt;
     });
   });
   planilhaList.querySelectorAll('[data-rename]').forEach(b=>{b.addEventListener('click',()=>{const id=b.getAttribute('data-rename');const u=getUser();const p=u.planilhas.find(x=>x.id===id);if(p._sharedWithMe){toast('Não dá pra renomear planilha compartilhada (você não é o dono)','error');return}const novo=prompt('Novo nome:',p.name);if(novo){p.name=novo.trim();persistUsers();renderPlanilhaList();updatePlanilhaName()}})});
@@ -6674,6 +6829,7 @@ function logout(){
   updateSyncBadge && updateSyncBadge('ok'); // esconde badge (currentUserEmail=null)
   if(presenceAvatars)presenceAvatars.style.display='none';
   if(notifBadge)notifBadge.style.display='none';
+  if(monthBar)monthBar.style.display='none';
   _lastNotifCount=0;
   showAuth();
 }
