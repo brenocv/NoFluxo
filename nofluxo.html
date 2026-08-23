@@ -2973,7 +2973,7 @@ function renderInicio(){
       const saldoMes=b.rec-b.desp;
       const saldoPrev=b.recPrev-b.despPrev;
       const saldoTotal=saldoMes+saldoPrev;
-      html+=`<div class="currency-row">
+      html+=`<div class="currency-row" data-currency-detail="${code}" style="cursor:pointer">
         <div class="currency-flag">${flagImg(code,32)}</div>
         <div class="currency-info">
           <div class="currency-code">${code}</div>
@@ -3162,6 +3162,68 @@ function renderInicio(){
       toast('Histórico limpo','success');
     });
   }
+  // Click em moeda → mostra detalhes dos itens dessa moeda
+  screen.querySelectorAll('[data-currency-detail]').forEach(row=>{
+    row.addEventListener('click',()=>openCurrencyDetailModal(row.getAttribute('data-currency-detail')));
+  });
+}
+
+// === Modal: detalhes de itens por moeda ===
+function openCurrencyDetailModal(currencyCode){
+  const c=getCurrency(currencyCode);
+  const settings=getSettings();
+  const includePend=settings.showPendingInBalance;
+  const prevMonth=addMonths(currentMonth,-1);
+  const monthItems=[],prevItems=[];
+  ['receitas','despesas','reservas'].forEach(tipo=>{
+    itemsForMonth(tipo).forEach(it=>{if((it.currency||'BRL')===currencyCode&&(!it.pending||includePend))monthItems.push({...it,_tipo:tipo})});
+    itemsForMonth(tipo,prevMonth).forEach(it=>{if((it.currency||'BRL')===currencyCode&&!it.pending)prevItems.push({...it,_tipo:tipo})});
+  });
+  const tipoLabel={receitas:'Receita',despesas:'Despesa',reservas:'Reserva'};
+  const tipoColor={receitas:'var(--c-receitas)',despesas:'var(--c-despesas)',reservas:'#b78a00'};
+  const renderItem=(it)=>{
+    const v=Number(it.value)||0;
+    const sig=it._tipo==='despesas'?'−':'+';
+    const col=it._tipo==='despesas'?'var(--c-despesas)':'var(--c-receitas)';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--c-surface-2);border-radius:8px;margin-bottom:6px">
+      <span style="font-size:9px;font-weight:800;text-transform:uppercase;padding:2px 5px;border-radius:4px;background:${tipoColor[it._tipo]}20;color:${tipoColor[it._tipo]}">${tipoLabel[it._tipo]}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--c-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(it.name)}</div>
+        <div style="font-size:10px;color:var(--c-text-3)">${it.subgroup?escapeHtml(it.subgroup):'Sem subgrupo'} · ${fmtDate(it.date)}</div>
+      </div>
+      <div style="font-size:13px;font-weight:700;color:${col};white-space:nowrap">${sig} ${c.symbol} ${fmtShortRaw(v)}</div>
+    </div>`;
+  };
+  const monthList=monthItems.length?monthItems.map(renderItem).join(''):'<div style="text-align:center;color:var(--c-text-3);font-size:12px;padding:16px">Nenhum item neste mês</div>';
+  const prevList=prevItems.length?prevItems.map(renderItem).join(''):'';
+  const monthSaldo=monthItems.filter(i=>i._tipo==='receitas').reduce((s,it)=>s+Number(it.value||0),0)-monthItems.filter(i=>i._tipo==='despesas').reduce((s,it)=>s+Number(it.value||0),0);
+  const prevSaldo=prevItems.filter(i=>i._tipo==='receitas').reduce((s,it)=>s+Number(it.value||0),0)-prevItems.filter(i=>i._tipo==='despesas').reduce((s,it)=>s+Number(it.value||0),0);
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay open';
+  overlay.style.zIndex='1001';
+  overlay.innerHTML=`<div class="modal-sheet" style="max-width:420px">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">${flagImg(currencyCode,28)} ${currencyCode} — ${escapeHtml(c.name)}</h2>
+    <p class="modal-sub">Itens em ${currencyCode}</p>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <div style="flex:1;background:var(--c-surface-2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:9px;color:var(--c-text-3);font-weight:700;text-transform:uppercase">Este mês</div>
+        <div style="font-size:14px;font-weight:800;color:${monthSaldo>=0?'var(--c-receitas)':'var(--c-despesas)'};margin-top:2px">${monthSaldo>=0?'+':'−'} ${c.symbol} ${fmtShortRaw(Math.abs(monthSaldo))}</div>
+      </div>
+      <div style="flex:1;background:var(--c-surface-2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:9px;color:var(--c-text-3);font-weight:700;text-transform:uppercase">Mês anterior</div>
+        <div style="font-size:14px;font-weight:800;color:${prevSaldo>=0?'var(--c-receitas)':'var(--c-despesas)'};margin-top:2px">${prevSaldo>=0?'+':'−'} ${c.symbol} ${fmtShortRaw(Math.abs(prevSaldo))}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:700;color:var(--c-text-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em">${monthLabelLong(currentMonth)} (${monthItems.length} itens)</div>
+    <div style="max-height:30vh;overflow-y:auto;margin-bottom:14px">${monthList}</div>
+    ${prevItems.length?`<div style="font-size:11px;font-weight:700;color:var(--c-text-2);margin-bottom:6px;text-transform:uppercase;letter-spacing:0.04em">${monthLabelLong(prevMonth)} (${prevItems.length} itens)</div><div style="max-height:20vh;overflow-y:auto;margin-bottom:14px">${prevList}</div>`:''}
+    <div class="modal-actions"><button class="btn btn-primary" id="curDetailClose">Fechar</button></div>
+  </div>`;
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('#curDetailClose').addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
 }
 
 // Gráfico anual (12 meses do ano atual)
@@ -4084,13 +4146,19 @@ function renderMonthBar(){
   });
   html+=`</div>`;
   monthBar.innerHTML=html;
-  // Auto-scroll: centraliza o mês ativo (4 meses de cada lado)
+  // Auto-scroll: centraliza o mês ativo no meio da roleta
   const scrollContainer=monthBar.querySelector('#mbMonthsScroll');
   const activeBtn=monthBar.querySelector('.mb-month.active');
   if(scrollContainer&&activeBtn){
+    // Usa scrollIntoView com inline:'center' — mais confiável que cálculo manual
     setTimeout(()=>{
-      scrollContainer.scrollLeft=activeBtn.offsetLeft-scrollContainer.offsetWidth/2+activeBtn.offsetWidth/2;
-    },50);
+      if(activeBtn.scrollIntoView){
+        activeBtn.scrollIntoView({behavior:'auto',block:'nearest',inline:'center'});
+      }else{
+        // Fallback: cálculo manual
+        scrollContainer.scrollLeft=activeBtn.offsetLeft-scrollContainer.offsetWidth/2+activeBtn.offsetWidth/2;
+      }
+    },100);
   }
   // === Mouse drag para rolar a roleta (estilo "arrastar") ===
   if(scrollContainer){
