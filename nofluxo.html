@@ -89,7 +89,7 @@ svg{display:block}
 /* LOGIN */
 .auth-screen{position:fixed;inset:0;max-width:480px;margin:0 auto;background:linear-gradient(160deg,var(--c-primary) 0%,#001a23 100%);z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;overflow-y:auto}
 .auth-card{background:var(--c-surface);border-radius:24px;padding:36px 24px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.4)}
-.auth-logo{width:72px;height:72px;border-radius:20px;background:linear-gradient(135deg,var(--c-brand-fab) 0%,var(--c-brand-fab-2) 100%);display:grid;place-items:center;color:#fff;font-weight:800;font-size:34px;margin:0 auto 18px;box-shadow:0 8px 24px rgba(230,125,0,0.4)}
+.auth-logo{width:72px;height:72px;border-radius:20px;overflow:hidden;margin:0 auto 18px;box-shadow:0 8px 24px rgba(0,58,73,0.35)}
 .auth-title{text-align:center;font-size:24px;font-weight:800;color:var(--c-text);margin-bottom:2px;letter-spacing:-0.02em}
 .auth-tagline{text-align:center;font-size:13px;color:var(--c-text-2);margin-bottom:24px;font-style:italic;font-weight:500}
 .auth-field{margin-bottom:12px}
@@ -123,8 +123,9 @@ svg{display:block}
 #notifBtn{flex-shrink:0!important;order:98} /* sempre visível */
 #syncBadge{flex-shrink:0!important;order:97} /* sempre visível */
 .brand{order:1;flex-shrink:1}
-.planilha-selector{order:2;flex-shrink:1}
-.month-selector{order:3;flex-shrink:1}
+.search-wrap{order:2;flex-shrink:1}
+.planilha-selector{order:3;flex-shrink:1}
+.month-selector{order:4;flex-shrink:1}
 #togglePrivacyBtn{order:5}
 #undoBtn{order:6}
 #redoBtn{order:7}
@@ -6520,7 +6521,7 @@ function hideAuth(){authScreen.style.display='none';appBar.style.display='flex'}
 function renderAuth(){
   if(authState.step==='login'){
     authCard.innerHTML=`
-      <div class="auth-logo">N</div>
+      <div class="auth-logo"><svg viewBox="0 0 512 512" style="width:100%;height:100%"><rect width="512" height="512" rx="112" fill="#003A49"/><rect x="124" y="120" width="64" height="272" fill="#E67D00"/><rect x="324" y="120" width="64" height="272" fill="#E67D00"/><polygon points="124,392 188,392 388,120 324,120" fill="#E67D00"/></svg></div>
       <div class="auth-title">NoFluxo</div>
       <div class="auth-tagline">Seu dinheiro. No fluxo.</div>
       <div class="auth-field"><label class="auth-label">E-mail</label><input class="auth-input" id="loginEmail" type="email" placeholder="voce@email.com" autocomplete="email"></div>
@@ -6538,7 +6539,7 @@ function renderAuth(){
     setTimeout(()=>document.getElementById('loginEmail').focus(),100);
   }else if(authState.step==='register'){
     authCard.innerHTML=`
-      <div class="auth-logo">N</div>
+      <div class="auth-logo"><svg viewBox="0 0 512 512" style="width:100%;height:100%"><rect width="512" height="512" rx="112" fill="#003A49"/><rect x="124" y="120" width="64" height="272" fill="#E67D00"/><rect x="324" y="120" width="64" height="272" fill="#E67D00"/><polygon points="124,392 188,392 388,120 324,120" fill="#E67D00"/></svg></div>
       <div class="auth-title">NoFluxo</div>
       <div class="auth-tagline">Seu dinheiro. No fluxo.</div>
       <div class="auth-field"><label class="auth-label">E-mail</label><input class="auth-input" id="regEmail" type="email" placeholder="voce@email.com" autocomplete="email"></div>
@@ -6557,7 +6558,7 @@ function renderAuth(){
         <div style="font-size:32px;font-weight:800;letter-spacing:8px;font-family:monospace">${authState.code}</div>
       </div>` : '';
     authCard.innerHTML=`
-      <div class="auth-logo">N</div>
+      <div class="auth-logo"><svg viewBox="0 0 512 512" style="width:100%;height:100%"><rect width="512" height="512" rx="112" fill="#003A49"/><rect x="124" y="120" width="64" height="272" fill="#E67D00"/><rect x="324" y="120" width="64" height="272" fill="#E67D00"/><polygon points="124,392 188,392 388,120 324,120" fill="#E67D00"/></svg></div>
       <div class="auth-title">Verificar e-mail</div>
       <div class="auth-tagline">Seu dinheiro. No fluxo.</div>
       ${demoCodeBox}
@@ -6575,7 +6576,7 @@ function renderAuth(){
     setTimeout(()=>document.getElementById('regCode').focus(),100);
   }else if(authState.step==='setpass'){
     authCard.innerHTML=`
-      <div class="auth-logo">N</div>
+      <div class="auth-logo"><svg viewBox="0 0 512 512" style="width:100%;height:100%"><rect width="512" height="512" rx="112" fill="#003A49"/><rect x="124" y="120" width="64" height="272" fill="#E67D00"/><rect x="324" y="120" width="64" height="272" fill="#E67D00"/><polygon points="124,392 188,392 388,120 324,120" fill="#E67D00"/></svg></div>
       <div class="auth-title">Definir senha</div>
       <div class="auth-tagline">Seu dinheiro. No fluxo.</div>
       <div class="auth-field"><label class="auth-label">Nova senha</label><input class="auth-input" id="newPass" type="password" placeholder="mínimo 4 caracteres"></div>
@@ -6586,7 +6587,7 @@ function renderAuth(){
     setTimeout(()=>document.getElementById('newPass').focus(),100);
   }else if(authState.step==='forgot'){
     authCard.innerHTML=`
-      <div class="auth-logo">N</div>
+      <div class="auth-logo"><svg viewBox="0 0 512 512" style="width:100%;height:100%"><rect width="512" height="512" rx="112" fill="#003A49"/><rect x="124" y="120" width="64" height="272" fill="#E67D00"/><rect x="324" y="120" width="64" height="272" fill="#E67D00"/><polygon points="124,392 188,392 388,120 324,120" fill="#E67D00"/></svg></div>
       <div class="auth-title">Esqueci a senha</div>
       <div class="auth-tagline">Seu dinheiro. No fluxo.</div>
       <div class="auth-field"><label class="auth-label">E-mail</label><input class="auth-input" id="forgotEmail" type="email" placeholder="voce@email.com"></div>
