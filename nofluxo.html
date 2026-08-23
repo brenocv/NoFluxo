@@ -1250,22 +1250,23 @@ html[data-theme="dark"] .hero-mini-despesas{
 .month-circle.active{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
 
 /* === Month Bar fixo (visível em todas as páginas) === */
-.month-bar{position:sticky;top:calc(var(--app-bar-h) + var(--safe-top));z-index:49;background:var(--c-surface-2);border-bottom:1px solid var(--c-border-2);padding:8px 10px;display:flex;align-items:center;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.month-bar{position:sticky;top:calc(var(--app-bar-h) + var(--safe-top));z-index:49;background:var(--c-surface-2);border-bottom:1px solid var(--c-border-2);padding:6px 6px;display:flex;align-items:center;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .month-bar::-webkit-scrollbar{display:none}
-.month-bar .mb-year{display:flex;align-items:center;gap:4px;flex-shrink:0;font-size:13px;font-weight:800;color:var(--c-text)}
-.month-bar .mb-year button{padding:4px 6px;border:none;background:none;cursor:pointer;color:var(--c-text-2);font-size:16px;font-weight:700;border-radius:6px}
+.month-bar .mb-year{display:flex;align-items:center;gap:1px;flex-shrink:0;font-size:12px;font-weight:800;color:var(--c-text)}
+.month-bar .mb-year button{padding:2px 4px;border:none;background:none;cursor:pointer;color:var(--c-text-2);font-size:14px;font-weight:700;border-radius:4px;line-height:1}
 .month-bar .mb-year button:active{background:var(--c-border)}
-.month-bar .mb-year span{min-width:38px;text-align:center;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-.month-bar .mb-divider{width:1px;height:24px;background:var(--c-border);flex-shrink:0}
-.month-bar .mb-months{display:flex;gap:4px;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 4px}
+.month-bar .mb-year span{min-width:30px;text-align:center;cursor:pointer;text-decoration:underline;text-underline-offset:2px;font-size:12px}
+.month-bar .mb-divider{display:none}
+.month-bar .mb-months{display:flex;gap:3px;flex:1;min-width:0;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;scrollbar-width:none;padding:0 2px}
 .month-bar .mb-months::-webkit-scrollbar{display:none}
-.month-bar .mb-month{padding:6px 8px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:10px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.02em;flex-shrink:0;transition:all .15s}
+.month-bar .mb-month{padding:5px 7px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:0.02em;flex-shrink:0;transition:all .15s;line-height:1}
 .month-bar .mb-month:active{transform:scale(0.94)}
 .month-bar .mb-month.active{background:var(--c-primary);color:#fff;border-color:var(--c-primary)}
 @media(max-width:380px){
-  .month-bar{padding:6px 8px;gap:6px}
-  .month-bar .mb-month{padding:5px 6px;font-size:9px}
-  .month-bar .mb-year span{font-size:12px;min-width:34px}
+  .month-bar{padding:5px 4px;gap:3px}
+  .month-bar .mb-month{padding:4px 6px;font-size:8px}
+  .month-bar .mb-year span{font-size:11px;min-width:28px}
+  .month-bar .mb-year button{padding:2px 3px;font-size:13px}
 }
 
 /* BLOCO DE NOTAS (simples) */
