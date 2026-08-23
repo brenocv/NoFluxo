@@ -4084,7 +4084,7 @@ function renderMonthBar(){
   });
   html+=`</div>`;
   monthBar.innerHTML=html;
-  // Auto-scroll para centralizar o mês ativo
+  // Auto-scroll: centraliza o mês ativo (4 meses de cada lado)
   const scrollContainer=monthBar.querySelector('#mbMonthsScroll');
   const activeBtn=monthBar.querySelector('.mb-month.active');
   if(scrollContainer&&activeBtn){
@@ -4092,11 +4092,55 @@ function renderMonthBar(){
       scrollContainer.scrollLeft=activeBtn.offsetLeft-scrollContainer.offsetWidth/2+activeBtn.offsetWidth/2;
     },50);
   }
-  // Handlers dos meses
+  // === Mouse drag para rolar a roleta (estilo "arrastar") ===
+  if(scrollContainer){
+    let isDragging=false;
+    let startX=0;
+    let startScrollLeft=0;
+    let dragMoved=false;
+    scrollContainer.addEventListener('mousedown',(e)=>{
+      isDragging=true;
+      dragMoved=false;
+      startX=e.pageX;
+      startScrollLeft=scrollContainer.scrollLeft;
+      scrollContainer.style.cursor='grabbing';
+      scrollContainer.style.userSelect='none';
+    });
+    document.addEventListener('mousemove',(e)=>{
+      if(!isDragging)return;
+      const dx=e.pageX-startX;
+      if(Math.abs(dx)>3)dragMoved=true; // se moveu mais de 3px, é drag não click
+      scrollContainer.scrollLeft=startScrollLeft-dx;
+    });
+    document.addEventListener('mouseup',()=>{
+      if(isDragging){
+        isDragging=false;
+        scrollContainer.style.cursor='grab';
+        scrollContainer.style.userSelect='';
+      }
+    });
+    // Touch já funciona nativamente (overflow-x:auto), mas melhorando:
+    scrollContainer.style.cursor='grab';
+  }
+  // Handlers dos meses (só dispara click se NÃO foi drag)
   monthBar.querySelectorAll('.mb-month').forEach(b=>{
-    b.addEventListener('click',()=>{currentMonth=b.getAttribute('data-mk');renderAll()});
+    b.addEventListener('click',(e)=>{
+      // Se foi um drag (mouse moveu), não troca de mês
+      if(scrollContainer&&scrollContainer.dataset.dragged==='1'){
+        scrollContainer.dataset.dragged='0';
+        return;
+      }
+      currentMonth=b.getAttribute('data-mk');
+      renderAll();
+    });
   });
-  // Setas ‹ › mudam de MÊS (não de ano) — a roleta se move
+  // Marca como "dragged" quando o mouse move durante o drag
+  if(scrollContainer){
+    scrollContainer.addEventListener('scroll',()=>{
+      if(isDragging)scrollContainer.dataset.dragged='1';
+    });
+  }
+  // Setas ‹ › mudam de MÊS — a roleta se move
   const prevBtn=monthBar.querySelector('#mbPrevMonth');
   const nextBtn=monthBar.querySelector('#mbNextMonth');
   const yearDisp=monthBar.querySelector('#mbYearDisplay');
