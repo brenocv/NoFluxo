@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+<!-- NoFluxo v12.1 — versão corrigida: meses fixos + saldo acumulado + planilha compartilhada + sem CSS desktop -->
 <html lang="pt-BR" data-theme="light">
 <head>
 <meta charset="UTF-8">
@@ -2794,6 +2795,10 @@ function renderInicio(){
   const totalDespComPend=despAll.reduce((s,it)=>s+convertToBRL(it.value,it.currency||'BRL'),0);
   const totalRecExibido=settings.showPendingInBalance?totalRecComPend:totalRec;
   const totalDespExibido=settings.showPendingInBalance?totalDespComPend:totalDesp;
+
+  // Declara variáveis que eram parte do seletor de mês (agora fixo no app-bar)
+  let html='';
+  const [yr,mo]=currentMonth.split('-').map(Number);
 
   html+=`<div class="hero-balance">
     <div class="hero-card">
