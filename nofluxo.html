@@ -1332,6 +1332,96 @@ html[data-theme="dark"] .hero-mini-despesas{
 
 /* ENTRADAS X SAÍDAS ANUAL */
 .annual-chart-card{background:var(--c-surface);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);border:1px solid var(--c-border-2)}
+
+/* ============================================================
+   LAYOUT DE COMPUTADOR (telas largas)
+   Em vez de 1 tela por vez (como no celular), mostramos as 4
+   páginas — Início, Despesas, Receitas e Reservas — lado a lado,
+   ao mesmo tempo, aproveitando a largura da tela. O HTML de cada
+   página já é renderizado o tempo todo (renderAll() atualiza as
+   4 juntas); aqui só mudamos a exibição via CSS. O celular
+   continua exatamente igual a antes.
+   ============================================================ */
+@media(min-width:1024px){
+  body{max-width:100%;box-shadow:none}
+
+  .content{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(260px,1fr));
+    grid-template-areas:"inicio inicio inicio" "despesas receitas reservas";
+    gap:16px;
+    max-width:1680px;
+    margin:0 auto;
+    padding:20px 120px 40px 24px; /* padding direito extra para o botão "+" flutuante nunca cobrir a coluna de Reservas */
+    min-height:calc(100vh - var(--app-bar-h));
+    background:var(--c-bg)!important;
+  }
+
+  /* Mostra as 4 telas ao mesmo tempo (ignora o controle .active, que só existe para o celular) */
+  .screen{
+    display:block!important;
+    animation:none;
+    position:relative;
+    background:var(--c-surface);
+    border-radius:var(--radius-lg);
+    border:1px solid var(--c-border-2);
+    padding:46px 18px 26px;
+    box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);
+  }
+  /* Selo com o nome da página no topo de cada painel (substitui a bottom-nav, que no celular indica a página atual) */
+  .screen::before{
+    position:absolute;top:14px;left:18px;
+    font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
+    padding:5px 11px;border-radius:999px;
+  }
+  .screen[data-screen="inicio"]::before{content:"Início";background:rgba(0,58,73,.1);color:var(--c-primary)}
+  .screen[data-screen="despesas"]::before{content:"Despesas";background:rgba(146,18,39,.12);color:var(--c-despesas)}
+  .screen[data-screen="receitas"]::before{content:"Receitas";background:rgba(31,68,18,.14);color:var(--c-receitas)}
+  .screen[data-screen="reservas"]::before{content:"Reservas";background:rgba(179,138,0,.16);color:#b78a00}
+  html[data-theme="dark"] .screen[data-screen="inicio"]::before{background:rgba(61,180,212,.16);color:var(--c-primary-bright)}
+  html[data-theme="dark"] .screen[data-screen="despesas"]::before{background:rgba(255,92,122,.16);color:var(--c-despesas)}
+  html[data-theme="dark"] .screen[data-screen="receitas"]::before{background:rgba(91,229,132,.16);color:var(--c-receitas)}
+  html[data-theme="dark"] .screen[data-screen="reservas"]::before{background:rgba(255,217,61,.18);color:var(--c-reservas)}
+
+  /* Início ocupa a linha de cima inteira e reorganiza seus próprios cartões em colunas (dashboard) */
+  .screen[data-screen="inicio"]{
+    grid-area:inicio;
+    display:grid!important;
+    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    gap:14px;
+    align-items:start;
+    background:var(--c-bg-inicio);
+  }
+  .screen[data-screen="inicio"]>*{margin-bottom:0}
+  .screen[data-screen="inicio"]>.hero-balance{grid-column:1/-1}
+
+  /* Despesas / Receitas / Reservas — uma coluna cada, lado a lado */
+  .screen[data-screen="despesas"]{grid-area:despesas;background:rgba(146,18,39,0.05)}
+  .screen[data-screen="receitas"]{grid-area:receitas;background:rgba(46,160,67,0.08)}
+  .screen[data-screen="reservas"]{grid-area:reservas;background:rgba(230,125,0,0.05)}
+  html[data-theme="dark"] .screen[data-screen="despesas"]{background:rgba(255,92,122,0.08)}
+  html[data-theme="dark"] .screen[data-screen="receitas"]{background:rgba(91,229,132,0.08)}
+  html[data-theme="dark"] .screen[data-screen="reservas"]{background:rgba(255,217,61,0.08)}
+
+  /* A bottom-nav do celular vira só um botão "+" flutuante (as 4 páginas já estão todas visíveis, não precisa de abas) */
+  .bottom-nav{
+    position:fixed;left:auto;right:28px;bottom:28px;transform:none;
+    width:auto;max-width:none;height:auto;padding:0;background:none;border:none;box-shadow:none;
+  }
+  .nav-item{display:none}
+  .fab{margin:0;transform:none}
+  .fab:active{transform:scale(.94)}
+
+  /* Telas de login e modais (editar item, moedas, importar, etc.) — o fundo escurecido passa a
+     cobrir a tela toda (senão ficaria só no centro e o dashboard apareceria pelas laterais),
+     mas o cartão em si continua com largura de celular e centralizado, como uma janela. */
+  .auth-screen,.modal-overlay,.month-picker{max-width:100%}
+  .modal-sheet{left:50%;right:auto;width:100%;max-width:460px;transform:translate(-50%,100%)}
+  .modal-overlay.open .modal-sheet{transform:translate(-50%,0)}
+
+  /* Banner de instalar PWA: centralizado e mais estreito, em vez de esticar a tela toda */
+  .install-banner{left:50%;right:auto;transform:translateX(-50%);width:380px;max-width:90vw}
+}
 </style>
 </head>
 <body>
