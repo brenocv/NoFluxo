@@ -1383,17 +1383,20 @@ html[data-theme="dark"] .hero-mini-despesas{
   html[data-theme="dark"] .screen[data-screen="receitas"]::before{background:rgba(91,229,132,.16);color:var(--c-receitas)}
   html[data-theme="dark"] .screen[data-screen="reservas"]::before{background:rgba(255,217,61,.18);color:var(--c-reservas)}
 
-  /* Início ocupa a linha de cima inteira e reorganiza seus próprios cartões em colunas (dashboard) */
+  /* Início: o Resumo (saldo do mês) fica como uma coluna à esquerda, na largura que tinha
+     no celular — e as outras caixas (distribuição de gastos, receitas x despesas, origem das
+     receitas, saldos por moeda etc.) se organizam à direita dele, preenchendo o espaço em
+     colunas, em vez de esticar cada caixa para a largura toda. */
   .screen[data-screen="inicio"]{
     grid-area:inicio;
     display:grid!important;
-    grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+    grid-template-columns:minmax(320px,400px) repeat(auto-fill,minmax(240px,1fr));
     gap:14px;
     align-items:start;
     background:var(--c-bg-inicio);
   }
   .screen[data-screen="inicio"]>*{margin-bottom:0}
-  .screen[data-screen="inicio"]>.hero-balance{grid-column:1/-1}
+  .screen[data-screen="inicio"]>.hero-balance{grid-column:1;grid-row:1/-1}
 
   /* Despesas / Receitas / Reservas — uma coluna cada, lado a lado */
   .screen[data-screen="despesas"]{grid-area:despesas;background:rgba(146,18,39,0.05)}
