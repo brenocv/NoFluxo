@@ -1357,10 +1357,10 @@ html[data-theme="dark"] .hero-mini-despesas{
     flex-wrap:wrap;
     align-content:flex-start;
     align-items:flex-start;
-    gap:16px;
-    max-width:1680px;
+    gap:14px;
+    max-width:100%;
     margin:0 auto;
-    padding:20px 120px 40px 24px; /* padding direito extra para o botão "+" flutuante nunca cobrir a última coluna */
+    padding:16px 16px 40px 16px;
     min-height:calc(100vh - var(--app-bar-h));
     background:var(--c-bg)!important;
   }
@@ -1383,8 +1383,8 @@ html[data-theme="dark"] .hero-mini-despesas{
   .content>[data-widget-key]{
     position:relative;
     flex:0 0 auto;
-    width:340px;
-    min-width:240px;
+    width:300px;
+    min-width:220px;
     max-width:100%;
     min-height:90px;
     margin-bottom:0;
@@ -3372,8 +3372,9 @@ function demoteContentCardsToInicio(){
   const inicioScreen=document.querySelector('.screen[data-screen="inicio"]');
   if(!content||!inicioScreen)return;
   Array.from(content.querySelectorAll(':scope>[data-widget-key]')).forEach(el=>{
-    if(el.classList.contains('screen'))return; // páginas ficam onde já estavam
+    const isScreen=el.classList.contains('screen');
     if(el._widgetResizeObserver){el._widgetResizeObserver.disconnect();el._widgetResizeObserver=null}
+    // Remove wrapper do header e do body (tanto para cartões quanto para screens)
     const header=el.querySelector(':scope>.widget-sticky-header');
     if(header)header.remove();
     const body=el.querySelector(':scope>.widget-scroll-body');
@@ -3383,7 +3384,12 @@ function demoteContentCardsToInicio(){
     }
     el.style.width='';
     el.style.height='';
-    inicioScreen.appendChild(el);
+    // Limpa data-widget-key das screens (não precisam no mobile)
+    if(isScreen){
+      delete el.dataset.widgetKey;
+    }else{
+      inicioScreen.appendChild(el);
+    }
   });
 }
 function applyDashboardOrder(){
@@ -4546,6 +4552,13 @@ function renderItemRow(it,tipo,isPending){
 
 function renderAll(){
   renderMonthBar();
+  // Em mobile, garante que as screens não têm wrappers do dashboard desktop
+  if(!isDesktopDashboard()){
+    const screens=document.querySelectorAll('.screen[data-widget-key]');
+    if(screens.length){
+      demoteContentCardsToInicio();
+    }
+  }
   renderInicio();
   ['despesas','receitas','reservas'].forEach(renderScreen);
   renderMonthPicker();
