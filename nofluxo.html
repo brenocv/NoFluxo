@@ -56,6 +56,7 @@ html[data-theme="dark"] ::-webkit-scrollbar-thumb:active{background:var(--c-acce
   --c-shadow:rgba(0,0,0,0.04);--c-shadow-2:rgba(0,0,0,0.03);
   --c-overlay:rgba(0,26,33,0.55);--c-track:#EEF1F3;
   --c-bg-inicio:#E8F1F4;
+  --c-reservas-label:#b78a00;
   --c-nav-bg:#003A49;--c-nav-fg:#FFFFFF;--c-nav-inactive:rgba(255,255,255,0.5);
   /* Cores FIXAS (não mudam entre temas) — versões brilhantes para contraste com o azul-petróleo */
   --c-nav-active-inicio:#3DB4D4;--c-nav-active-despesas:#FF5C7A;--c-nav-active-receitas:#6EE087;--c-nav-active-reservas:#FFD93D;
@@ -71,6 +72,7 @@ html[data-theme="dark"] {
   --c-shadow:rgba(0,0,0,0.3);--c-shadow-2:rgba(0,0,0,0.2);
   --c-overlay:rgba(0,0,0,0.7);--c-track:#1F323A;
   --c-bg-inicio:#0A1A20;
+  --c-reservas-label:#FFD93D;
   /* Cores de ITENS/VALORES mais brilhantes no dark mode (contraste) */
   --c-primary-bright:#3DB4D4;--c-despesas:#FF5C7A;--c-receitas:#5BE584;--c-reservas:#FFD93D;--c-accent:#FF9D3D;--c-accent-2:#FFB86B;--c-juros:#B388FF;
   /* Nav-bg e app-bar iguais em ambos os temas (azul-petróleo) */
@@ -1334,97 +1336,94 @@ html[data-theme="dark"] .hero-mini-despesas{
 .annual-chart-card{background:var(--c-surface);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);border:1px solid var(--c-border-2)}
 
 .drag-handle{display:none}
+.widget-toolbar{display:none}
+#customizeBtn{display:none}
 
 /* ============================================================
-   LAYOUT DE COMPUTADOR (telas largas)
-   Em vez de 1 tela por vez (como no celular), mostramos as 4
-   páginas — Início, Despesas, Receitas e Reservas — lado a lado,
-   ao mesmo tempo, aproveitando a largura da tela. O HTML de cada
-   página já é renderizado o tempo todo (renderAll() atualiza as
-   4 juntas); aqui só mudamos a exibição via CSS. O celular
-   continua exatamente igual a antes.
+   PAINEL DE COMPUTADOR (telas largas) — "tela inicial" personalizável
+   Em telas largas, o Resumo, as páginas de Despesas/Receitas/Reservas
+   e os cartões do Início (Meta, gráficos, Saldos por moeda etc.) viram
+   "widgets" soltos num único grid: o usuário arrasta cada um para onde
+   quiser, escolhe a largura e pode esconder/mostrar pelo botão
+   "Personalizar" na barra superior. A ordem/tamanho/visibilidade ficam
+   salvos no navegador. O celular continua exatamente igual a antes.
    ============================================================ */
 @media(min-width:1024px){
   body{max-width:100%;box-shadow:none}
+  #customizeBtn{display:flex}
 
   .content{
     display:grid;
-    grid-template-columns:repeat(3,minmax(260px,1fr));
-    grid-template-areas:"inicio inicio inicio" "despesas receitas reservas";
+    grid-template-columns:repeat(auto-fill,minmax(270px,1fr));
+    grid-auto-rows:min-content;
+    align-items:start;
     gap:16px;
     max-width:1680px;
     margin:0 auto;
-    padding:20px 120px 40px 24px; /* padding direito extra para o botão "+" flutuante nunca cobrir a coluna de Reservas */
+    padding:20px 120px 40px 24px; /* padding direito extra para o botão "+" flutuante nunca cobrir a última coluna */
     min-height:calc(100vh - var(--app-bar-h));
     background:var(--c-bg)!important;
   }
 
-  /* Mostra as 4 telas ao mesmo tempo (ignora o controle .active, que só existe para o celular) */
-  .screen{
-    display:block!important;
-    animation:none;
+  /* A página de Início "crua" não é mais mostrada — seu conteúdo é promovido
+     para dentro do .content como widgets individuais (ver initDesktopDashboard) */
+  .screen[data-screen="inicio"]{display:none!important}
+
+  /* Cada widget (as 3 páginas + os cartões do Início) */
+  .content>[data-widget-key]{
     position:relative;
+    grid-column:span 1;
+    margin-bottom:0;
     background:var(--c-surface);
     border-radius:var(--radius-lg);
     border:1px solid var(--c-border-2);
-    padding:46px 18px 26px;
+    padding:44px 18px 18px;
     box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);
+    max-height:600px;
+    overflow-y:auto;
   }
-  /* Selo com o nome da página no topo de cada painel (substitui a bottom-nav, que no celular indica a página atual) */
-  .screen::before{
+  /* As páginas (Despesas/Receitas/Reservas) são <section class="screen">: precisam ignorar o
+     display:none/.active do celular. Os cartões do Início (hero-balance, .card etc.) não são
+     .screen, então mantêm seu próprio display (ex: hero-balance continua flex) */
+  .content>.screen[data-widget-key]{display:block!important;animation:none}
+  .content>[data-widget-key][data-w-size="2"]{grid-column:span 2}
+  .content>[data-widget-key][data-w-size="3"]{grid-column:span 3}
+  .content>[data-widget-key].widget-hidden{display:none!important}
+  .content>[data-widget-key]>*{margin-bottom:0}
+
+  /* Selo com o nome do widget, cor calculada por JS via --w-color */
+  .content>[data-widget-key]::before{
+    content:attr(data-widget-label);
     position:absolute;top:14px;left:18px;
     font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;
     padding:5px 11px;border-radius:999px;
+    background:color-mix(in srgb, var(--w-color, var(--c-primary)) 14%, transparent);
+    color:var(--w-color, var(--c-primary));
   }
-  .screen[data-screen="inicio"]::before{content:"Início";background:rgba(0,58,73,.1);color:var(--c-primary)}
-  .screen[data-screen="despesas"]::before{content:"Despesas";background:rgba(146,18,39,.12);color:var(--c-despesas)}
-  .screen[data-screen="receitas"]::before{content:"Receitas";background:rgba(31,68,18,.14);color:var(--c-receitas)}
-  .screen[data-screen="reservas"]::before{content:"Reservas";background:rgba(179,138,0,.16);color:#b78a00}
-  html[data-theme="dark"] .screen[data-screen="inicio"]::before{background:rgba(61,180,212,.16);color:var(--c-primary-bright)}
-  html[data-theme="dark"] .screen[data-screen="despesas"]::before{background:rgba(255,92,122,.16);color:var(--c-despesas)}
-  html[data-theme="dark"] .screen[data-screen="receitas"]::before{background:rgba(91,229,132,.16);color:var(--c-receitas)}
-  html[data-theme="dark"] .screen[data-screen="reservas"]::before{background:rgba(255,217,61,.18);color:var(--c-reservas)}
 
-  /* Início: o Resumo (saldo do mês) fica como uma coluna à esquerda, na largura que tinha
-     no celular — e as outras caixas (distribuição de gastos, receitas x despesas, origem das
-     receitas, saldos por moeda etc.) se organizam à direita dele, preenchendo o espaço em
-     colunas, em vez de esticar cada caixa para a largura toda. */
-  .screen[data-screen="inicio"]{
-    grid-area:inicio;
-    display:grid!important;
-    grid-template-columns:minmax(320px,400px) repeat(auto-fill,minmax(240px,1fr));
-    gap:14px;
-    align-items:start;
-    background:var(--c-bg-inicio);
+  /* Barra de ferramentas do widget (alça de arrastar + tamanho) — some, aparece no hover */
+  .widget-toolbar{
+    display:flex;gap:4px;
+    position:absolute;top:-11px;left:14px;z-index:6;
+    opacity:0;transition:opacity .15s;
   }
-  .screen[data-screen="inicio"]>*{margin-bottom:0}
-  .screen[data-screen="inicio"]>.hero-balance{grid-column:1;grid-row:1/-1}
-
-  /* Alcinha para arrastar e reorganizar os cartões do Início (o Resumo não tem, fica fixo) */
-  .screen[data-screen="inicio"]>[data-card-key]{position:relative}
-  .drag-handle{
+  .content>[data-widget-key]:hover>.widget-toolbar,
+  .widget-toolbar:hover{opacity:1}
+  .widget-toolbar button{
+    width:22px;height:22px;border-radius:6px;
     display:flex;align-items:center;justify-content:center;
-    position:absolute;top:-10px;left:14px;width:20px;height:20px;border-radius:6px;
     background:var(--c-surface-2);border:1px solid var(--c-border-2);color:var(--c-text-3);
-    cursor:grab;opacity:0;transition:opacity .15s,color .15s,border-color .15s,background-color .15s;
-    z-index:6;box-shadow:0 2px 6px var(--c-shadow);touch-action:none;
+    cursor:pointer;box-shadow:0 2px 6px var(--c-shadow);
+    transition:color .15s,border-color .15s,background-color .15s;
   }
-  .screen[data-screen="inicio"]>[data-card-key]:hover>.drag-handle{opacity:1}
-  .drag-handle:hover{background:var(--c-border-2);color:var(--c-text)}
-  .drag-handle:active{cursor:grabbing}
-  .inicio-card-dragging{opacity:.45;outline:2px dashed var(--c-primary);outline-offset:3px}
-  .inicio-card-dragging .drag-handle{opacity:1;cursor:grabbing}
-  .inicio-card-drop-target{outline:2px solid var(--c-primary);outline-offset:3px;transition:outline-color .1s}
+  .widget-toolbar button:hover{background:var(--c-border-2);color:var(--c-text)}
+  .widget-drag-handle{cursor:grab;touch-action:none}
+  .widget-drag-handle:active{cursor:grabbing}
+  .widget-dragging{opacity:.45;outline:2px dashed var(--c-primary);outline-offset:3px}
+  .widget-dragging .widget-toolbar{opacity:1}
+  .widget-drop-target{outline:2px solid var(--c-primary);outline-offset:3px;transition:outline-color .1s}
 
-  /* Despesas / Receitas / Reservas — uma coluna cada, lado a lado */
-  .screen[data-screen="despesas"]{grid-area:despesas;background:rgba(146,18,39,0.05)}
-  .screen[data-screen="receitas"]{grid-area:receitas;background:rgba(46,160,67,0.08)}
-  .screen[data-screen="reservas"]{grid-area:reservas;background:rgba(230,125,0,0.05)}
-  html[data-theme="dark"] .screen[data-screen="despesas"]{background:rgba(255,92,122,0.08)}
-  html[data-theme="dark"] .screen[data-screen="receitas"]{background:rgba(91,229,132,0.08)}
-  html[data-theme="dark"] .screen[data-screen="reservas"]{background:rgba(255,217,61,0.08)}
-
-  /* A bottom-nav do celular vira só um botão "+" flutuante (as 4 páginas já estão todas visíveis, não precisa de abas) */
+  /* A bottom-nav do celular vira só um botão "+" flutuante (as páginas já ficam todas visíveis) */
   .bottom-nav{
     position:fixed;left:auto;right:28px;bottom:28px;transform:none;
     width:auto;max-width:none;height:auto;padding:0;background:none;border:none;box-shadow:none;
@@ -1433,8 +1432,8 @@ html[data-theme="dark"] .hero-mini-despesas{
   .fab{margin:0;transform:none}
   .fab:active{transform:scale(.94)}
 
-  /* Telas de login e modais (editar item, moedas, importar, etc.) — o fundo escurecido passa a
-     cobrir a tela toda (senão ficaria só no centro e o dashboard apareceria pelas laterais),
+  /* Telas de login e modais (editar item, moedas, importar, personalizar, etc.) — o fundo escurecido
+     passa a cobrir a tela toda (senão ficaria só no centro e o painel apareceria pelas laterais),
      mas o cartão em si continua com largura de celular e centralizado, como uma janela. */
   .auth-screen,.modal-overlay,.month-picker{max-width:100%}
   .modal-sheet{left:50%;right:auto;width:100%;max-width:460px;transform:translate(-50%,100%)}
@@ -1482,6 +1481,9 @@ html[data-theme="dark"] .hero-mini-despesas{
     </div>
   </div>
   <div class="app-bar-right">
+    <button class="icon-btn" id="customizeBtn" aria-label="Personalizar painel" title="Personalizar painel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+    </button>
     <button class="icon-btn" id="togglePrivacyBtn" aria-label="Ocultar/exibir valores" title="Ocultar/exibir valores">
       <svg id="privacyIconEye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       <svg id="privacyIconEyeOff" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -1635,6 +1637,20 @@ html[data-theme="dark"] .hero-mini-despesas{
 </div>
 
 <!-- MODAL MOEDAS -->
+<!-- MODAL PERSONALIZAR PAINEL (computador) -->
+<div class="modal-overlay" id="dashboardCustomizeModal">
+  <div class="modal-sheet" style="max-height:88vh;display:flex;flex-direction:column">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">Personalizar painel</h2>
+    <p class="modal-sub">Escolha o que aparece na tela e arraste os blocos para organizar do seu jeito</p>
+    <div id="dashboardWidgetList" style="overflow-y:auto;flex:1"></div>
+    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:8px;margin-top:12px">
+      <button class="btn btn-secondary" id="dashboardResetBtn">Restaurar padrão</button>
+      <button class="btn btn-primary" id="dashboardCustomizeCloseBtn">Concluído</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="currencyModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -3156,7 +3172,6 @@ function renderInicio(){
   }
 
   screen.innerHTML=html;
-  initInicioCardOrder();
   // Month selector agora é fixo (renderMonthBar) — handlers estão lá
 
   // Hero toggle: incluir valores a receber no saldo (afeta saldo do mês e acumulado)
@@ -3274,105 +3289,255 @@ function renderInicio(){
 }
 
 /* ============================================================
-   INÍCIO — cartões arrastáveis (layout de computador)
-   O usuário pode arrastar as caixas (Meta, gráficos, Saldos por
-   moeda, Bloco de notas etc.) pela alcinha que aparece ao passar
-   o mouse, para reorganizar como preferir. A ordem escolhida fica
-   salva no navegador (localStorage) e é reaplicada a cada render.
-   O Resumo (hero-balance) fica fixo como âncora à esquerda.
+   PAINEL DE COMPUTADOR — widgets soltos e personalizáveis
+   Em telas largas, o Resumo, as páginas de Despesas/Receitas/
+   Reservas e os cartões do Início viram "widgets": o usuário
+   arrasta cada um pela alcinha para reorganizar, escolhe a
+   largura pelo botão de tamanho, e liga/desliga cada um pelo
+   botão "Personalizar" na barra superior — como a tela inicial
+   de um celular. Tudo fica salvo no navegador (localStorage).
+   No celular nada disso roda; a página volta ao normal.
    ============================================================ */
-const INICIO_ORDER_KEY='nofluxo_inicio_card_order_v1';
-function getInicioSavedOrder(){
-  try{
-    const raw=localStorage.getItem(INICIO_ORDER_KEY);
-    const arr=raw?JSON.parse(raw):[];
-    return Array.isArray(arr)?arr:[];
-  }catch(e){return []}
+const DASHBOARD_WIDGETS=[
+  {key:'hero',           label:'Resumo do mês',          color:'var(--c-primary)'},
+  {key:'page-despesas',  label:'Despesas',               color:'var(--c-despesas)'},
+  {key:'page-receitas',  label:'Receitas',               color:'var(--c-receitas)'},
+  {key:'page-reservas',  label:'Reservas',               color:'var(--c-reservas-label)'},
+  {key:'meta',           label:'Meta de poupança',       color:'var(--c-accent)'},
+  {key:'annual',         label:'Receitas × Despesas (gráfico anual)',color:'var(--c-primary)'},
+  {key:'donut-despesas', label:'Distribuição de gastos', color:'var(--c-despesas)'},
+  {key:'donut-receitas', label:'Origem das receitas',    color:'var(--c-receitas)'},
+  {key:'saldos',         label:'Saldos por moeda',       color:'var(--c-primary)'},
+  {key:'notebook',       label:'Bloco de notas',         color:'var(--c-accent)'},
+  {key:'actionlog',      label:'Histórico de ações',     color:'var(--c-primary)'},
+];
+const DASHBOARD_STATE_KEY='nofluxo_dashboard_state_v1';
+function getDashboardState(){
+  let st=null;
+  try{st=JSON.parse(localStorage.getItem(DASHBOARD_STATE_KEY)||'null')}catch(e){}
+  if(!st||typeof st!=='object')st={};
+  if(!Array.isArray(st.order))st.order=[];
+  if(!Array.isArray(st.hidden))st.hidden=[];
+  if(!st.sizes||typeof st.sizes!=='object')st.sizes={};
+  return st;
 }
-function saveInicioOrder(){
-  const screen=document.querySelector('.screen[data-screen="inicio"]');
-  if(!screen)return;
-  const order=Array.from(screen.children)
-    .filter(el=>el.dataset&&el.dataset.cardKey&&el.dataset.cardKey!=='hero')
-    .map(el=>el.dataset.cardKey);
-  try{localStorage.setItem(INICIO_ORDER_KEY,JSON.stringify(order))}catch(e){}
+function saveDashboardState(mutator){
+  const st=getDashboardState();
+  mutator(st);
+  try{localStorage.setItem(DASHBOARD_STATE_KEY,JSON.stringify(st))}catch(e){}
+  return st;
 }
-function applyInicioSavedOrder(){
-  const screen=document.querySelector('.screen[data-screen="inicio"]');
-  if(!screen)return;
-  const saved=getInicioSavedOrder();
-  if(!saved.length)return;
-  const children=Array.from(screen.children);
+function isDesktopDashboard(){
+  return window.matchMedia('(min-width:1024px)').matches;
+}
+// Move os cartões soltos do Início (hero, meta, gráficos etc.) para dentro de .content,
+// e marca as páginas de Despesas/Receitas/Reservas como widgets também.
+function promoteInicioCardsToContent(){
+  const content=document.getElementById('content');
+  const inicioScreen=document.querySelector('.screen[data-screen="inicio"]');
+  if(!content||!inicioScreen)return;
+  // Remove widgets promovidos de uma renderização anterior (o Início foi recriado do zero)
+  content.querySelectorAll(':scope>[data-widget-key]').forEach(el=>{
+    if(!el.classList.contains('screen'))el.remove();
+  });
+  Array.from(inicioScreen.children).forEach(card=>{
+    const key=card.dataset&&card.dataset.cardKey;
+    if(!key)return;
+    card.dataset.widgetKey=key;
+    content.appendChild(card);
+  });
+  ['despesas','receitas','reservas'].forEach(tipo=>{
+    const page=document.querySelector('.screen[data-screen="'+tipo+'"]');
+    if(page&&!page.dataset.widgetKey)page.dataset.widgetKey='page-'+tipo;
+  });
+}
+// Faz o caminho inverso: tira os cartões de dentro de .content e devolve para a tela de Início
+// (usado quando a janela é redimensionada de computador para celular sem recarregar a página)
+function demoteContentCardsToInicio(){
+  const content=document.getElementById('content');
+  const inicioScreen=document.querySelector('.screen[data-screen="inicio"]');
+  if(!content||!inicioScreen)return;
+  Array.from(content.querySelectorAll(':scope>[data-widget-key]')).forEach(el=>{
+    if(el.classList.contains('screen'))return; // páginas ficam onde já estavam
+    el.querySelectorAll('.widget-toolbar').forEach(t=>t.remove());
+    inicioScreen.appendChild(el);
+  });
+}
+function applyDashboardOrder(){
+  const content=document.getElementById('content');
+  if(!content)return;
+  const st=getDashboardState();
+  if(!st.order.length)return;
+  const children=Array.from(content.querySelectorAll(':scope>[data-widget-key]'));
   const byKey={};
-  children.forEach(el=>{if(el.dataset&&el.dataset.cardKey)byKey[el.dataset.cardKey]=el});
+  children.forEach(el=>{byKey[el.dataset.widgetKey]=el});
   const used=new Set();
   const ordered=[];
-  saved.forEach(key=>{if(byKey[key]&&key!=='hero'){ordered.push(byKey[key]);used.add(key)}});
-  // Cartões que existem agora mas ainda não estavam na ordem salva (ex: Meta apareceu esse mês) entram no fim, na ordem natural
+  st.order.forEach(key=>{if(byKey[key]){ordered.push(byKey[key]);used.add(key)}});
   children.forEach(el=>{
-    const key=el.dataset&&el.dataset.cardKey;
-    if(key&&key!=='hero'&&!used.has(key)){ordered.push(el);used.add(key)}
+    const key=el.dataset.widgetKey;
+    if(!used.has(key)){ordered.push(el);used.add(key)}
   });
-  ordered.forEach(el=>screen.appendChild(el));
+  ordered.forEach(el=>content.appendChild(el));
 }
-function attachInicioDragHandles(){
-  const screen=document.querySelector('.screen[data-screen="inicio"]');
-  if(!screen)return;
-  Array.from(screen.children).forEach(card=>{
-    const key=card.dataset&&card.dataset.cardKey;
-    if(!key||key==='hero')return;
-    if(card.querySelector(':scope>.drag-handle'))return;
-    const handle=document.createElement('div');
-    handle.className='drag-handle';
-    handle.setAttribute('role','button');
-    handle.setAttribute('tabindex','-1');
+function applyDashboardVisibilityAndSizes(){
+  const content=document.getElementById('content');
+  if(!content)return;
+  const st=getDashboardState();
+  content.querySelectorAll(':scope>[data-widget-key]').forEach(el=>{
+    const key=el.dataset.widgetKey;
+    el.classList.toggle('widget-hidden',st.hidden.includes(key));
+    el.dataset.wSize=st.sizes[key]||'1';
+  });
+}
+function labelAndColorForWidget(key){
+  return DASHBOARD_WIDGETS.find(w=>w.key===key)||{label:key,color:'var(--c-primary)'};
+}
+function attachWidgetToolbars(){
+  const content=document.getElementById('content');
+  if(!content)return;
+  content.querySelectorAll(':scope>[data-widget-key]').forEach(widget=>{
+    const key=widget.dataset.widgetKey;
+    const meta=labelAndColorForWidget(key);
+    widget.dataset.widgetLabel=meta.label;
+    widget.style.setProperty('--w-color',meta.color);
+    if(widget.querySelector(':scope>.widget-toolbar'))return;
+    const bar=document.createElement('div');
+    bar.className='widget-toolbar';
+    const handle=document.createElement('button');
+    handle.className='widget-drag-handle';
+    handle.type='button';
     handle.setAttribute('aria-label','Arrastar para reorganizar');
     handle.title='Arrastar para reorganizar';
     handle.innerHTML='<svg viewBox="0 0 20 20" width="12" height="12" fill="currentColor"><circle cx="6" cy="4" r="1.6"/><circle cx="14" cy="4" r="1.6"/><circle cx="6" cy="10" r="1.6"/><circle cx="14" cy="10" r="1.6"/><circle cx="6" cy="16" r="1.6"/><circle cx="14" cy="16" r="1.6"/></svg>';
-    card.appendChild(handle);
-    handle.addEventListener('pointerdown',(e)=>startInicioDrag(e,card));
+    handle.addEventListener('pointerdown',(e)=>startWidgetDrag(e,widget));
+    const sizeBtn=document.createElement('button');
+    sizeBtn.className='widget-size-btn';
+    sizeBtn.type='button';
+    sizeBtn.setAttribute('aria-label','Mudar largura');
+    sizeBtn.title='Mudar largura';
+    sizeBtn.innerHTML='<svg viewBox="0 0 20 20" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M2 10h16M2 10l4-4M2 10l4 4M18 10l-4-4M18 10l-4 4"/></svg>';
+    sizeBtn.addEventListener('click',()=>cycleWidgetSize(widget));
+    bar.appendChild(handle);
+    bar.appendChild(sizeBtn);
+    widget.appendChild(bar);
   });
 }
-let inicioDragState=null;
-function startInicioDrag(e,card){
-  if(e.button!==undefined&&e.button!==0)return; // só arrasta com botão esquerdo / toque
+function cycleWidgetSize(widget){
+  const cur=parseInt(widget.dataset.wSize||'1',10);
+  const next=cur>=3?1:cur+1;
+  widget.dataset.wSize=String(next);
+  saveDashboardState(st=>{st.sizes[widget.dataset.widgetKey]=String(next)});
+}
+let widgetDragState=null;
+function startWidgetDrag(e,widget){
+  if(e.button!==undefined&&e.button!==0)return; // só botão esquerdo / toque
   e.preventDefault();
-  const screen=card.parentElement;
-  if(!screen)return;
-  inicioDragState={card};
-  card.classList.add('inicio-card-dragging');
+  const content=widget.parentElement;
+  if(!content)return;
+  widgetDragState={widget};
+  widget.classList.add('widget-dragging');
   document.body.style.cursor='grabbing';
   const onMove=(ev)=>{
-    if(!inicioDragState)return;
+    if(!widgetDragState)return;
     const el=document.elementFromPoint(ev.clientX,ev.clientY);
-    const targetCard=el&&el.closest?el.closest('[data-card-key]'):null;
-    if(!targetCard||targetCard===card||targetCard.parentElement!==screen)return;
-    if(targetCard.dataset.cardKey==='hero')return;
-    screen.querySelectorAll('.inicio-card-drop-target').forEach(x=>x.classList.remove('inicio-card-drop-target'));
-    targetCard.classList.add('inicio-card-drop-target');
-    const pos=card.compareDocumentPosition(targetCard);
+    const targetWidget=el&&el.closest?el.closest('[data-widget-key]'):null;
+    if(!targetWidget||targetWidget===widget||targetWidget.parentElement!==content)return;
+    content.querySelectorAll('.widget-drop-target').forEach(x=>x.classList.remove('widget-drop-target'));
+    targetWidget.classList.add('widget-drop-target');
+    const pos=widget.compareDocumentPosition(targetWidget);
     if(pos&Node.DOCUMENT_POSITION_FOLLOWING){
-      screen.insertBefore(card,targetCard.nextSibling);
+      content.insertBefore(widget,targetWidget.nextSibling);
     }else if(pos&Node.DOCUMENT_POSITION_PRECEDING){
-      screen.insertBefore(card,targetCard);
+      content.insertBefore(widget,targetWidget);
     }
   };
   const onUp=()=>{
     document.removeEventListener('pointermove',onMove);
     document.removeEventListener('pointerup',onUp);
     document.body.style.cursor='';
-    card.classList.remove('inicio-card-dragging');
-    screen.querySelectorAll('.inicio-card-drop-target').forEach(x=>x.classList.remove('inicio-card-drop-target'));
-    saveInicioOrder();
-    inicioDragState=null;
+    widget.classList.remove('widget-dragging');
+    content.querySelectorAll('.widget-drop-target').forEach(x=>x.classList.remove('widget-drop-target'));
+    const order=Array.from(content.querySelectorAll(':scope>[data-widget-key]')).map(el=>el.dataset.widgetKey);
+    saveDashboardState(st=>{st.order=order});
+    widgetDragState=null;
   };
   document.addEventListener('pointermove',onMove);
   document.addEventListener('pointerup',onUp);
 }
-function initInicioCardOrder(){
-  applyInicioSavedOrder();
-  attachInicioDragHandles();
+function initDesktopDashboard(){
+  if(!isDesktopDashboard())return;
+  promoteInicioCardsToContent();
+  applyDashboardOrder();
+  applyDashboardVisibilityAndSizes();
+  attachWidgetToolbars();
 }
+// Reage a redimensionar a janela cruzando o ponto de corte celular/computador
+if(window.matchMedia){
+  const dashboardBreakpoint=window.matchMedia('(min-width:1024px)');
+  const handleDashboardBreakpointChange=(ev)=>{
+    if(ev.matches){
+      initDesktopDashboard();
+    }else{
+      demoteContentCardsToInicio();
+      if(typeof currentScreen!=='undefined')switchScreen(currentScreen);
+    }
+  };
+  if(dashboardBreakpoint.addEventListener)dashboardBreakpoint.addEventListener('change',handleDashboardBreakpointChange);
+  else if(dashboardBreakpoint.addListener)dashboardBreakpoint.addListener(handleDashboardBreakpointChange);
+}
+// === Modal "Personalizar painel" ===
+function renderDashboardCustomizeList(){
+  const list=document.getElementById('dashboardWidgetList');
+  if(!list)return;
+  const st=getDashboardState();
+  const content=document.getElementById('content');
+  const present=new Set(content?Array.from(content.querySelectorAll(':scope>[data-widget-key]')).map(el=>el.dataset.widgetKey):[]);
+  list.innerHTML=DASHBOARD_WIDGETS.map(w=>{
+    const hidden=st.hidden.includes(w.key);
+    const unavailable=!present.has(w.key);
+    return `<div class="toggle-row">
+      <div><div class="toggle-label">${w.label}</div>${unavailable?'<div class="toggle-sub">Não disponível neste mês</div>':''}</div>
+      <button class="toggle ${hidden?'':'on'}" data-widget-toggle="${w.key}" aria-label="Mostrar ${w.label}"></button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('[data-widget-toggle]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const key=btn.getAttribute('data-widget-toggle');
+      const nowOn=!btn.classList.contains('on');
+      btn.classList.toggle('on',nowOn);
+      saveDashboardState(st=>{
+        st.hidden=st.hidden.filter(k=>k!==key);
+        if(!nowOn)st.hidden.push(key);
+      });
+      applyDashboardVisibilityAndSizes();
+    });
+  });
+}
+function openDashboardCustomizeModal(){
+  renderDashboardCustomizeList();
+  document.getElementById('dashboardCustomizeModal').classList.add('open');
+}
+const customizeBtn=document.getElementById('customizeBtn');
+if(customizeBtn)customizeBtn.addEventListener('click',openDashboardCustomizeModal);
+const dashboardCustomizeModal=document.getElementById('dashboardCustomizeModal');
+if(dashboardCustomizeModal){
+  dashboardCustomizeModal.addEventListener('click',e=>{if(e.target===dashboardCustomizeModal)dashboardCustomizeModal.classList.remove('open')});
+}
+const dashboardCustomizeCloseBtn=document.getElementById('dashboardCustomizeCloseBtn');
+if(dashboardCustomizeCloseBtn)dashboardCustomizeCloseBtn.addEventListener('click',()=>dashboardCustomizeModal.classList.remove('open'));
+const dashboardResetBtn=document.getElementById('dashboardResetBtn');
+if(dashboardResetBtn)dashboardResetBtn.addEventListener('click',()=>{
+  try{localStorage.removeItem(DASHBOARD_STATE_KEY)}catch(e){}
+  const content=document.getElementById('content');
+  if(content){
+    // Restaura a ordem "de fábrica": páginas primeiro, depois os cartões do Início na ordem natural
+    const order=['hero','page-despesas','page-receitas','page-reservas','meta','annual','donut-despesas','donut-receitas','saldos','notebook','actionlog'];
+    saveDashboardState(st=>{st.order=order;st.hidden=[];st.sizes={}});
+  }
+  initDesktopDashboard();
+  renderDashboardCustomizeList();
+});
 
 // === Modal: detalhes de itens por moeda ===
 function openCurrencyDetailModal(currencyCode){
@@ -4322,6 +4487,7 @@ function renderAll(){
   renderMonthPicker();
   updatePlanilhaName();
   updateMenuCurrentPlan();
+  initDesktopDashboard();
 }
 
 // === Month Bar fixo (visível em todas as páginas) ===
