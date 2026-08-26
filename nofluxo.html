@@ -109,6 +109,10 @@ svg{display:block}
 /* APP BAR */
 .app-bar{position:sticky;top:0;z-index:50;height:calc(var(--app-bar-h) + var(--safe-top));background:var(--c-primary);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 10px;padding-top:var(--safe-top);gap:6px}
 .app-bar-left,.app-bar-right{display:flex;align-items:center;gap:4px}
+.app-bar-center{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.fab-btn{background:linear-gradient(135deg,var(--c-brand-fab) 0%,var(--c-brand-fab-2) 100%)!important;width:38px!important;height:38px!important;border-radius:50%;box-shadow:0 3px 12px rgba(230,125,0,0.45)}
+.fab-btn:active{transform:scale(0.92)}
+.fab-btn svg{width:20px!important;height:20px!important}
 .brand{display:flex;align-items:center;gap:7px;padding:0 2px}
 .brand-logo{width:30px;height:30px;border-radius:9px;overflow:hidden;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,0.15)}
 .brand-name{font-weight:700;font-size:15px;letter-spacing:-0.02em}
@@ -1353,16 +1357,13 @@ html[data-theme="dark"] .hero-mini-despesas{
   #customizeBtn{display:flex}
 
   .content{
-    display:grid;
-    grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
-    grid-auto-rows:10px;
-    grid-auto-flow:dense;
-    gap:14px;
+    position:relative;
     max-width:100%;
     margin:0 auto;
-    padding:16px 16px 40px 16px;
-    min-height:calc(100vh - var(--app-bar-h));
+    padding:16px;
+    min-height:calc(100vh - var(--app-bar-h) - 60px);
     background:var(--c-bg)!important;
+    overflow:hidden;
   }
 
   /* Botões de mês/ano maiores no computador, crescendo com a largura da janela */
@@ -1381,24 +1382,20 @@ html[data-theme="dark"] .hero-mini-despesas{
      navegador — o mesmo do Bloco de notas — então dá pra ajustar largura e altura livremente,
      sem tamanhos fixos, arrastando a quina no canto inferior direito. */
   .content>[data-widget-key]{
-    position:relative;
-    grid-column:span 1;
-    grid-row:span 30;
-    min-width:0;
-    min-height:90px;
-    margin-bottom:0;
+    position:absolute;
+    min-width:200px;
+    min-height:100px;
     background:var(--c-surface);
     border-radius:var(--radius-lg);
     border:1px solid var(--c-border-2);
     box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);
     overflow:auto;
     resize:both;
-    overflow:auto;
   }
-  /* Hero (Resumo do mês) e gráfico anual ocupam 2 colunas para aproveitar melhor o espaço */
-  .content>[data-widget-key="hero"]{grid-column:span 2}
-  .content>[data-widget-key="annual"]{grid-column:span 2}
-  /* Garante que o handle de resize (canto inferior direito) fique sempre visível no desktop */
+  /* Hero (Resumo do mês) e gráfico anual: largura inicial maior */
+  .content>[data-widget-key="hero"],
+  .content>[data-widget-key="annual"]{width:600px!important}
+  /* Garante que o handle de resize fique visível */
   .content>[data-widget-key]::-webkit-resizer{background:linear-gradient(135deg,transparent 50%,var(--c-text-3) 50%);width:14px;height:14px;border-bottom-right-radius:var(--radius-lg)}
   .content>[data-widget-key]::-webkit-scrollbar-corner{background:var(--c-surface-2);border-bottom-right-radius:var(--radius-lg)}
   /* As páginas (Despesas/Receitas/Reservas) são <section class="screen">: precisam ignorar o
@@ -1440,9 +1437,7 @@ html[data-theme="dark"] .hero-mini-despesas{
   .widget-dragging{opacity:.45;outline:2px dashed var(--c-primary);outline-offset:3px}
   .widget-drop-target{outline:2px solid var(--c-primary);outline-offset:3px;transition:outline-color .1s}
 
-  /* Botões de adicionar (+) e IA no app-bar — visíveis só no desktop */
-  #deskAddBtn{display:flex!important;order:3}
-  #deskAgentBtn{display:flex!important;order:4}
+  /* Botões de adicionar (+) e IA estão no centro do cabeçalho — sempre visíveis */
 
   /* A bottom-nav do celular vira só um botão "+" flutuante (as páginas já ficam todas visíveis) */
   .bottom-nav{
@@ -1452,6 +1447,10 @@ html[data-theme="dark"] .hero-mini-despesas{
   .nav-item{display:none}
   .fab{margin:0;transform:none}
   .fab:active{transform:scale(.94)}
+  /* No desktop, o FAB amarelo do canto inferior direito fica oculto (já está no cabeçalho) */
+  .fab{display:none!important}
+  /* Esconde os FABs flutuantes do agente IA e instalar no desktop (já estão no cabeçalho) */
+  .fab-stack{display:none!important}
 
   /* Telas de login e modais (editar item, moedas, importar, personalizar, etc.) — o fundo escurecido
      passa a cobrir a tela toda (senão ficaria só no centro e o painel apareceria pelas laterais),
@@ -1501,15 +1500,18 @@ html[data-theme="dark"] .hero-mini-despesas{
       <input type="search" style="display:none">
     </div>
   </div>
+  <!-- Centro: botões + e IA (sempre visíveis em qualquer tela) -->
+  <div class="app-bar-center">
+    <button class="icon-btn fab-btn" id="deskAddBtn" aria-label="Adicionar item" title="Adicionar item">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
+    <button class="icon-btn fab-btn" id="deskAgentBtn" aria-label="Agente IA" title="Agente NoFluxo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+    </button>
+  </div>
   <div class="app-bar-right">
     <button class="icon-btn" id="customizeBtn" aria-label="Personalizar painel" title="Personalizar painel">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-    </button>
-    <button class="icon-btn" id="deskAddBtn" aria-label="Adicionar item" title="Adicionar item" style="display:none">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </button>
-    <button class="icon-btn" id="deskAgentBtn" aria-label="Agente IA" title="Agente NoFluxo" style="display:none;position:relative">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
     </button>
     <button class="icon-btn" id="togglePrivacyBtn" aria-label="Ocultar/exibir valores" title="Ocultar/exibir valores">
       <svg id="privacyIconEye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -3429,29 +3431,20 @@ function applyDashboardVisibilityAndSizes(){
   const content=document.getElementById('content');
   if(!content)return;
   const st=getDashboardState();
-  const heightToRows=(h)=>Math.max(1,Math.ceil((h+14)/(10+14)));
   content.querySelectorAll(':scope>[data-widget-key]').forEach(el=>{
     const key=el.dataset.widgetKey;
     el.classList.toggle('widget-hidden',st.hidden.includes(key));
     const sz=st.sizes[key];
-    // Hero e annual sempre 2 colunas, ignoram span salvo
-    if(key==='hero'||key==='annual'){
-      el.style.height=(sz&&sz.height)?sz.height+'px':'';
-      el.style.gridRow=(sz&&sz.height)?'span '+heightToRows(sz.height):'';
-      el.style.gridColumn='span 2';
-      return;
-    }
-    if(sz&&sz.height){
-      el.style.height=sz.height+'px';
-      el.style.gridRow='span '+heightToRows(sz.height);
+    if(sz&&sz.x!==undefined){
+      el.style.left=sz.x+'px';
+      el.style.top=sz.y+'px';
+      el.style.width=sz.w+'px';
+      el.style.height=sz.h+'px';
     }else{
+      el.style.left='';
+      el.style.top='';
+      el.style.width='';
       el.style.height='';
-      el.style.gridRow='';
-    }
-    if(sz&&sz.cols&&sz.cols>1){
-      el.style.gridColumn='span '+sz.cols;
-    }else{
-      el.style.gridColumn='';
     }
   });
 }
@@ -3506,51 +3499,98 @@ function ensureWidgetStructure(widget){
   widget.appendChild(header);
   widget.appendChild(body);
 }
-// Observa o tamanho real do widget e salva SÓ quando a mudança veio do usuário arrastando a
-// quina de redimensionar (não quando o tamanho muda por outro motivo, como o conteúdo mudar ou
-// a janela ser redimensionada) — assim widgets que ninguém tocou continuam se ajustando sozinhos.
+// === Layout livre com colisão (position:absolute + detecção AABB) ===
+// Helpers
+function aabbOverlap(a,b){return a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top}
+function getWidgetRect(w){const r=w.getBoundingClientRect();const c=w.parentElement.getBoundingClientRect();return{left:r.left-c.left,top:r.top-c.top,width:r.width,height:r.height,right:r.left-c.left+r.width,bottom:r.top-c.top+r.height}}
+function clampWidget(w,x,y,containerW,containerH){
+  const minW=200,minH=100;
+  const wW=w.offsetWidth||300,wH=w.offsetHeight||200;
+  x=Math.max(0,Math.min(x,containerW-wW));
+  y=Math.max(0,Math.min(y,containerH-wH));
+  return{x,y};
+}
+function resolveCollision(moving, others, containerW, containerH){
+  // Tenta posicionar o widget; se colidir, empurra para o lado mais próximo
+  let {x,y}=moving;
+  const w=moving.w,h=moving.h;
+  let best={x,y};
+  // Verifica colisões
+  for(let attempt=0;attempt<others.length*2+4;attempt++){
+    let collided=false;
+    for(const o of others){
+      if(o.left<best.x+w+4&&o.right>best.x-4&&o.top<best.y+h+4&&o.bottom>best.y-4){
+        collided=true;
+        // Empurra para baixo primeiro, depois direita, depois cima, depois esquerda
+        const pushDown=o.bottom+2;
+        const pushRight=o.right+2;
+        const pushUp=o.top-h-2;
+        const pushLeft=o.left-w-2;
+        const opts=[];
+        if(pushDown+h<=containerH)opts.push({x:best.x,y:pushDown,d:Math.abs(pushDown-best.y)});
+        if(pushRight+w<=containerW)opts.push({x:pushRight,y:best.y,d:Math.abs(pushRight-best.x)});
+        if(pushUp>=0)opts.push({x:best.x,y:pushUp,d:Math.abs(pushUp-best.y)});
+        if(pushLeft>=0)opts.push({x:pushLeft,y:best.y,d:Math.abs(pushLeft-best.x)});
+        if(opts.length===0){opts.push({x:best.x,y:pushDown+2,d:0})}
+        opts.sort((a,b)=>a.d-b.d);
+        best=opts[0];
+      }
+    }
+    if(!collided)break;
+  }
+  return best;
+}
+function autoArrangeWidgets(content){
+  const widgets=Array.from(content.querySelectorAll(':scope>[data-widget-key]:not(.widget-hidden)'));
+  const cw=content.clientWidth-32; // padding
+  const colW=320,gap=14;
+  const cols=Math.max(1,Math.floor((cw+gap)/(colW+gap)));
+  const actualColW=Math.floor((cw-(cols-1)*gap)/cols);
+  let x=0,y=0,rowH=0;
+  widgets.forEach(w=>{
+    const wW=(w.dataset.widgetKey==='hero'||w.dataset.widgetKey==='annual')?actualColW*2+gap:actualColW;
+    w.style.left=x+'px';
+    w.style.top=y+'px';
+    w.style.width=wW+'px';
+    w.style.height='300px';
+    rowH=Math.max(rowH,300);
+    x+=wW+gap;
+    if(x+actualColW>cw+16){x=0;y+=rowH+gap;rowH=0}
+  });
+  content.style.height=(y+rowH+60)+'px';
+}
 function observeWidgetResize(widget){
   if(widget._widgetResizeObserver)return;
   let saveTimer=null;
-  // Calcula quantas linhas de grid (10px cada + 14px gap) cabem numa altura em pixels
-  const heightToRows=(h)=>Math.max(1,Math.ceil((h+14)/(10+14)));
-  // Calcula quantas colunas de grid um widget de largura L ocupa
-  const widthToCols=(w,gridW,cols)=>{
-    if(!gridW||!cols)return 1;
-    const colW=(gridW-(cols-1)*14)/cols; // largura de 1 coluna
-    return Math.max(1,Math.round(w/colW));
-  };
-  // Aplica o grid-row span baseado na altura atual
-  const syncGridRow=()=>{
-    const h=widget.offsetHeight;
-    if(h>0)widget.style.gridRow='span '+heightToRows(h);
-  };
-  // Aplica span inicial
-  requestAnimationFrame(syncGridRow);
-  const content=widget.parentElement;
   const ro=new ResizeObserver(()=>{
-    syncGridRow();
-    // Sincroniza largura (grid-column span) — só em widgets que NÃO têm largura fixa via CSS
-    if(!widget.dataset.widgetKey||['hero','annual'].includes(widget.dataset.widgetKey))return;
+    // Verifica colisão com outros widgets durante resize
     if(widget._userResizing){
-      const w=widget.offsetWidth;
-      const gridW=content?content.clientWidth-32:0; // subtrai padding
-      const cols=Math.floor((gridW+14)/294); // ~280px por coluna + 14px gap
-      if(cols>0){
-        const span=widthToCols(w,gridW,cols);
-        widget.style.gridColumn='span '+span;
+      const content=widget.parentElement;
+      if(content){
+        const others=Array.from(content.querySelectorAll(':scope>[data-widget-key]:not(.widget-hidden)')).filter(w=>w!==widget).map(w=>getWidgetRect(w));
+        const myRect=getWidgetRect(widget);
+        // Se colide com algum, restringe o tamanho
+        for(const o of others){
+          if(myRect.left<o.right+4&&myRect.right>o.left-4&&myRect.top<o.bottom+4&&myRect.bottom>o.top-4){
+            // Colide! Reduz o tamanho para não sobrepor
+            // Limita largura/altura para não passar o vizinho mais próximo
+            const overlapRight=o.left-myRect.left-4;
+            const overlapBottom=o.top-myRect.top-4;
+            if(overlapRight>200&&overlapRight<myRect.width)widget.style.width=overlapRight+'px';
+            if(overlapBottom>100&&overlapBottom<myRect.height)widget.style.height=overlapBottom+'px';
+            break;
+          }
+        }
+        // Limita à área do content
+        const cw=content.clientWidth-16;
+        if(myRect.left+myRect.width>cw)widget.style.width=(cw-myRect.left)+'px';
       }
     }
-    if(!widget._userResizing)return;
     clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>{
-      const h=widget.offsetHeight;
-      const w=widget.offsetWidth;
       const key=widget.dataset.widgetKey;
-      const gridW=content?content.clientWidth-32:0;
-      const cols=Math.floor((gridW+14)/294);
-      const colSpan=cols>0?widthToCols(w,gridW,cols):1;
-      saveDashboardState(st=>{st.sizes[key]={height:Math.round(h),cols:colSpan}});
+      const rect=getWidgetRect(widget);
+      saveDashboardState(st=>{st.sizes[key]={x:Math.round(rect.left),y:Math.round(rect.top),w:Math.round(rect.width),h:Math.round(rect.height)}});
     },250);
   });
   ro.observe(widget);
@@ -3560,10 +3600,7 @@ function observeWidgetResize(widget){
     const nearCorner=(rect.right-e.clientX)<20&&(rect.bottom-e.clientY)<20;
     if(!nearCorner)return;
     widget._userResizing=true;
-    const onUp=()=>{
-      document.removeEventListener('pointerup',onUp);
-      setTimeout(()=>{widget._userResizing=false;syncGridRow()},300);
-    };
+    const onUp=()=>{document.removeEventListener('pointerup',onUp);setTimeout(()=>{widget._userResizing=false},300)};
     document.addEventListener('pointerup',onUp);
   });
 }
@@ -3582,25 +3619,45 @@ function attachWidgetToolbars(){
 }
 let widgetDragState=null;
 function startWidgetDrag(e,widget){
-  if(e.button!==undefined&&e.button!==0)return; // só botão esquerdo / toque
+  if(e.button!==undefined&&e.button!==0)return;
   e.preventDefault();
   const content=widget.parentElement;
   if(!content)return;
+  const startRect=getWidgetRect(widget);
+  const startX=e.clientX,startY=e.clientY;
+  const origX=startRect.left,origY=startRect.top;
   widgetDragState={widget};
   widget.classList.add('widget-dragging');
   document.body.style.cursor='grabbing';
   const onMove=(ev)=>{
     if(!widgetDragState)return;
-    const el=document.elementFromPoint(ev.clientX,ev.clientY);
-    const targetWidget=el&&el.closest?el.closest('[data-widget-key]'):null;
-    if(!targetWidget||targetWidget===widget||targetWidget.parentElement!==content)return;
-    content.querySelectorAll('.widget-drop-target').forEach(x=>x.classList.remove('widget-drop-target'));
-    targetWidget.classList.add('widget-drop-target');
-    const pos=widget.compareDocumentPosition(targetWidget);
-    if(pos&Node.DOCUMENT_POSITION_FOLLOWING){
-      content.insertBefore(widget,targetWidget.nextSibling);
-    }else if(pos&Node.DOCUMENT_POSITION_PRECEDING){
-      content.insertBefore(widget,targetWidget);
+    let dx=ev.clientX-startX;
+    let dy=ev.clientY-startY;
+    let newX=origX+dx;
+    let newY=origY+dy;
+    // Limita à área do content
+    const cw=content.clientWidth-16;
+    const ch=Math.max(content.clientHeight-16,content.scrollHeight-16);
+    newX=Math.max(0,Math.min(newX,cw-widget.offsetWidth));
+    newY=Math.max(0,Math.min(newY,ch-widget.offsetHeight));
+    // Detecção de colisão
+    const others=Array.from(content.querySelectorAll(':scope>[data-widget-key]:not(.widget-hidden)')).filter(w=>w!==widget).map(w=>getWidgetRect(w));
+    const moving={x:newX,y:newY,w:widget.offsetWidth,h:widget.offsetHeight};
+    // Se colide, tenta resolver
+    let collides=false;
+    for(const o of others){
+      if(moving.x<o.right+4&&moving.x+moving.w>o.left-4&&moving.y<o.bottom+4&&moving.y+moving.h>o.top-4){
+        collides=true;break;
+      }
+    }
+    if(!collides){
+      widget.style.left=newX+'px';
+      widget.style.top=newY+'px';
+    }else{
+      // Tenta resolver colisão
+      const resolved=resolveCollision(moving,others,cw,ch);
+      widget.style.left=resolved.x+'px';
+      widget.style.top=resolved.y+'px';
     }
   };
   const onUp=()=>{
@@ -3608,9 +3665,9 @@ function startWidgetDrag(e,widget){
     document.removeEventListener('pointerup',onUp);
     document.body.style.cursor='';
     widget.classList.remove('widget-dragging');
-    content.querySelectorAll('.widget-drop-target').forEach(x=>x.classList.remove('widget-drop-target'));
-    const order=Array.from(content.querySelectorAll(':scope>[data-widget-key]')).map(el=>el.dataset.widgetKey);
-    saveDashboardState(st=>{st.order=order});
+    const key=widget.dataset.widgetKey;
+    const rect=getWidgetRect(widget);
+    saveDashboardState(st=>{st.sizes[key]={x:Math.round(rect.left),y:Math.round(rect.top),w:Math.round(rect.width),h:Math.round(rect.height)}});
     widgetDragState=null;
   };
   document.addEventListener('pointermove',onMove);
@@ -3622,6 +3679,13 @@ function initDesktopDashboard(){
   applyDashboardOrder();
   attachWidgetToolbars();
   applyDashboardVisibilityAndSizes();
+  // Se não há posições salvas, faz auto-arrange
+  const st=getDashboardState();
+  const hasPositions=st.sizes&&Object.keys(st.sizes).some(k=>st.sizes[k].x!==undefined);
+  if(!hasPositions){
+    const content=document.getElementById('content');
+    if(content)autoArrangeWidgets(content);
+  }
 }
 // Reage a redimensionar a janela cruzando o ponto de corte celular/computador
 if(window.matchMedia){
@@ -3685,14 +3749,15 @@ if(dashboardCustomizeCloseBtn)dashboardCustomizeCloseBtn.addEventListener('click
 const dashboardResetBtn=document.getElementById('dashboardResetBtn');
 if(dashboardResetBtn)dashboardResetBtn.addEventListener('click',()=>{
   try{localStorage.removeItem(DASHBOARD_STATE_KEY)}catch(e){}
-  const content=document.getElementById('content');
-  if(content){
-    // Restaura a ordem "de fábrica": páginas primeiro, depois os cartões do Início na ordem natural
-    const order=['hero','page-despesas','page-receitas','page-reservas','meta','annual','donut-despesas','donut-receitas','saldos','notebook','actionlog'];
-    saveDashboardState(st=>{st.order=order;st.hidden=[];st.sizes={}});
-  }
-  initDesktopDashboard();
+  // Re-renderiza tudo do zero (limpa posições, recria widgets)
+  renderAll();
+  // Força auto-arrange após re-render
+  setTimeout(()=>{
+    const content=document.getElementById('content');
+    if(content&&isDesktopDashboard())autoArrangeWidgets(content);
+  },200);
   renderDashboardCustomizeList();
+  toast('Painel restaurado para o padrão','success');
 });
 
 // === Modal: detalhes de itens por moeda ===
