@@ -1392,11 +1392,15 @@ html[data-theme="dark"] .hero-mini-despesas{
     border:1px solid var(--c-border-2);
     box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);
     overflow:auto;
-    resize:vertical;
+    resize:both;
+    overflow:auto;
   }
-  /* Hero (Resumo do mês) ocupa 2 colunas para aproveitar melhor o espaço */
+  /* Hero (Resumo do mês) e gráfico anual ocupam 2 colunas para aproveitar melhor o espaço */
   .content>[data-widget-key="hero"]{grid-column:span 2}
   .content>[data-widget-key="annual"]{grid-column:span 2}
+  /* Garante que o handle de resize (canto inferior direito) fique sempre visível no desktop */
+  .content>[data-widget-key]::-webkit-resizer{background:linear-gradient(135deg,transparent 50%,var(--c-text-3) 50%);width:14px;height:14px;border-bottom-right-radius:var(--radius-lg)}
+  .content>[data-widget-key]::-webkit-scrollbar-corner{background:var(--c-surface-2);border-bottom-right-radius:var(--radius-lg)}
   /* As páginas (Despesas/Receitas/Reservas) são <section class="screen">: precisam ignorar o
      display:none/.active do celular. Os cartões do Início (hero-balance, .card etc.) não são
      .screen, então mantêm seu próprio display (ex: hero-balance continua flex) */
@@ -3420,12 +3424,24 @@ function applyDashboardVisibilityAndSizes(){
     const key=el.dataset.widgetKey;
     el.classList.toggle('widget-hidden',st.hidden.includes(key));
     const sz=st.sizes[key];
+    // Hero e annual sempre 2 colunas, ignoram span salvo
+    if(key==='hero'||key==='annual'){
+      el.style.height=(sz&&sz.height)?sz.height+'px':'';
+      el.style.gridRow=(sz&&sz.height)?'span '+heightToRows(sz.height):'';
+      el.style.gridColumn='span 2';
+      return;
+    }
     if(sz&&sz.height){
       el.style.height=sz.height+'px';
       el.style.gridRow='span '+heightToRows(sz.height);
     }else{
       el.style.height='';
       el.style.gridRow='';
+    }
+    if(sz&&sz.cols&&sz.cols>1){
+      el.style.gridColumn='span '+sz.cols;
+    }else{
+      el.style.gridColumn='';
     }
   });
 }
@@ -3471,6 +3487,12 @@ function observeWidgetResize(widget){
   let saveTimer=null;
   // Calcula quantas linhas de grid (10px cada + 14px gap) cabem numa altura em pixels
   const heightToRows=(h)=>Math.max(1,Math.ceil((h+14)/(10+14)));
+  // Calcula quantas colunas de grid um widget de largura L ocupa
+  const widthToCols=(w,gridW,cols)=>{
+    if(!gridW||!cols)return 1;
+    const colW=(gridW-(cols-1)*14)/cols; // largura de 1 coluna
+    return Math.max(1,Math.round(w/colW));
+  };
   // Aplica o grid-row span baseado na altura atual
   const syncGridRow=()=>{
     const h=widget.offsetHeight;
@@ -3478,14 +3500,30 @@ function observeWidgetResize(widget){
   };
   // Aplica span inicial
   requestAnimationFrame(syncGridRow);
+  const content=widget.parentElement;
   const ro=new ResizeObserver(()=>{
     syncGridRow();
+    // Sincroniza largura (grid-column span) — só em widgets que NÃO têm largura fixa via CSS
+    if(!widget.dataset.widgetKey||['hero','annual'].includes(widget.dataset.widgetKey))return;
+    if(widget._userResizing){
+      const w=widget.offsetWidth;
+      const gridW=content?content.clientWidth-32:0; // subtrai padding
+      const cols=Math.floor((gridW+14)/294); // ~280px por coluna + 14px gap
+      if(cols>0){
+        const span=widthToCols(w,gridW,cols);
+        widget.style.gridColumn='span '+span;
+      }
+    }
     if(!widget._userResizing)return;
     clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>{
       const h=widget.offsetHeight;
+      const w=widget.offsetWidth;
       const key=widget.dataset.widgetKey;
-      saveDashboardState(st=>{st.sizes[key]={height:Math.round(h)}});
+      const gridW=content?content.clientWidth-32:0;
+      const cols=Math.floor((gridW+14)/294);
+      const colSpan=cols>0?widthToCols(w,gridW,cols):1;
+      saveDashboardState(st=>{st.sizes[key]={height:Math.round(h),cols:colSpan}});
     },250);
   });
   ro.observe(widget);
