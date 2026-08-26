@@ -1363,7 +1363,8 @@ html[data-theme="dark"] .hero-mini-despesas{
     padding:16px;
     min-height:calc(100vh - var(--app-bar-h) - 60px);
     background:var(--c-bg)!important;
-    overflow:hidden;
+    overflow-y:auto;
+    overflow-x:hidden;
   }
 
   /* Botões de mês/ano maiores no computador, crescendo com a largura da janela */
@@ -1437,7 +1438,14 @@ html[data-theme="dark"] .hero-mini-despesas{
   .widget-dragging{opacity:.45;outline:2px dashed var(--c-primary);outline-offset:3px}
   .widget-drop-target{outline:2px solid var(--c-primary);outline-offset:3px;transition:outline-color .1s}
 
-  /* Botões de adicionar (+) e IA estão no centro do cabeçalho — sempre visíveis */
+  /* Botões de adicionar (+) e IA no centro do cabeçalho — só no desktop */
+  .desk-only{display:none}
+  @media(min-width:1024px){
+    .desk-only{display:flex!important}
+    /* No desktop, esconde o FAB amarelo do canto e os FABs flutuantes (já estão no cabeçalho) */
+    .fab{display:none!important}
+    .fab-stack{display:none!important}
+  }
 
   /* A bottom-nav do celular vira só um botão "+" flutuante (as páginas já ficam todas visíveis) */
   .bottom-nav{
@@ -1445,12 +1453,7 @@ html[data-theme="dark"] .hero-mini-despesas{
     width:auto;max-width:none;height:auto;padding:0;background:none;border:none;box-shadow:none;
   }
   .nav-item{display:none}
-  .fab{margin:0;transform:none}
-  .fab:active{transform:scale(.94)}
-  /* No desktop, o FAB amarelo do canto inferior direito fica oculto (já está no cabeçalho) */
-  .fab{display:none!important}
-  /* Esconde os FABs flutuantes do agente IA e instalar no desktop (já estão no cabeçalho) */
-  .fab-stack{display:none!important}
+  /* FAB e fab-stack já ocultos pelo .desk-only media query acima */
 
   /* Telas de login e modais (editar item, moedas, importar, personalizar, etc.) — o fundo escurecido
      passa a cobrir a tela toda (senão ficaria só no centro e o painel apareceria pelas laterais),
@@ -1500,8 +1503,8 @@ html[data-theme="dark"] .hero-mini-despesas{
       <input type="search" style="display:none">
     </div>
   </div>
-  <!-- Centro: botões + e IA (sempre visíveis em qualquer tela) -->
-  <div class="app-bar-center">
+  <!-- Centro: botões + e IA — só no desktop (classe desk-only) -->
+  <div class="app-bar-center desk-only">
     <button class="icon-btn fab-btn" id="deskAddBtn" aria-label="Adicionar item" title="Adicionar item">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     </button>
@@ -3431,22 +3434,41 @@ function applyDashboardVisibilityAndSizes(){
   const content=document.getElementById('content');
   if(!content)return;
   const st=getDashboardState();
+  let needsArrange=false;
   content.querySelectorAll(':scope>[data-widget-key]').forEach(el=>{
     const key=el.dataset.widgetKey;
-    el.classList.toggle('widget-hidden',st.hidden.includes(key));
-    const sz=st.sizes[key];
-    if(sz&&sz.x!==undefined){
-      el.style.left=sz.x+'px';
-      el.style.top=sz.y+'px';
-      el.style.width=sz.w+'px';
-      el.style.height=sz.h+'px';
-    }else{
+    const wasHidden=el.classList.contains('widget-hidden');
+    const shouldHide=st.hidden.includes(key);
+    el.classList.toggle('widget-hidden',shouldHide);
+    // Se o widget acabou de ficar visível (não estava hidden antes, está hidden agora não)
+    if(wasHidden&&!shouldHide){
+      // Volta visível mas sem posição — precisa de auto-arrange
       el.style.left='';
       el.style.top='';
       el.style.width='';
       el.style.height='';
+      needsArrange=true;
+    }
+    if(!shouldHide){
+      const sz=st.sizes[key];
+      if(sz&&sz.x!==undefined&&sz.w){
+        el.style.left=sz.x+'px';
+        el.style.top=sz.y+'px';
+        el.style.width=sz.w+'px';
+        el.style.height=sz.h+'px';
+      }
     }
   });
+  // Se algum widget voltou visível sem posição, reorganiza todos
+  if(needsArrange){
+    autoArrangeWidgets(content);
+    // Salva as novas posições
+    content.querySelectorAll(':scope>[data-widget-key]:not(.widget-hidden)').forEach(el=>{
+      const key=el.dataset.widgetKey;
+      const rect=getWidgetRect(el);
+      saveDashboardState(st=>{st.sizes[key]={x:Math.round(rect.left),y:Math.round(rect.top),w:Math.round(rect.width),h:Math.round(rect.height)}});
+    });
+  }
 }
 function labelAndColorForWidget(key){
   return DASHBOARD_WIDGETS.find(w=>w.key===key)||{label:key,color:'var(--c-primary)'};
@@ -3559,6 +3581,16 @@ function autoArrangeWidgets(content){
   });
   content.style.height=(y+rowH+60)+'px';
 }
+// Ajusta a altura do content para caber todos os widgets (evita sumir ao aumentar)
+function adjustContentHeight(content){
+  let maxBottom=0;
+  content.querySelectorAll(':scope>[data-widget-key]:not(.widget-hidden)').forEach(w=>{
+    const rect=getWidgetRect(w);
+    maxBottom=Math.max(maxBottom,rect.bottom);
+  });
+  const minH=window.innerHeight-(parseInt(getComputedStyle(document.querySelector('.app-bar')).height)||60)-120;
+  content.style.height=Math.max(maxBottom+32,minH)+'px';
+}
 function observeWidgetResize(widget){
   if(widget._widgetResizeObserver)return;
   let saveTimer=null;
@@ -3572,8 +3604,6 @@ function observeWidgetResize(widget){
         // Se colide com algum, restringe o tamanho
         for(const o of others){
           if(myRect.left<o.right+4&&myRect.right>o.left-4&&myRect.top<o.bottom+4&&myRect.bottom>o.top-4){
-            // Colide! Reduz o tamanho para não sobrepor
-            // Limita largura/altura para não passar o vizinho mais próximo
             const overlapRight=o.left-myRect.left-4;
             const overlapBottom=o.top-myRect.top-4;
             if(overlapRight>200&&overlapRight<myRect.width)widget.style.width=overlapRight+'px';
@@ -3581,9 +3611,8 @@ function observeWidgetResize(widget){
             break;
           }
         }
-        // Limita à área do content
-        const cw=content.clientWidth-16;
-        if(myRect.left+myRect.width>cw)widget.style.width=(cw-myRect.left)+'px';
+        // Ajusta altura do content para não cortar o widget
+        adjustContentHeight(content);
       }
     }
     clearTimeout(saveTimer);
@@ -3591,6 +3620,8 @@ function observeWidgetResize(widget){
       const key=widget.dataset.widgetKey;
       const rect=getWidgetRect(widget);
       saveDashboardState(st=>{st.sizes[key]={x:Math.round(rect.left),y:Math.round(rect.top),w:Math.round(rect.width),h:Math.round(rect.height)}});
+      const content=widget.parentElement;
+      if(content)adjustContentHeight(content);
     },250);
   });
   ro.observe(widget);
@@ -3668,6 +3699,7 @@ function startWidgetDrag(e,widget){
     const key=widget.dataset.widgetKey;
     const rect=getWidgetRect(widget);
     saveDashboardState(st=>{st.sizes[key]={x:Math.round(rect.left),y:Math.round(rect.top),w:Math.round(rect.width),h:Math.round(rect.height)}});
+    adjustContentHeight(content);
     widgetDragState=null;
   };
   document.addEventListener('pointermove',onMove);
