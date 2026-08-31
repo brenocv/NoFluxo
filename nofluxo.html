@@ -211,7 +211,7 @@ html[data-theme="dark"] body[data-active-screen="reservas"] .content{background:
   .month-bar{max-width:100%;padding:14px 20px}
   .month-bar .mb-year{font-size:22px;gap:10px}
   .month-bar .mb-year span{font-size:28px;min-width:72px;font-weight:800}
-  .month-bar .mb-year button{font-size:32px;padding:6px 14px;border-radius:8px}
+  .month-bar .mb-year button{font-size:32px;padding:6px 14px}
   .month-bar .mb-months{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:8px}
   .month-bar .mb-months::-webkit-scrollbar{display:none}
   .month-bar .mb-month{font-size:16px;padding:12px 18px;flex-shrink:0;border-radius:12px;border-width:2px}
@@ -3203,6 +3203,25 @@ function renderInicio(){
   screen.querySelectorAll('[data-currency-detail]').forEach(row=>{
     row.addEventListener('click',()=>openCurrencyDetailModal(row.getAttribute('data-currency-detail')));
   });
+  // Seletor de período do gráfico de evolução
+  const evoContainer=screen.querySelector('#evoChartContainer');
+  if(evoContainer)evoContainer.innerHTML=renderEvoChartSVG(6);
+  screen.querySelectorAll('.evo-period-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const period=parseInt(btn.getAttribute('data-period'));
+      screen.querySelectorAll('.evo-period-btn').forEach(b=>{b.style.background='var(--c-surface)';b.style.color='var(--c-text-2)';b.classList.remove('active')});
+      btn.style.background='var(--c-primary)';btn.style.color='#fff';btn.classList.add('active');
+      const c=screen.querySelector('#evoChartContainer');
+      if(c)c.innerHTML=renderEvoChartSVG(period);
+    });
+  });
+  // Botão Análise completa
+  const fullBtn=screen.querySelector('#evoFullAnalysisBtn');
+  if(fullBtn){
+    const activeBtn=screen.querySelector('.evo-period-btn.active');
+    const currentPeriod=activeBtn?parseInt(activeBtn.getAttribute('data-period')):6;
+    fullBtn.addEventListener('click',()=>openFullAnalysisModal(currentPeriod));
+  }
 }
 
 // === Modal: detalhes de itens por moeda ===
@@ -3425,143 +3444,207 @@ function renderEvolutionChart(){
   </div>`;
 }
 
-// === Gráfico de evolução do saldo (receitas, despesas, saldo acumulado) ===
-// Mostra 12 meses do ano atual + projeção dos meses futuros sem dados
+// === Gráfico de evolução do saldo — versão resumida com seletor de período ===
 function renderBalanceEvolutionChart(yr){
-  const monthInitials=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  return `<div class="card" style="margin-bottom:14px">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span style="display:flex;align-items:center;gap:8px"><span class="bullet" style="background:var(--c-accent)"></span>Evolução do saldo</span>
+      <div style="display:flex;gap:4px" id="evoPeriodSelector">
+        <button class="evo-period-btn active" data-period="6" style="padding:4px 10px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s">6m</button>
+        <button class="evo-period-btn" data-period="12" style="padding:4px 10px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s">12m</button>
+        <button class="evo-period-btn" data-period="18" style="padding:4px 10px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s">18m</button>
+        <button class="evo-period-btn" data-period="24" style="padding:4px 10px;border-radius:99px;border:1.5px solid var(--c-border);background:var(--c-surface);color:var(--c-text-2);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s">24m</button>
+      </div>
+    </div>
+    <div id="evoChartContainer"></div>
+    <div style="text-align:center;margin-top:8px">
+      <button class="btn btn-secondary" id="evoFullAnalysisBtn" style="font-size:11px;padding:6px 16px">Análise completa</button>
+    </div>
+  </div>`;
+}
+// Renderiza o gráfico SVG no container
+function renderEvoChartSVG(period){
+  const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
   const months=[];
-  for(let i=0;i<12;i++){
-    const m=yr+'-'+String(i+1).padStart(2,'0');
+  for(let i=0;i<period;i++){
+    const m=addMonths(currentMonth,i);
     let rec=0,desp=0;
     itemsForMonth('receitas',m).forEach(it=>{if(!it.pending)rec+=convertToBRL(it.value,it.currency||'BRL')});
     itemsForMonth('despesas',m).forEach(it=>{if(!it.pending)desp+=convertToBRL(it.value,it.currency||'BRL')});
     const saldoMes=rec-desp;
-    const saldoAcum=calcAccumulatedBalance(addMonths(m,1))+saldoMes;
-    months.push({m,rec,desp,saldoMes,saldoAcum,label:monthInitials[i],hasData:rec>0||desp>0});
+    months.push({m,rec,desp,saldoMes,saldoAcum:0,label:monthNames[parseInt(m.split('-')[1])-1]+'/'+m.split('-')[0].slice(2),hasData:rec>0||desp>0});
   }
-  // Calcula média de receitas e despesas dos meses com dados para projetar
+  // Saldo acumulado
+  let acum=calcAccumulatedBalance(currentMonth);
+  months.forEach(mo=>{acum+=mo.saldoMes;mo.saldoAcum=acum});
+  // Projeção com média
   const monthWithData=months.filter(x=>x.hasData);
   let avgRec=0,avgDesp=0;
   if(monthWithData.length>0){
     avgRec=monthWithData.reduce((s,x)=>s+x.rec,0)/monthWithData.length;
     avgDesp=monthWithData.reduce((s,x)=>s+x.desp,0)/monthWithData.length;
   }
-  // Projeção: para meses futuros sem dados, usa média
-  let projSaldo=months.filter(x=>x.hasData).length>0?months.filter(x=>x.hasData).reduce((s,x)=>s+x.saldoMes,0)+calcAccumulatedBalance(yr+'-01'):0;
-  months.forEach((mo,i)=>{
-    if(!mo.hasData&&avgRec>0){
-      mo.rec=avgRec;
-      mo.desp=avgDesp;
-      mo.saldoMes=avgRec-avgDesp;
-      projSaldo+=mo.saldoMes;
-      mo.saldoAcum=projSaldo;
-      mo.projected=true;
-    }
-  });
+  let projSaldo=months.filter(x=>x.hasData).length>0?calcAccumulatedBalance(currentMonth)+months.filter(x=>x.hasData).reduce((s,x)=>s+x.saldoMes,0):0;
+  months.forEach(mo=>{if(!mo.hasData&&avgRec>0){mo.rec=avgRec;mo.desp=avgDesp;mo.saldoMes=avgRec-avgDesp;projSaldo+=mo.saldoMes;mo.saldoAcum=projSaldo;mo.projected=true}});
 
-  const W=440,H=240,padL=40,padR=16,padT=20,padB=34,chartW=W-padL-padR,chartH=H-padT-padB;
+  const W=460,H=280,padL=50,padR=16,padT=20,padB=36,chartW=W-padL-padR,chartH=H-padT-padB;
   const allVals=months.flatMap(x=>[x.rec,x.desp,x.saldoAcum]);
   const minV=Math.min(0,...allVals);
   const maxV=Math.max(...allVals,1);
-  const range=maxV-minV||1;
-  const yScale=v=>padT+chartH-((v-minV)/range)*chartH;
-  const groupW=chartW/12;
-  const barW=groupW*0.22;
   const niceMax=v=>{const order=Math.pow(10,Math.floor(Math.log10(Math.abs(v)||1)));const n=v/order;let r;if(Math.abs(n)<=1)r=1;else if(Math.abs(n)<=2)r=2;else if(Math.abs(n)<=5)r=5;else r=10;return(v<0?-1:1)*r*order};
-  const yMax=niceMax(maxV);
-  const yMin=niceMax(minV);
-  const yRange=(yMax-yMin)||1;
-  const yScale2=v=>padT+chartH-((v-yMin)/yRange)*chartH;
+  const yMax=niceMax(maxV),yMin=niceMax(minV),yRange=(yMax-yMin)||1;
+  const yScale=v=>padT+chartH-((v-yMin)/yRange)*chartH;
+  const groupW=chartW/months.length;
+  const barW=groupW*0.2;
 
-  // Grid + labels eixo Y
-  const yTicks=4;
-  const gridLines=[],yLabels=[];
+  // Grid
+  const yTicks=5;
+  let grid='',yLabels='';
   for(let i=0;i<=yTicks;i++){
     const v=yMin+(yMax-yMin)*i/yTicks;
-    const y=yScale2(v);
-    gridLines.push(`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--c-border)" stroke-width="0.5"/>`);
+    const y=yScale(v);
+    grid+=`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--c-border)" stroke-width="0.5"/>`;
     const lbl=Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':Math.round(v);
-    yLabels.push(`<text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="var(--c-text-3)" font-family="var(--font)">${lbl}</text>`);
+    yLabels+=`<text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="var(--c-text-3)" font-family="var(--font)">${lbl}</text>`;
   }
-  // Linha do zero
-  const zeroY=yScale2(0);
-  const zeroLine=`<line x1="${padL}" y1="${zeroY}" x2="${W-padR}" y2="${zeroY}" stroke="var(--c-text-3)" stroke-width="1" stroke-dasharray="3,3"/>`;
-
-  // Barras de receitas e despesas
-  const bars=[];
+  const zeroY=yScale(0);
+  // Barras
+  let bars='';
   months.forEach((mo,i)=>{
-    const x=padL+i*groupW+groupW*0.14;
-    const recH=((mo.rec-yMin)/yRange)*chartH;
-    const despH=((mo.desp-yMin)/yRange)*chartH;
-    const recY=yScale2(mo.rec);
-    const despY=yScale2(mo.desp);
-    const opacity=mo.projected?0.35:1;
-    bars.push(`<rect x="${x}" y="${recY}" width="${barW}" height="${Math.max(0,padT+chartH-recY-zeroY)}" fill="var(--c-receitas)" opacity="${opacity}" rx="2"/>`);
-    bars.push(`<rect x="${x+barW+2}" y="${despY}" width="${barW}" height="${Math.max(0,padT+chartH-despY-zeroY)}" fill="var(--c-despesas)" opacity="${opacity}" rx="2"/>`);
+    const x=padL+i*groupW+groupW*0.12;
+    const recY=yScale(mo.rec);
+    const despY=yScale(mo.desp);
+    const op=mo.projected?0.35:1;
+    bars+=`<rect x="${x}" y="${recY}" width="${barW}" height="${Math.max(0,zeroY-recY)}" fill="var(--c-receitas)" opacity="${op}" rx="2"/>`;
+    bars+=`<rect x="${x+barW+2}" y="${despY}" width="${barW}" height="${Math.max(0,zeroY-despY)}" fill="var(--c-despesas)" opacity="${op}" rx="2"/>`;
+    // Valor exato em cima da barra
+    if(mo.rec>0)bars+=`<text x="${x+barW/2}" y="${recY-4}" text-anchor="middle" font-size="7" fill="var(--c-receitas)" font-family="var(--font)" font-weight="600">${mo.rec>=1000?(mo.rec/1000).toFixed(1)+'k':Math.round(mo.rec)}</text>`;
+    if(mo.desp>0)bars+=`<text x="${x+barW+2+barW/2}" y="${despY-4}" text-anchor="middle" font-size="7" fill="var(--c-despesas)" font-family="var(--font)" font-weight="600">${mo.desp>=1000?(mo.desp/1000).toFixed(1)+'k':Math.round(mo.desp)}</text>`;
   });
-
-  // Linha de saldo acumulado
-  const pts=months.map((mo,i)=>{
-    const x=padL+i*groupW+groupW*0.5;
-    const y=yScale2(mo.saldoAcum);
-    return `${x},${y}`;
-  }).join(' ');
-  const areaPts=months.map((mo,i)=>{
-    const x=padL+i*groupW+groupW*0.5;
-    const y=yScale2(mo.saldoAcum);
-    return `${x},${y}`;
-  }).join(' ');
-  const areaPath=`M ${padL},${zeroY} L ${pts.split(' ').join(' L ')} L ${padL+11*groupW+groupW*0.5},${zeroY} Z`;
+  // Linha de saldo
+  const pts=months.map((mo,i)=>`${padL+i*groupW+groupW*0.5},${yScale(mo.saldoAcum)}`).join(' ');
   const lineColor='var(--c-accent)';
-
-  // Labels dos meses
-  const xLabels=months.map((mo,i)=>{
+  // Pontos + valores do saldo
+  let dots='';
+  months.forEach((mo,i)=>{
     const x=padL+i*groupW+groupW*0.5;
-    return `<text x="${x}" y="${H-8}" text-anchor="middle" font-size="9" fill="var(--c-text-2)" font-family="var(--font)">${mo.label}</text>`;
-  }).join('');
-
-  // Encontra quando o saldo fica positivo (cruzamento do zero)
-  let crossoverText='';
-  for(let i=0;i<months.length;i++){
-    if(months[i].saldoAcum>=0&&i>0&&months[i-1].saldoAcum<0){
-      crossoverText=`<div style="font-size:11px;color:var(--c-receitas);font-weight:700;margin-top:6px;text-align:center">Saldo fica positivo em ${months[i].label}/${yr}</div>`;
-      break;
+    const y=yScale(mo.saldoAcum);
+    dots+=`<circle cx="${x}" cy="${y}" r="3.5" fill="${lineColor}" stroke="var(--c-surface)" stroke-width="1.5"/>`;
+    // Valor do saldo embaixo do ponto (só a cada 3 meses para não poluir)
+    if(i%3===0||i===months.length-1)dots+=`<text x="${x}" y="${y+14}" text-anchor="middle" font-size="7" fill="${lineColor}" font-family="var(--font)" font-weight="700">${mo.saldoAcum>=1000?(mo.saldoAcum/1000).toFixed(1)+'k':Math.round(mo.saldoAcum)}</text>`;
+  });
+  // Labels X
+  let xLabels='';
+  months.forEach((mo,i)=>{
+    if(i%Math.ceil(months.length/8)===0||i===months.length-1){
+      const x=padL+i*groupW+groupW*0.5;
+      xLabels+=`<text x="${x}" y="${H-10}" text-anchor="middle" font-size="8" fill="var(--c-text-2)" font-family="var(--font)">${mo.label}</text>`;
     }
+  });
+  // Crossover
+  let crossover='';
+  for(let i=0;i<months.length;i++){
+    if(months[i].saldoAcum>=0&&i>0&&months[i-1].saldoAcum<0){crossover=`<div style="font-size:11px;color:var(--c-receitas);font-weight:700;margin-top:6px;text-align:center">Saldo fica positivo em ${months[i].label}</div>`;break}
   }
-  // Se nunca cruza, mas o último mês é negativo
-  if(!crossoverText&&months[months.length-1].saldoAcum<0){
-    crossoverText=`<div style="font-size:11px;color:var(--c-despesas);font-weight:700;margin-top:6px;text-align:center">Ainda no vermelho em ${months[11].label}/${yr} — continue reduzindo despesas</div>`;
-  }else if(!crossoverText&&months[months.length-1].saldoAcum>=0){
-    crossoverText=`<div style="font-size:11px;color:var(--c-receitas);font-weight:700;margin-top:6px;text-align:center">Saldo positivo o ano todo</div>`;
-  }
+  if(!crossover&&months[months.length-1].saldoAcum<0){crossover=`<div style="font-size:11px;color:var(--c-despesas);font-weight:700;margin-top:6px;text-align:center">Ainda no vermelho em ${months[months.length-1].label} — continue reduzindo despesas</div>`}
+  else if(!crossover&&months[months.length-1].saldoAcum>=0){crossover=`<div style="font-size:11px;color:var(--c-receitas);font-weight:700;margin-top:6px;text-align:center">Saldo positivo neste período</div>`}
 
-  // Legenda
-  const legend=`<div style="display:flex;gap:14px;justify-content:center;margin-top:6px;font-size:10px;color:var(--c-text-2);font-weight:600">
-    <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--c-receitas)"></span>Receitas</span>
-    <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--c-despesas)"></span>Despesas</span>
-    <span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:3px;border-radius:2px;background:${lineColor}"></span>Saldo acumulado</span>
-    <span style="display:flex;align-items:center;gap:4px;color:var(--c-text-3)"><span style="width:10px;height:10px;border-radius:2px;background:var(--c-receitas);opacity:0.35"></span>Projetado</span>
+  const legend=`<div style="display:flex;gap:12px;justify-content:center;margin-top:4px;font-size:9px;color:var(--c-text-2);font-weight:600;flex-wrap:wrap">
+    <span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:var(--c-receitas)"></span>Receitas</span>
+    <span style="display:flex;align-items:center;gap:3px"><span style="width:8px;height:8px;border-radius:2px;background:var(--c-despesas)"></span>Despesas</span>
+    <span style="display:flex;align-items:center;gap:3px"><span style="width:12px;height:3px;border-radius:2px;background:${lineColor}"></span>Saldo acumulado</span>
+    <span style="display:flex;align-items:center;gap:3px;color:var(--c-text-3)"><span style="width:8px;height:8px;border-radius:2px;background:var(--c-receitas);opacity:0.35"></span>Projetado</span>
   </div>`;
 
-  return `<div class="card" style="margin-bottom:14px">
-    <div class="card-title"><span class="bullet" style="background:var(--c-accent)"></span>Evolução do saldo · ${yr}</div>
-    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:440px;height:auto;display:block;margin:0 auto">
-      ${gridLines.join('')}
-      ${zeroLine}
-      ${yLabels.join('')}
-      <polygon points="${areaPath}" fill="${lineColor}" opacity="0.08"/>
-      <polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
-      ${months.map((mo,i)=>{
-        const x=padL+i*groupW+groupW*0.5;
-        const y=yScale2(mo.saldoAcum);
-        return `<circle cx="${x}" cy="${y}" r="3" fill="${lineColor}" stroke="var(--c-surface)" stroke-width="1.5"/>`;
-      }).join('')}
-      ${bars.join('')}
-      ${xLabels}
-    </svg>
-    ${legend}
-    ${crossoverText}
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:460px;height:auto;display:block;margin:0 auto">${grid}<line x1="${padL}" y1="${zeroY}" x2="${W-padR}" y2="${zeroY}" stroke="var(--c-text-3)" stroke-width="1" stroke-dasharray="3,3"/>${yLabels}${bars}<polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}${xLabels}</svg>${legend}${crossover}`;
+}
+
+// === Modal de análise completa ===
+function openFullAnalysisModal(period){
+  const overlay=document.createElement('div');
+  overlay.className='modal-overlay open';
+  overlay.style.zIndex='1001';
+  const monthNames=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const months=[];
+  for(let i=0;i<period;i++){
+    const m=addMonths(currentMonth,i);
+    let rec=0,desp=0,res=0;
+    itemsForMonth('receitas',m).forEach(it=>{if(!it.pending)rec+=convertToBRL(it.value,it.currency||'BRL')});
+    itemsForMonth('despesas',m).forEach(it=>{if(!it.pending)desp+=convertToBRL(it.value,it.currency||'BRL')});
+    itemsForMonth('reservas',m).forEach(it=>{if(!it.pending)res+=convertToBRL(it.value,it.currency||'BRL')});
+    const saldoMes=rec-desp;
+    months.push({m,rec,desp,res,saldoMes,label:monthNames[parseInt(m.split('-')[1])-1]+' '+m.split('-')[0],hasData:rec>0||desp>0});
+  }
+  let acum=calcAccumulatedBalance(currentMonth);
+  months.forEach(mo=>{acum+=mo.saldoMes;mo.saldoAcum=acum});
+  // Projeção
+  const monthWithData=months.filter(x=>x.hasData);
+  let avgRec=0,avgDesp=0,avgRes=0;
+  if(monthWithData.length>0){avgRec=monthWithData.reduce((s,x)=>s+x.rec,0)/monthWithData.length;avgDesp=monthWithData.reduce((s,x)=>s+x.desp,0)/monthWithData.length;avgRes=monthWithData.reduce((s,x)=>s+x.res,0)/monthWithData.length}
+  let projSaldo=calcAccumulatedBalance(currentMonth)+months.filter(x=>x.hasData).reduce((s,x)=>s+x.saldoMes,0);
+  months.forEach(mo=>{if(!mo.hasData&&avgRec>0){mo.rec=avgRec;mo.desp=avgDesp;mo.res=avgRes;mo.saldoMes=avgRec-avgDesp;projSaldo+=mo.saldoMes;mo.saldoAcum=projSaldo;mo.projected=true}});
+  // Totais
+  const totalRec=months.reduce((s,m)=>s+m.rec,0);
+  const totalDesp=months.reduce((s,m)=>s+m.desp,0);
+  const totalRes=months.reduce((s,m)=>s+m.res,0);
+  const totalSaldo=totalRec-totalDesp;
+  const finalSaldo=months[months.length-1].saldoAcum;
+  // Crossover
+  let crossover='';
+  for(let i=0;i<months.length;i++){if(months[i].saldoAcum>=0&&i>0&&months[i-1].saldoAcum<0){crossover=`Saldo fica positivo em <b>${months[i].label}</b>`;break}}
+  if(!crossover&&finalSaldo<0)crossover=`Ainda no vermelho em <b>${months[months.length-1].label}</b>`;
+  else if(!crossover)crossover=`Saldo positivo desde o início`;
+  // Tabela
+  const tableRows=months.map(mo=>`
+    <tr style="border-bottom:1px solid var(--c-border-2)">
+      <td style="padding:8px 6px;font-size:11px;font-weight:600;color:var(--c-text)">${mo.label}${mo.projected?' <span style="font-size:8px;color:var(--c-text-3)">(proj.)</span>':''}</td>
+      <td style="padding:8px 6px;font-size:11px;text-align:right;color:var(--c-receitas);font-weight:600">${fmtBRL(mo.rec).replace('R$ ','')}</td>
+      <td style="padding:8px 6px;font-size:11px;text-align:right;color:var(--c-despesas);font-weight:600">${fmtBRL(mo.desp).replace('R$ ','')}</td>
+      <td style="padding:8px 6px;font-size:11px;text-align:right;color:var(--c-reservas);font-weight:600">${fmtBRL(mo.res).replace('R$ ','')}</td>
+      <td style="padding:8px 6px;font-size:11px;text-align:right;color:${mo.saldoMes>=0?'var(--c-receitas)':'var(--c-despesas)'};font-weight:700">${mo.saldoMes>=0?'+':'−'} ${fmtBRL(Math.abs(mo.saldoMes)).replace('R$ ','')}</td>
+      <td style="padding:8px 6px;font-size:11px;text-align:right;color:${mo.saldoAcum>=0?'var(--c-receitas)':'var(--c-despesas)'};font-weight:700">${mo.saldoAcum>=0?'+':'−'} ${fmtBRL(Math.abs(mo.saldoAcum)).replace('R$ ','')}</td>
+    </tr>`).join('');
+  // Gráfico SVG maior
+  const chartHTML=renderEvoChartSVG(period);
+  overlay.innerHTML=`<div class="modal-sheet" style="max-width:600px;max-height:90vh;overflow-y:auto">
+    <div class="modal-handle"></div>
+    <h2 class="modal-title">Análise completa · ${period} meses</h2>
+    <p class="modal-sub">De ${months[0].label} até ${months[months.length-1].label}</p>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      <div style="flex:1;min-width:120px;background:var(--c-surface-2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:9px;color:var(--c-text-3);font-weight:700;text-transform:uppercase">Total receitas</div>
+        <div style="font-size:15px;font-weight:800;color:var(--c-receitas);margin-top:2px">${fmtBRL(totalRec).replace('R$ ','')}</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--c-surface-2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:9px;color:var(--c-text-3);font-weight:700;text-transform:uppercase">Total despesas</div>
+        <div style="font-size:15px;font-weight:800;color:var(--c-despesas);margin-top:2px">${fmtBRL(totalDesp).replace('R$ ','')}</div>
+      </div>
+      <div style="flex:1;min-width:120px;background:var(--c-surface-2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:9px;color:var(--c-text-3);font-weight:700;text-transform:uppercase">Saldo final</div>
+        <div style="font-size:15px;font-weight:800;color:${finalSaldo>=0?'var(--c-receitas)':'var(--c-despesas)'};margin-top:2px">${finalSaldo>=0?'+':'−'} ${fmtBRL(Math.abs(finalSaldo)).replace('R$ ','')}</div>
+      </div>
+    </div>
+    <div style="background:var(--c-surface-2);border-radius:10px;padding:10px;margin-bottom:14px;font-size:12px;color:var(--c-text-2);text-align:center;font-weight:600">${crossover}</div>
+    <div style="margin-bottom:14px">${chartHTML}</div>
+    <div style="overflow-x:auto;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;min-width:480px">
+        <thead><tr style="border-bottom:2px solid var(--c-border)">
+          <th style="padding:8px 6px;font-size:10px;color:var(--c-text-3);text-align:left;text-transform:uppercase">Mês</th>
+          <th style="padding:8px 6px;font-size:10px;color:var(--c-text-3);text-align:right;text-transform:uppercase">Receitas</th>
+          <th style="padding:8px 6px;font-size:10px;color:var(--c-text-3);text-align:right;text-transform:uppercase">Despesas</th>
+          <th style="padding:8px 6px;font-size:10px;color:var(--c-text-3);text-align:right;text-transform:uppercase">Reservas</th>
+          <th style="padding:8px 6px;font-size:10px;color:var(--c-text-3);text-align:right;text-transform:uppercase">Saldo mês</th>
+          <th style="padding:8px 6px;font-size:10px;color:var(--c-text-3);text-align:right;text-transform:uppercase">Saldo acum.</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    </div>
+    <div class="modal-actions"><button class="btn btn-primary" id="fullAnalysisClose">Fechar</button></div>
   </div>`;
+  document.body.appendChild(overlay);
+  const close=()=>overlay.remove();
+  overlay.querySelector('#fullAnalysisClose').addEventListener('click',close);
+  overlay.addEventListener('click',e=>{if(e.target===overlay)close()});
 }
 
 function renderDonutCard(tipo,groupArr,total,title){
@@ -4311,9 +4394,9 @@ function renderMonthBar(){
     months.push({key:mKey,label:monthInitials[m-1],year:y,active:mKey===currentMonth});
   }
   let html=`<div class="mb-year">
-    <button id="mbPrevMonth" aria-label="Mês anterior" title="Mês anterior">‹</button>
+    <button id="mbPrevMonth" aria-label="Ano anterior" title="Ano anterior">‹</button>
     <span id="mbYearDisplay" title="Ir para mês/ano específico">${curYr}</span>
-    <button id="mbNextMonth" aria-label="Próximo mês" title="Próximo mês">›</button>
+    <button id="mbNextMonth" aria-label="Próximo ano" title="Próximo ano">›</button>
   </div>
   <div class="mb-divider"></div>
   <div class="mb-months" id="mbMonthsScroll">`;
@@ -4384,20 +4467,18 @@ function renderMonthBar(){
       if(isDragging)scrollContainer.dataset.dragged='1';
     });
   }
-  // Setas ‹ › mudam de MÊS — a roleta se move
+  // Setas ‹ › mudam de ANO (mantém o mês atual)
   const prevBtn=monthBar.querySelector('#mbPrevMonth');
   const nextBtn=monthBar.querySelector('#mbNextMonth');
   const yearDisp=monthBar.querySelector('#mbYearDisplay');
   if(prevBtn)prevBtn.addEventListener('click',()=>{
     const[y,m]=currentMonth.split('-').map(Number);
-    const d=new Date(y,m-2,1);
-    currentMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    currentMonth=(y-1)+'-'+String(m).padStart(2,'0');
     renderAll();
   });
   if(nextBtn)nextBtn.addEventListener('click',()=>{
     const[y,m]=currentMonth.split('-').map(Number);
-    const d=new Date(y,m,1);
-    currentMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    currentMonth=(y+1)+'-'+String(m).padStart(2,'0');
     renderAll();
   });
   if(yearDisp)yearDisp.addEventListener('click',()=>openCalendarPicker());
