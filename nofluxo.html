@@ -208,10 +208,15 @@ html[data-theme="dark"] body[data-active-screen="reservas"] .content{background:
 @media(min-width:1024px){
   body{max-width:100%;box-shadow:none}
   .app-bar{max-width:100%}
-  .month-bar{max-width:100%}
+  .month-bar{max-width:100%;padding:14px 20px}
+  .month-bar .mb-year{font-size:22px;gap:10px}
+  .month-bar .mb-year span{font-size:28px;min-width:72px;font-weight:800}
+  .month-bar .mb-year button{font-size:32px;padding:6px 14px;border-radius:8px}
+  .month-bar .mb-months{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:8px}
+  .month-bar .mb-months::-webkit-scrollbar{display:none}
+  .month-bar .mb-month{font-size:16px;padding:12px 18px;flex-shrink:0;border-radius:12px;border-width:2px}
   .content{display:flex;gap:14px;max-width:100%;padding:14px 16px 40px;align-items:flex-start}
   .screen{display:block!important;flex:1 1 0;min-width:340px;max-width:520px;animation:none;border-radius:var(--radius-lg);padding:14px;overflow:hidden}
-  /* Fundo colorido de cada tela */
   .screen[data-screen="inicio"]{background:var(--c-bg-inicio)}
   .screen[data-screen="despesas"]{background:rgba(146,18,39,0.1)}
   .screen[data-screen="receitas"]{background:rgba(46,160,67,0.12)}
@@ -220,26 +225,17 @@ html[data-theme="dark"] body[data-active-screen="reservas"] .content{background:
   html[data-theme="dark"] .screen[data-screen="despesas"]{background:rgba(255,92,122,0.15)}
   html[data-theme="dark"] .screen[data-screen="receitas"]{background:rgba(91,229,132,0.15)}
   html[data-theme="dark"] .screen[data-screen="reservas"]{background:rgba(255,217,61,0.15)}
-  /* Cabeçalho colorido de cada tela */
   .screen::before{content:attr(data-screen);display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--c-border-2)}
   .screen[data-screen="inicio"]::before{content:'Início';color:var(--c-primary)}
   .screen[data-screen="despesas"]::before{content:'Despesas';color:var(--c-despesas)}
   .screen[data-screen="receitas"]::before{content:'Receitas';color:var(--c-receitas)}
   .screen[data-screen="reservas"]::before{content:'Reservas';color:var(--c-reservas)}
-  /* Esconde navegação mobile */
   .bottom-nav{display:none!important}
   .fab-stack{display:none!important}
-  /* Mostra botões + e IA no cabeçalho (só desktop) */
-  .desk-only{display:flex!important}
-  /* Meses repetem até o final horizontal */
-  .month-bar .mb-months{flex-wrap:nowrap}
-  /* Modals centralizados na largura total */
   .modal-overlay,.auth-screen,.month-picker{max-width:100%}
   .modal-sheet{left:50%;right:auto;width:100%;max-width:460px;transform:translate(-50%,100%)}
   .modal-overlay.open .modal-sheet{transform:translate(-50%,0)}
 }
-/* Botões + e IA: ocultos no mobile, visíveis no desktop */
-.desk-only{display:none}
 
 /* CARDS */
 .card{background:var(--c-surface);border-radius:var(--radius-lg);padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px var(--c-shadow),0 4px 16px var(--c-shadow-2);border:1px solid var(--c-border-2);transition:background-color .25s,border-color .25s}
@@ -1408,12 +1404,6 @@ html[data-theme="dark"] .hero-mini-despesas{
     </div>
   </div>
   <div class="app-bar-right">
-    <button class="icon-btn desk-only" id="deskAddBtn" aria-label="Adicionar item" title="Adicionar item">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    </button>
-    <button class="icon-btn desk-only" id="deskAgentBtn" aria-label="Agente IA" title="Agente NoFluxo">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-    </button>
     <button class="icon-btn" id="togglePrivacyBtn" aria-label="Ocultar/exibir valores" title="Ocultar/exibir valores">
       <svg id="privacyIconEye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
       <svg id="privacyIconEyeOff" style="display:none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
@@ -2962,6 +2952,9 @@ function renderInicio(){
   // === Gráfico de entradas x saídas ANUAL ===
   html += renderAnnualChart(yr);
 
+  // === Gráfico de evolução do saldo (projeção) ===
+  html += renderBalanceEvolutionChart(yr);
+
   if(despGroupArr.length>0){const t=despGroupArr.reduce((s,[,v])=>s+v,0);html+=renderDonutCard('despesas',despGroupArr,t,'Distribuição de gastos')}
   if(recGroupArr.length>0){const t=recGroupArr.reduce((s,[,v])=>s+v,0);html+=renderDonutCard('receitas',recGroupArr,t,'Origem das receitas')}
 
@@ -3107,14 +3100,12 @@ function renderInicio(){
     heroTogglePend.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();togglePend()}});
   }
   // Navegação ao clicar em Entradas/Saídas/Reservas no início
-  // No desktop (telas lado a lado), rola até a tela em vez de trocar
   screen.querySelectorAll('[data-nav-to]').forEach(el=>{
     const nav=()=>{
       const target=el.getAttribute('data-nav-to');
       if(window.matchMedia('(min-width:1024px)').matches){
-        // Desktop: rola até a tela
-        const targetEl=document.querySelector('.screen[data-screen="'+target+'"]');
-        if(targetEl)targetEl.scrollIntoView({behavior:'smooth',block:'start',inline:'center'});
+        const t=document.querySelector('.screen[data-screen="'+target+'"]');
+        if(t)t.scrollIntoView({behavior:'smooth',block:'start',inline:'center'});
       }else{
         switchScreen(target);
       }
@@ -3431,6 +3422,145 @@ function renderEvolutionChart(){
       <div class="evo-legend-item"><span class="evo-legend-dot" style="background:var(--c-receitas)"></span>Receitas</div>
       <div class="evo-legend-item"><span class="evo-legend-dot" style="background:var(--c-despesas)"></span>Despesas</div>
     </div>
+  </div>`;
+}
+
+// === Gráfico de evolução do saldo (receitas, despesas, saldo acumulado) ===
+// Mostra 12 meses do ano atual + projeção dos meses futuros sem dados
+function renderBalanceEvolutionChart(yr){
+  const monthInitials=['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+  const months=[];
+  for(let i=0;i<12;i++){
+    const m=yr+'-'+String(i+1).padStart(2,'0');
+    let rec=0,desp=0;
+    itemsForMonth('receitas',m).forEach(it=>{if(!it.pending)rec+=convertToBRL(it.value,it.currency||'BRL')});
+    itemsForMonth('despesas',m).forEach(it=>{if(!it.pending)desp+=convertToBRL(it.value,it.currency||'BRL')});
+    const saldoMes=rec-desp;
+    const saldoAcum=calcAccumulatedBalance(addMonths(m,1))+saldoMes;
+    months.push({m,rec,desp,saldoMes,saldoAcum,label:monthInitials[i],hasData:rec>0||desp>0});
+  }
+  // Calcula média de receitas e despesas dos meses com dados para projetar
+  const monthWithData=months.filter(x=>x.hasData);
+  let avgRec=0,avgDesp=0;
+  if(monthWithData.length>0){
+    avgRec=monthWithData.reduce((s,x)=>s+x.rec,0)/monthWithData.length;
+    avgDesp=monthWithData.reduce((s,x)=>s+x.desp,0)/monthWithData.length;
+  }
+  // Projeção: para meses futuros sem dados, usa média
+  let projSaldo=months.filter(x=>x.hasData).length>0?months.filter(x=>x.hasData).reduce((s,x)=>s+x.saldoMes,0)+calcAccumulatedBalance(yr+'-01'):0;
+  months.forEach((mo,i)=>{
+    if(!mo.hasData&&avgRec>0){
+      mo.rec=avgRec;
+      mo.desp=avgDesp;
+      mo.saldoMes=avgRec-avgDesp;
+      projSaldo+=mo.saldoMes;
+      mo.saldoAcum=projSaldo;
+      mo.projected=true;
+    }
+  });
+
+  const W=440,H=240,padL=40,padR=16,padT=20,padB=34,chartW=W-padL-padR,chartH=H-padT-padB;
+  const allVals=months.flatMap(x=>[x.rec,x.desp,x.saldoAcum]);
+  const minV=Math.min(0,...allVals);
+  const maxV=Math.max(...allVals,1);
+  const range=maxV-minV||1;
+  const yScale=v=>padT+chartH-((v-minV)/range)*chartH;
+  const groupW=chartW/12;
+  const barW=groupW*0.22;
+  const niceMax=v=>{const order=Math.pow(10,Math.floor(Math.log10(Math.abs(v)||1)));const n=v/order;let r;if(Math.abs(n)<=1)r=1;else if(Math.abs(n)<=2)r=2;else if(Math.abs(n)<=5)r=5;else r=10;return(v<0?-1:1)*r*order};
+  const yMax=niceMax(maxV);
+  const yMin=niceMax(minV);
+  const yRange=(yMax-yMin)||1;
+  const yScale2=v=>padT+chartH-((v-yMin)/yRange)*chartH;
+
+  // Grid + labels eixo Y
+  const yTicks=4;
+  const gridLines=[],yLabels=[];
+  for(let i=0;i<=yTicks;i++){
+    const v=yMin+(yMax-yMin)*i/yTicks;
+    const y=yScale2(v);
+    gridLines.push(`<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--c-border)" stroke-width="0.5"/>`);
+    const lbl=Math.abs(v)>=1000?(v/1000).toFixed(1)+'k':Math.round(v);
+    yLabels.push(`<text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9" fill="var(--c-text-3)" font-family="var(--font)">${lbl}</text>`);
+  }
+  // Linha do zero
+  const zeroY=yScale2(0);
+  const zeroLine=`<line x1="${padL}" y1="${zeroY}" x2="${W-padR}" y2="${zeroY}" stroke="var(--c-text-3)" stroke-width="1" stroke-dasharray="3,3"/>`;
+
+  // Barras de receitas e despesas
+  const bars=[];
+  months.forEach((mo,i)=>{
+    const x=padL+i*groupW+groupW*0.14;
+    const recH=((mo.rec-yMin)/yRange)*chartH;
+    const despH=((mo.desp-yMin)/yRange)*chartH;
+    const recY=yScale2(mo.rec);
+    const despY=yScale2(mo.desp);
+    const opacity=mo.projected?0.35:1;
+    bars.push(`<rect x="${x}" y="${recY}" width="${barW}" height="${Math.max(0,padT+chartH-recY-zeroY)}" fill="var(--c-receitas)" opacity="${opacity}" rx="2"/>`);
+    bars.push(`<rect x="${x+barW+2}" y="${despY}" width="${barW}" height="${Math.max(0,padT+chartH-despY-zeroY)}" fill="var(--c-despesas)" opacity="${opacity}" rx="2"/>`);
+  });
+
+  // Linha de saldo acumulado
+  const pts=months.map((mo,i)=>{
+    const x=padL+i*groupW+groupW*0.5;
+    const y=yScale2(mo.saldoAcum);
+    return `${x},${y}`;
+  }).join(' ');
+  const areaPts=months.map((mo,i)=>{
+    const x=padL+i*groupW+groupW*0.5;
+    const y=yScale2(mo.saldoAcum);
+    return `${x},${y}`;
+  }).join(' ');
+  const areaPath=`M ${padL},${zeroY} L ${pts.split(' ').join(' L ')} L ${padL+11*groupW+groupW*0.5},${zeroY} Z`;
+  const lineColor='var(--c-accent)';
+
+  // Labels dos meses
+  const xLabels=months.map((mo,i)=>{
+    const x=padL+i*groupW+groupW*0.5;
+    return `<text x="${x}" y="${H-8}" text-anchor="middle" font-size="9" fill="var(--c-text-2)" font-family="var(--font)">${mo.label}</text>`;
+  }).join('');
+
+  // Encontra quando o saldo fica positivo (cruzamento do zero)
+  let crossoverText='';
+  for(let i=0;i<months.length;i++){
+    if(months[i].saldoAcum>=0&&i>0&&months[i-1].saldoAcum<0){
+      crossoverText=`<div style="font-size:11px;color:var(--c-receitas);font-weight:700;margin-top:6px;text-align:center">Saldo fica positivo em ${months[i].label}/${yr}</div>`;
+      break;
+    }
+  }
+  // Se nunca cruza, mas o último mês é negativo
+  if(!crossoverText&&months[months.length-1].saldoAcum<0){
+    crossoverText=`<div style="font-size:11px;color:var(--c-despesas);font-weight:700;margin-top:6px;text-align:center">Ainda no vermelho em ${months[11].label}/${yr} — continue reduzindo despesas</div>`;
+  }else if(!crossoverText&&months[months.length-1].saldoAcum>=0){
+    crossoverText=`<div style="font-size:11px;color:var(--c-receitas);font-weight:700;margin-top:6px;text-align:center">Saldo positivo o ano todo</div>`;
+  }
+
+  // Legenda
+  const legend=`<div style="display:flex;gap:14px;justify-content:center;margin-top:6px;font-size:10px;color:var(--c-text-2);font-weight:600">
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--c-receitas)"></span>Receitas</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:10px;height:10px;border-radius:2px;background:var(--c-despesas)"></span>Despesas</span>
+    <span style="display:flex;align-items:center;gap:4px"><span style="width:14px;height:3px;border-radius:2px;background:${lineColor}"></span>Saldo acumulado</span>
+    <span style="display:flex;align-items:center;gap:4px;color:var(--c-text-3)"><span style="width:10px;height:10px;border-radius:2px;background:var(--c-receitas);opacity:0.35"></span>Projetado</span>
+  </div>`;
+
+  return `<div class="card" style="margin-bottom:14px">
+    <div class="card-title"><span class="bullet" style="background:var(--c-accent)"></span>Evolução do saldo · ${yr}</div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:440px;height:auto;display:block;margin:0 auto">
+      ${gridLines.join('')}
+      ${zeroLine}
+      ${yLabels.join('')}
+      <polygon points="${areaPath}" fill="${lineColor}" opacity="0.08"/>
+      <polyline points="${pts}" fill="none" stroke="${lineColor}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+      ${months.map((mo,i)=>{
+        const x=padL+i*groupW+groupW*0.5;
+        const y=yScale2(mo.saldoAcum);
+        return `<circle cx="${x}" cy="${y}" r="3" fill="${lineColor}" stroke="var(--c-surface)" stroke-width="1.5"/>`;
+      }).join('')}
+      ${bars.join('')}
+      ${xLabels}
+    </svg>
+    ${legend}
+    ${crossoverText}
   </div>`;
 }
 
@@ -7014,11 +7144,6 @@ function openAgent(){
 function closeAgent(){agentOverlay.classList.remove('open')}
 
 if(fabAgent)fabAgent.addEventListener('click',openAgent);
-// Botões + e IA no cabeçalho do desktop
-const deskAddBtn=document.getElementById('deskAddBtn');
-const deskAgentBtn=document.getElementById('deskAgentBtn');
-if(deskAddBtn)deskAddBtn.addEventListener('click',()=>openAddModal());
-if(deskAgentBtn)deskAgentBtn.addEventListener('click',()=>openAgent());
 if(agentClose)agentClose.addEventListener('click',closeAgent);
 if(agentOverlay)agentOverlay.addEventListener('click',e=>{if(e.target===agentOverlay)closeAgent()});
 
