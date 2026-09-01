@@ -208,15 +208,21 @@ html[data-theme="dark"] body[data-active-screen="reservas"] .content{background:
 @media(min-width:1024px){
   body{max-width:100%;box-shadow:none}
   .app-bar{max-width:100%}
-  .month-bar{max-width:100%;padding:16px 24px}
-  .month-bar .mb-year{font-size:26px;gap:12px}
-  .month-bar .mb-year span{font-size:32px;min-width:84px;font-weight:800}
-  .month-bar .mb-year button{font-size:38px;padding:8px 18px}
-  .month-bar .mb-months{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:10px}
+  /* Fonte dos meses/ano escalada com clamp — cresce com a resolução */
+  .month-bar{max-width:100%;padding:clamp(12px,1.2vw,20px) clamp(14px,1.5vw,28px)}
+  .month-bar .mb-year{font-size:clamp(18px,1.8vw,28px);gap:clamp(6px,0.8vw,14px)}
+  .month-bar .mb-year span{font-size:clamp(20px,2.2vw,36px);min-width:clamp(48px,5vw,96px);font-weight:800}
+  .month-bar .mb-year button{font-size:clamp(24px,2.5vw,42px);padding:clamp(4px,0.5vw,10px) clamp(8px,1vw,20px)}
+  .month-bar .mb-months{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:clamp(6px,0.6vw,12px)}
   .month-bar .mb-months::-webkit-scrollbar{display:none}
-  .month-bar .mb-month{font-size:18px;padding:14px 20px;flex-shrink:0;border-radius:14px;border-width:2px}
-  .content{display:flex;gap:14px;max-width:100%;padding:14px 16px 40px;align-items:flex-start}
-  .screen{display:block!important;flex:1 1 0;min-width:340px;max-width:520px;animation:none;border-radius:var(--radius-lg);padding:14px;overflow:hidden}
+  .month-bar .mb-month{font-size:clamp(13px,1.3vw,20px);padding:clamp(8px,0.9vw,16px) clamp(10px,1.2vw,24px);flex-shrink:0;border-radius:clamp(8px,0.8vw,16px);border-width:2px}
+  /* Content com scrollbar horizontal — telas não cabem todas em telas menores */
+  .content{display:flex;gap:14px;max-width:100%;padding:14px 16px 40px;align-items:flex-start;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth}
+  .content::-webkit-scrollbar{height:8px}
+  .content::-webkit-scrollbar-track{background:var(--c-surface-2);border-radius:99px}
+  .content::-webkit-scrollbar-thumb{background:var(--c-primary);border-radius:99px}
+  .content::-webkit-scrollbar-thumb:hover{background:var(--c-accent)}
+  .screen{display:block!important;flex:0 0 auto;min-width:360px;max-width:520px;width:420px;animation:none;border-radius:var(--radius-lg);padding:14px;overflow:hidden}
   .screen[data-screen="inicio"]{background:var(--c-bg-inicio)}
   .screen[data-screen="despesas"]{background:rgba(146,18,39,0.1)}
   .screen[data-screen="receitas"]{background:rgba(46,160,67,0.12)}
@@ -3504,7 +3510,7 @@ function renderEvoContent(){
   const yMax=niceMax(maxV),yMin=niceMax(minV),yRange=(yMax-yMin)||1;
   const yScale=v=>padT+chartH-((v-yMin)/yRange)*chartH;
   const groupW=chartW/months.length;
-  const barGap=10; // espaço entre barra de receita e despesa
+  const barGap=12; // espaço entre barra de receita e despesa
   const barW=groupW*0.2;
   const yTicks=5;
   let grid='',yLabels='';
