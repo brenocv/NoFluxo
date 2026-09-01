@@ -209,24 +209,23 @@ html[data-theme="dark"] body[data-active-screen="reservas"] .content{background:
   html{height:100%}
   /* body vira uma coluna flex com altura fixa na janela: app-bar e month-bar não encolhem,
      e o .content ocupa exatamente o espaço restante — assim a rolagem horizontal do .content
-     fica sempre presa ao limite inferior da janela, e não ao fim da coluna mais alta */
+     fica sempre presa ao limite inferior da janela, e não ao fim da coluna mais alta.
+     A rolagem VERTICAL é única para a janela toda (fica no próprio .content, que contém as
+     4 colunas) — não é uma barra por coluna/tela. */
   body{max-width:100%;box-shadow:none;height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
   .app-bar{max-width:100%;flex-shrink:0}
   .month-bar{max-width:100%;flex-shrink:0;padding:clamp(12px,1.2vw,20px) clamp(14px,1.5vw,28px)}
   .month-bar .mb-months{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:clamp(6px,0.6vw,12px)}
   .month-bar .mb-months::-webkit-scrollbar{display:none}
-  /* Content ocupa o espaço restante da janela (flex:1) — a barra de rolagem horizontal fica
-     fixada no limite da janela, e cada tela rola verticalmente por conta própria */
-  .content{display:flex;gap:14px;max-width:100%;padding:14px 16px 16px;align-items:stretch;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;flex:1;min-height:0}
-  .content::-webkit-scrollbar{height:8px}
+  /* Content ocupa o espaço restante da janela (flex:1) — as barras de rolagem horizontal
+     e vertical ficam fixadas nos limites da janela, com uma única rolagem vertical para
+     todas as 4 colunas juntas (não uma por tela) */
+  .content{display:flex;gap:14px;max-width:100%;padding:14px 16px 16px;align-items:flex-start;overflow:auto;scroll-behavior:smooth;flex:1;min-height:0}
+  .content::-webkit-scrollbar{height:8px;width:8px}
   .content::-webkit-scrollbar-track{background:var(--c-surface-2);border-radius:99px}
   .content::-webkit-scrollbar-thumb{background:var(--c-primary);border-radius:99px}
   .content::-webkit-scrollbar-thumb:hover{background:var(--c-accent)}
-  .screen{display:block!important;flex:0 0 auto;min-width:360px;max-width:520px;width:420px;animation:none;border-radius:var(--radius-lg);padding:14px;overflow-y:auto;overflow-x:hidden}
-  .screen::-webkit-scrollbar{width:6px}
-  .screen::-webkit-scrollbar-track{background:transparent}
-  .screen::-webkit-scrollbar-thumb{background:var(--c-border-2);border-radius:99px}
-  .screen::-webkit-scrollbar-thumb:hover{background:var(--c-primary)}
+  .screen{display:block!important;flex:0 0 auto;min-width:360px;max-width:520px;width:420px;animation:none;border-radius:var(--radius-lg);padding:14px;overflow:visible}
   .screen[data-screen="inicio"]{background:var(--c-bg-inicio)}
   .screen[data-screen="despesas"]{background:rgba(146,18,39,0.1)}
   .screen[data-screen="receitas"]{background:rgba(46,160,67,0.12)}
@@ -1314,13 +1313,14 @@ html[data-theme="dark"] .hero-mini-despesas{
 }
 
 /* Fonte dos meses/ano em janelas largas (desktop) — escala com clamp() conforme a largura
-   da janela. Fica depois das regras-base acima de propósito, para vencer a cascata (mesma
+   da janela, só que de forma bem mais sutil (o usuário achou grande demais na primeira
+   versão). Fica depois das regras-base acima de propósito, para vencer a cascata (mesma
    especificidade + ordem de declaração). Não afeta o modo mobile (abaixo de 1024px). */
 @media(min-width:1024px){
-  .month-bar .mb-year{font-size:clamp(18px,1.8vw,28px);gap:clamp(6px,0.8vw,14px)}
-  .month-bar .mb-year span{font-size:clamp(20px,2.2vw,36px);min-width:clamp(48px,5vw,96px);font-weight:800}
-  .month-bar .mb-year button{font-size:clamp(24px,2.5vw,42px);padding:clamp(4px,0.5vw,10px) clamp(8px,1vw,20px)}
-  .month-bar .mb-month{font-size:clamp(13px,1.3vw,20px);padding:clamp(8px,0.9vw,16px) clamp(10px,1.2vw,24px);flex-shrink:0;border-radius:clamp(8px,0.8vw,16px);border-width:2px}
+  .month-bar .mb-year{font-size:clamp(13px,0.9vw,18px);gap:clamp(3px,0.3vw,6px)}
+  .month-bar .mb-year span{font-size:clamp(14px,1.05vw,20px);min-width:clamp(30px,2.2vw,44px);font-weight:800}
+  .month-bar .mb-year button{font-size:clamp(15px,1.1vw,22px);padding:clamp(2px,0.25vw,5px) clamp(4px,0.5vw,8px)}
+  .month-bar .mb-month{font-size:clamp(10px,0.65vw,14px);padding:clamp(5px,0.45vw,9px) clamp(7px,0.65vw,13px);flex-shrink:0;border-radius:clamp(6px,0.5vw,10px);border-width:1.5px}
 }
 
 /* BLOCO DE NOTAS (simples) */
@@ -2077,7 +2077,13 @@ let deferredInstallPrompt=null;
 let showPendingToggle=null;
 let authState={step:'login',email:'',code:'',pendingEmail:''};
 
-function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function uid(){
+  // IDs (planilha, item, etc.) precisam ser difíceis de adivinhar — Date.now()+Math.random()
+  // sozinho é previsível o bastante pra valer a pena trocar. crypto.randomUUID() existe em
+  // todo navegador moderno (requer HTTPS, que é como o Railway serve o app).
+  if(typeof crypto!=='undefined'&&crypto.randomUUID)return crypto.randomUUID();
+  return Date.now().toString(36)+Math.random().toString(36).slice(2,7)+Math.random().toString(36).slice(2,7);
+}
 function monthKey(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')}
 function monthLabel(k){const[y,m]=k.split('-');return['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'][parseInt(m,10)-1]+' '+y}
 function monthLabelLong(k){const[y,m]=k.split('-');return['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][parseInt(m,10)-1]+' de '+y}

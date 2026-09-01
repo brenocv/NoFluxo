@@ -548,16 +548,64 @@ async function callLLM(userMessage, context, history) {
   return { error: 'Todos os provedores falharam. Detalhes:\n' + allErrors.join('\n') };
 }
 
+// === Rate limiting simples em memória (por IP) ===
+// Mitiga (1) abuso de custo no /api/agent — cada chamada aciona a Groq/Gemini, que são
+// pagas, e o endpoint não tem autenticação — e (2) tentativas de força-bruta de
+// email/ID nos outros endpoints /api/*. NÃO substitui autenticação de verdade — é só
+// uma camada a mais enquanto isso não existe (ver observações de segurança no final).
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const rateLimitBuckets = new Map(); // "categoria:ip" -> { count, windowStart }
+function getClientIp(req) {
+  const xf = req.headers['x-forwarded-for'];
+  if (xf) return xf.split(',')[0].trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+function isRateLimited(req, maxPerMinute, category) {
+  const key = category + ':' + getClientIp(req);
+  const now = Date.now();
+  let bucket = rateLimitBuckets.get(key);
+  if (!bucket || now - bucket.windowStart > RATE_LIMIT_WINDOW_MS) {
+    bucket = { count: 0, windowStart: now };
+    rateLimitBuckets.set(key, bucket);
+  }
+  bucket.count++;
+  return bucket.count > maxPerMinute;
+}
+// Limpa buckets antigos periodicamente pra não vazar memória
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, b] of rateLimitBuckets) {
+    if (now - b.windowStart > RATE_LIMIT_WINDOW_MS * 2) rateLimitBuckets.delete(key);
+  }
+}, 5 * 60 * 1000).unref();
+
 const server = http.createServer(async (req, res) => {
   console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
 
   let urlPath = req.url.split('?')[0];
 
-  // CORS (caso o app seja servido de outro domínio no futuro)
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  // CORS restrito à própria origem do app — antes era '*', o que permitia que QUALQUER
+  // site na internet lesse as respostas dessas APIs via fetch() rodando no navegador de
+  // quem visitasse ele (bastava saber o email de alguém). Agora só o próprio domínio do
+  // app (e localhost em desenvolvimento) recebem o header, então navegadores bloqueiam
+  // a leitura cross-origin para qualquer outro site.
+  const ALLOWED_ORIGINS = [APP_URL, `http://localhost:${PORT}`, 'http://localhost:3000'];
+  const reqOrigin = req.headers.origin;
+  if (reqOrigin && ALLOWED_ORIGINS.includes(reqOrigin)) {
+    res.setHeader('Access-Control-Allow-Origin', reqOrigin);
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
+
+  // Rate limit por IP nas rotas /api/* — limite mais apertado no agente de IA (custa
+  // dinheiro por chamada), mais folgado nas demais (só pra dificultar varredura em massa)
+  if (urlPath.startsWith('/api/')) {
+    const isAgent = urlPath === '/api/agent';
+    if (isRateLimited(req, isAgent ? 12 : 100, isAgent ? 'agent' : 'general')) {
+      return sendJSON(res, 429, { error: 'Muitas requisições deste IP. Aguarde um minuto e tente de novo.' });
+    }
+  }
 
   // === API do Agente IA ===
   if (urlPath === '/api/agent' && req.method === 'POST') {
@@ -1162,27 +1210,6 @@ const server = http.createServer(async (req, res) => {
       provedor_preferido: PREFERRED_PROVIDER,
       postgres: SYNC_ENABLED ? 'configurado' : 'não configurado (defina DATABASE_URL)',
       sync_ativo: SYNC_ENABLED
-    });
-  }
-
-  // === Debug — mostra configuração detalhada (sem expor chaves) ===
-  if (urlPath === '/api/debug' && req.method === 'GET') {
-    return sendJSON(res, 200, {
-      groq: {
-        configurado: !!GROQ_API_KEY,
-        tamanho_chave: GROQ_API_KEY.length,
-        comeca_com: GROQ_API_KEY ? GROQ_API_KEY.slice(0, 8) + '...' : '',
-        modelos: GROQ_MODELS
-      },
-      gemini: {
-        configurado: !!GEMINI_API_KEY,
-        tamanho_chave: GEMINI_API_KEY.length,
-        comeca_com: GEMINI_API_KEY ? GEMINI_API_KEY.slice(0, 10) + '...' : '',
-        modelos: GEMINI_MODELS
-      },
-      provedor_preferido: PREFERRED_PROVIDER,
-      node_version: process.version,
-      timestamp: new Date().toISOString()
     });
   }
 
