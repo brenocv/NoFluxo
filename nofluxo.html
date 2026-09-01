@@ -3572,7 +3572,7 @@ function renderEvoContent(){
   // Tabela
   const tableRows=months.map(mo=>`
     <tr style="border-bottom:1px solid var(--c-border-2)">
-      <td style="padding:9px 6px;font-size:12px;font-weight:600;color:var(--c-text)">${mo.fullLabel}${mo.projected?' <span style="font-size:9px;color:var(--c-text-3)">(proj.)</span>':''}</td>
+      <td style="padding:9px 6px;font-size:12px;font-weight:600;color:var(--c-text)">${mo.label}${mo.projected?' <span style="font-size:9px;color:var(--c-text-3)">(proj.)</span>':''}</td>
       <td style="padding:9px 6px;font-size:12px;text-align:right;color:var(--c-receitas);font-weight:600">${fmtBRL(mo.rec).replace('R$ ','')}</td>
       <td style="padding:9px 6px;font-size:12px;text-align:right;color:var(--c-despesas);font-weight:600">${fmtBRL(mo.desp).replace('R$ ','')}</td>
       <td style="padding:9px 6px;font-size:12px;text-align:right;color:var(--c-reservas);font-weight:600">${fmtBRL(mo.res).replace('R$ ','')}</td>
