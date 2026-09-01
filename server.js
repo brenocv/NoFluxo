@@ -227,15 +227,19 @@ const GEMINI_MODELS = [
 ];
 let GEMINI_MODEL_PREF = (process.env.GEMINI_MODEL || '').trim();
 
-// Chave do Groq (Llama 3.3 70B) — criar em https://console.groq.com/keys
+// Chave do Groq — criar em https://console.groq.com/keys
 const GROQ_API_KEY = (process.env.GROQ_API_KEY || '').trim();
-// Lista de modelos Groq (atualizada 2025). Tentados em ordem.
-// NOTA: deepseek-r1-distill-llama-70b é um "reasoning model" que mostra o raciocínio
-// antes de responder — não usamos por padrão, mas pode ser forçado via GROQ_MODEL no env.
+// Lista de modelos Groq (atualizada 09/2026). Tentados em ordem.
+// NOTA: llama-3.3-70b-versatile, llama-3.1-8b-instant e gemma2-9b-it foram descontinuados
+// pela Groq (ago/2026) — a recomendação oficial da Groq é migrar para a família gpt-oss.
+// qwen/qwen3.6-27b também está sendo descontinuado (decommission em 14/09/2026) em favor
+// de qwen/qwen3.8-27b, então já usamos direto a versão nova para não depender do redirect
+// automático da Groq. Se a Groq aposentar algum destes de novo, o fallback dinâmico logo
+// abaixo (fetchGroqModels) busca outros modelos disponíveis automaticamente.
 const GROQ_MODELS = [
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'gemma2-9b-it',
+  'openai/gpt-oss-120b',
+  'openai/gpt-oss-20b',
+  'qwen/qwen3.8-27b',
 ];
 
 const PREFERRED_PROVIDER = (process.env.LLM_PROVIDER || 'groq').toLowerCase().trim();
@@ -352,7 +356,7 @@ async function fetchGroqModels() {
     if (!resp.ok) return [];
     const data = await resp.json();
     const models = (data.data || []).map(m => m.id).filter(id =>
-      /llama|gemma|deepseek|qwen/i.test(id) && !/whisper|guard|mixtral/i.test(id)
+      /llama|gemma|deepseek|qwen|gpt-oss/i.test(id) && !/whisper|guard|mixtral/i.test(id)
     );
     console.log('Modelos Groq disponíveis dinamicamente:', models.join(', '));
     return models;
